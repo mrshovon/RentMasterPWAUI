@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: #030712; /* slate-950-ish */
+  color: #f8fafc;
+}
+
+body {
+  /* Clear the Android status/nav bars when installed (viewport-fit=cover +
+     black-translucent). Insets resolve to 0 in a normal browser, so this is a no-op there. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+
+  /* Subtle cinematic mesh backdrop for the whole app */
+  background-image:
+    radial-gradient(60% 50% at 15% -5%, rgba(99, 102, 241, 0.14), transparent 60%),
+    radial-gradient(50% 45% at 100% 0%, rgba(34, 211, 238, 0.08), transparent 55%),
+    radial-gradient(45% 40% at 85% 110%, rgba(16, 185, 129, 0.06), transparent 55%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Thin dark scrollbar to match the dashboards */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+  background-clip: padding-box;
+}
+
+/* Reusable surface treatments */
+@layer components {
+  .glass {
+    @apply bg-slate-900/50 backdrop-blur-xl border border-white/[0.06];
+  }
+  .card-surface {
+    @apply rounded-2xl bg-slate-900/60 border border-white/[0.06] shadow-card;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent;
+  }
+  .field-input {
+    @apply w-full rounded-xl bg-slate-950/70 border border-white/[0.08] px-3.5 py-3 text-sm text-slate-100
+      placeholder-slate-600 outline-none transition
+      focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/20;
+  }
+}
+
+/* Hide number input spinners for a cleaner look */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}

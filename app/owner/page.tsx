@@ -1,0 +1,1924 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  LayoutDashboard, Building2, Users, ReceiptText, Wrench, Megaphone,
+  Plus, MapPin, KeyRound, Phone, CircleDollarSign, Home, TriangleAlert,
+  CheckCircle2, Send, Circle, Inbox, Pencil, DoorOpen, FileText, Trash2, Upload, Download, X, History,
+  Receipt, PenLine, Gem, Crown, Sparkles, ArrowUpCircle, Infinity as InfinityIcon, CalendarClock, Copy, RotateCcw,
+} from "lucide-react";
+import { rentMasterFetch, uploadFile, DEMO_OWNER_ID } from "../../lib/api-service";
+import { toast } from "../../components/toast";
+import { confirmDialog } from "../../components/confirm";
+import { buildReceiptHtml } from "../../lib/receipt";
+import { ReceiptModal } from "../../components/receipt-modal";
+import { useSessionGuard } from "../../lib/use-session";
+import { useTabState } from "../../lib/use-tab";
+import {
+  Property, Tenant, BillingLedger, MaintenanceLog, Notice,
+  PaymentStatus, PriorityLevel, ResolutionStatus, Document, OccupancyHistory, RentRevision,
+  PlanState, PlanUsage, SubscriptionResponse, SubscriptionTier,
+} from "../../types/api";
+import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
+import { DashboardShell, NavItem } from "../../components/shell";
+import { AttachmentStrip } from "../../components/attachments";
+import {
+  Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
+  PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput,
+} from "../../components/ui";
+
+const priorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
+  low: "slate", medium: "amber", high: "rose", urgent: "rose",
+};
+const statusTone: Record<PaymentStatus, "emerald" | "amber" | "rose"> = {
+  paid: "emerald", sent: "amber", unpaid: "rose",
+};
+const maintStatusTone: Record<ResolutionStatus, "amber" | "cyan" | "emerald"> = {
+  reported: "amber", in_progress: "cyan", resolved: "emerald",
+};
+
+export default function OwnerDashboard() {
+  const { session, checkingSession, logout } = useSessionGuard("owner");
+  const [tab, setTab] = useTabState("overview");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [ledgers, setLedgers] = useState<BillingLedger[]>([]);
+  const [maintenance, setMaintenance] = useState<MaintenanceLog[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [plan, setPlan] = useState<SubscriptionResponse | null>(null);
+
+  // Modals
+  const [propOpen, setPropOpen] = useState(false);
+  const [tenantOpen, setTenantOpen] = useState(false);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const [editProp, setEditProp] = useState<Property | null>(null);
+  const [editTenant, setEditTenant] = useState<Tenant | null>(null);
+  const [chargeProp, setChargeProp] = useState<Property | null>(null);
+  const [editMaint, setEditMaint] = useState<MaintenanceLog | null>(null);
+  const [docsTenant, setDocsTenant] = useState<Tenant | null>(null);
+  const [historyProp, setHistoryProp] = useState<Property | null>(null);
+  const [ownerSignature, setOwnerSignature] = useState<string | null>(null);
+  const [sigOpen, setSigOpen] = useState(false);
+  const [receiptHtml, setReceiptHtml] = useState<string | null>(null);
+  const [revealPasscode, setRevealPasscode] = useState<{ name: string; code: string } | null>(null);
+
+  // Reset a tenant's login passcode (random; shown once). Passcodes are not derivable
+  // from the phone number, so a fresh one must be generated and shared explicitly.
+  async function resetTenantPasscode(t: Tenant) {
+    if (!(await confirmDialog({
+      title: "Reset passcode?",
+      message: `Generate a new login passcode for ${t.name}? Their current passcode will stop working.`,
+      confirmLabel: "Reset",
+    }))) return;
+    try {
+      const res = await rentMasterFetch<{ passcode?: string }>(`/api/admin/tenants/${t.id}`, {
+        method: "PATCH", role: "owner", body: JSON.stringify({ resetPasscode: true }),
+      });
+      if (res.passcode) setRevealPasscode({ name: t.name, code: res.passcode });
+      toast.success("Passcode reset.");
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const [p, t, b, m, n] = await Promise.allSettled([
+          rentMasterFetch("/api/admin/properties", { role: "owner" }),
+          rentMasterFetch("/api/admin/tenants", { role: "owner" }),
+          rentMasterFetch("/api/admin/billing", { role: "owner" }),
+          rentMasterFetch("/api/admin/maintenance", { role: "owner" }),
+          rentMasterFetch("/api/admin/notices", { role: "owner" }),
+        ]);
+        if (p.status === "fulfilled") setProperties(p.value.data || []);
+        if (t.status === "fulfilled") setTenants(t.value.data || []);
+        if (b.status === "fulfilled") setLedgers(b.value.data || []);
+        if (m.status === "fulfilled") setMaintenance(m.value.data || []);
+        if (n.status === "fulfilled") setNotices(n.value.data || []);
+        const firstErr = [p, t, b, m, n].find((r) => r.status === "rejected");
+        if (firstErr && firstErr.status === "rejected")
+          setError((firstErr.reason as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // Load the owner's plan state (limits, expiry, lock status).
+  async function loadPlan() {
+    try {
+      const res = await rentMasterFetch<SubscriptionResponse>("/api/admin/subscription", { role: "owner" });
+      setPlan(res);
+    } catch { /* non-fatal — plan tab shows a retry */ }
+  }
+  useEffect(() => { loadPlan(); }, []);
+
+  // Client-side pre-check before opening create modals. The server enforces these
+  // authoritatively too — this is a friendlier early exit that routes to the Plan tab.
+  function planBlockReason(kind: "property" | "tenant"): string | null {
+    if (!plan) return null; // not loaded yet — let the server decide
+    const s = plan.subscription;
+    if (s.status === "locked") {
+      return s.lockReason === "revoked"
+        ? "Your management permissions have been revoked by an administrator. Contact support to restore access."
+        : "Your subscription has lapsed. Renew your plan to continue managing your properties.";
+    }
+    const u = kind === "property" ? plan.usage.properties : plan.usage.tenants;
+    if (u.limit !== -1 && u.current >= u.limit) {
+      return `You've reached your ${s.tierName} limit of ${u.limit} ${kind === "property" ? "properties" : "tenants"}. Upgrade your plan to add more.`;
+    }
+    return null;
+  }
+  function guardedOpen(kind: "property" | "tenant", open: () => void) {
+    const reason = planBlockReason(kind);
+    if (reason) { toast.warning(reason); setTab("plan"); return; }
+    open();
+  }
+
+  // ---- Derived metrics ----
+  const metrics = useMemo(() => {
+    const occupied = properties.filter((p) => !p.is_vacant).length;
+    const monthlyRevenue = tenants.reduce((s, t) => s + Number(t.monthly_rent || 0), 0);
+    const outstanding = ledgers
+      .filter((l) => l.payment_status !== "paid")
+      .reduce((s, l) => s + Number(l.total_payable || 0), 0);
+    const unpaidCount = ledgers.filter((l) => l.payment_status !== "paid").length;
+    const openTickets = maintenance.filter((m) => m.resolution_status !== "resolved").length;
+    return { occupied, monthlyRevenue, outstanding, unpaidCount, openTickets };
+  }, [properties, tenants, ledgers, maintenance]);
+
+  const nav: NavItem[] = [
+    { key: "overview", label: "Overview", icon: LayoutDashboard },
+    { key: "properties", label: "Properties", icon: Building2, badge: properties.length },
+    { key: "tenants", label: "Tenants", icon: Users, badge: tenants.length },
+    { key: "billing", label: "Billing", icon: ReceiptText, badge: metrics.unpaidCount },
+    { key: "maintenance", label: "Requests", icon: Wrench, badge: metrics.openTickets },
+    { key: "notices", label: "Notices", icon: Megaphone },
+    { key: "plan", label: "Plan", icon: Gem },
+  ];
+
+  // ---- Status mutation (PATCH) ----
+  async function setPaymentStatus(id: string, paymentStatus: PaymentStatus) {
+    const prev = ledgers;
+    setLedgers((ls) => ls.map((l) => (l.id === id ? { ...l, payment_status: paymentStatus } : l)));
+    try {
+      await rentMasterFetch(`/api/admin/billing/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ paymentStatus }),
+        role: "owner",
+      });
+      toast.success(`Invoice marked ${paymentStatus}.`);
+    } catch (e: any) {
+      setLedgers(prev); // rollback
+      toast.error(`Status update failed: ${e.message}`);
+    }
+  }
+
+  // Load the owner's saved signature (from auth metadata) for receipts.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch("/api/admin/owner/signature", { role: "owner" });
+        setOwnerSignature(res.signatureUrl || null);
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
+  // Build an "Owner Copy" receipt for a paid invoice and open the preview.
+  function openOwnerReceipt(l: BillingLedger) {
+    const t = tenants.find((x) => x.id === l.tenant_id);
+    const prop = properties.find((p) => p.id === l.property_id);
+    setReceiptHtml(buildReceiptHtml({
+      copyLabel: "Owner Copy",
+      ownerName: session?.name || "Owner",
+      propertyAddress: prop?.address || null,
+      refNo: l.property_id,
+      billingMonth: l.billing_month,
+      tenantName: l.tenants?.name || t?.name || "Tenant",
+      houseRent: l.rent_amount,
+      serviceCharge: l.service_charge,
+      extraCharge: l.extra_charge,
+      discount: l.discount,
+      total: l.total_payable,
+      paymentStatus: l.payment_status,
+      paidAt: l.paid_at,
+      dueDay: t?.due_date,
+      note: l.extra_charge_remarks,
+      signatureUrl: ownerSignature,
+    }));
+  }
+
+  // ---- Vacate a property (archives occupancy on the backend) ----
+  async function vacateProperty(p: Property) {
+    if (!(await confirmDialog({
+      title: "Vacate property?",
+      message: `Mark "${p.name}" as vacant? The current occupancy will be archived.`,
+      confirmLabel: "Vacate",
+      danger: true,
+    }))) return;
+    const prev = properties;
+    setProperties((xs) => xs.map((x) => (x.id === p.id ? { ...x, is_vacant: true } : x)));
+    try {
+      await rentMasterFetch(`/api/admin/properties/${p.id}`, {
+        method: "PATCH", body: JSON.stringify({ vacate: true }), role: "owner",
+      });
+      toast.success(`"${p.name}" marked vacant; occupancy archived.`);
+    } catch (e: any) {
+      setProperties(prev); // rollback
+      toast.error(`Vacate failed: ${e.message}`);
+    }
+  }
+
+  if (checkingSession || loading)
+    return <FullScreenLoader label="Loading your portfolio…" sub="Syncing properties, tenants & ledgers" />;
+
+  return (
+    <DashboardShell
+      brand="owner"
+      roleLabel="HQ Admin Panel"
+      sessionName={session?.name}
+      sessionId={session?.userId}
+      nav={nav}
+      active={tab}
+      onNavigate={setTab}
+      onLogout={logout}
+    >
+      {error && <div className="mb-6"><Alert>{error}</Alert></div>}
+
+      {plan && <PlanBanner plan={plan} onRenew={() => setTab("plan")} />}
+
+      {tab === "overview" && (
+        <OverviewTab
+          properties={properties}
+          tenants={tenants}
+          metrics={metrics}
+          maintenance={maintenance}
+          onQuickInvoice={() => setInvoiceOpen(true)}
+          onQuickProperty={() => guardedOpen("property", () => setPropOpen(true))}
+        />
+      )}
+
+      {tab === "properties" && (
+        <PropertiesTab
+          properties={properties}
+          disabledIds={plan?.disabled.propertyIds || []}
+          onUpgrade={() => setTab("plan")}
+          onAdd={() => guardedOpen("property", () => setPropOpen(true))}
+          onEdit={setEditProp}
+          onVacate={vacateProperty}
+          onCharges={setChargeProp}
+          onHistory={setHistoryProp}
+        />
+      )}
+
+      {tab === "tenants" && (
+        <TenantsTab
+          tenants={tenants}
+          properties={properties}
+          disabledIds={plan?.disabled.tenantIds || []}
+          onUpgrade={() => setTab("plan")}
+          onAdd={() => guardedOpen("tenant", () => setTenantOpen(true))}
+          onEdit={setEditTenant}
+          onDocs={setDocsTenant}
+          onResetPasscode={resetTenantPasscode}
+        />
+      )}
+
+      {tab === "plan" && (
+        <PlanTab plan={plan} onReload={loadPlan} />
+      )}
+
+      {tab === "billing" && (
+        <BillingTab
+          ledgers={ledgers}
+          outstanding={metrics.outstanding}
+          onCreate={() => setInvoiceOpen(true)}
+          onStatus={setPaymentStatus}
+          onReceipt={openOwnerReceipt}
+          onSignature={() => setSigOpen(true)}
+          hasSignature={!!ownerSignature}
+        />
+      )}
+
+      {tab === "maintenance" && <MaintenanceTab logs={maintenance} onUpdate={setEditMaint} />}
+
+      {tab === "notices" && (
+        <NoticesTab notices={notices} onCreate={() => setNoticeOpen(true)} />
+      )}
+
+      {/* ---------- Modals ---------- */}
+      <PropertyModal
+        open={propOpen}
+        onClose={() => setPropOpen(false)}
+        onCreated={(p) => { setProperties((x) => [p, ...x]); loadPlan(); }}
+      />
+      <TenantModal
+        open={tenantOpen}
+        onClose={() => setTenantOpen(false)}
+        properties={properties}
+        onCreated={(t, passcode) => {
+          setTenants((x) => [t, ...x]);
+          setProperties((x) => x.map((p) => (p.id === t.property_id ? { ...p, is_vacant: false } : p)));
+          loadPlan();
+          if (passcode) setRevealPasscode({ name: t.name, code: passcode });
+        }}
+      />
+      <InvoiceModal
+        open={invoiceOpen}
+        onClose={() => setInvoiceOpen(false)}
+        tenants={tenants}
+        onCreated={(l) => setLedgers((x) => [l, ...x])}
+      />
+      <NoticeModal
+        open={noticeOpen}
+        onClose={() => setNoticeOpen(false)}
+        tenants={tenants}
+        onCreated={(n) => setNotices((x) => [n, ...x])}
+      />
+      <EditPropertyModal
+        property={editProp}
+        onClose={() => setEditProp(null)}
+        onSaved={(p) => setProperties((xs) => xs.map((x) => (x.id === p.id ? { ...x, ...p } : x)))}
+      />
+      <EditTenantModal
+        tenant={editTenant}
+        onClose={() => setEditTenant(null)}
+        onSaved={(t) => setTenants((xs) => xs.map((x) => (x.id === t.id ? { ...x, ...t, properties: x.properties } : x)))}
+      />
+      <ServiceChargeModal property={chargeProp} onClose={() => setChargeProp(null)} />
+      <MaintenanceStatusModal
+        log={editMaint}
+        onClose={() => setEditMaint(null)}
+        onSaved={(m) => setMaintenance((xs) => xs.map((x) => (x.id === m.id ? { ...x, ...m } : x)))}
+      />
+      <OwnerDocumentsModal tenant={docsTenant} onClose={() => setDocsTenant(null)} />
+      <PropertyHistoryModal property={historyProp} onClose={() => setHistoryProp(null)} />
+      <SignatureModal open={sigOpen} onClose={() => setSigOpen(false)} current={ownerSignature} onSaved={setOwnerSignature} />
+      <ReceiptModal open={!!receiptHtml} onClose={() => setReceiptHtml(null)} html={receiptHtml || ""} />
+
+      <Modal open={!!revealPasscode} onClose={() => setRevealPasscode(null)} title="Tenant login passcode">
+        <div className="space-y-5">
+          <p className="text-sm text-slate-300">
+            Share this passcode with <span className="font-semibold text-white">{revealPasscode?.name}</span> so they
+            can sign in to the resident portal. For security it won&apos;t be shown again — you can reset it anytime.
+          </p>
+          <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-4">
+            <span className="flex items-center gap-2 font-mono text-2xl font-black tracking-[0.3em] text-emerald-400">
+              <KeyRound className="h-5 w-5" />{revealPasscode?.code}
+            </span>
+            <Button size="sm" variant="secondary" icon={Copy}
+              onClick={() => { navigator.clipboard?.writeText(revealPasscode?.code || ""); toast.success("Passcode copied."); }}>
+              Copy
+            </Button>
+          </div>
+          <Button className="w-full" onClick={() => setRevealPasscode(null)}>Done</Button>
+        </div>
+      </Modal>
+    </DashboardShell>
+  );
+}
+
+/* ============================================================ PLAN */
+// Where "Contact us" enquiries for the custom Whole-Building plan are sent.
+const CONTACT_EMAIL = "sales@rentmaster.app";
+// A tier with a "custom" billing interval is a contact-us / enterprise plan
+// (no self-service price, set up by the admin after the customer gets in touch).
+const isContactTier = (t: SubscriptionTier) => t.billing_interval === "custom";
+
+function planStatusBadge(s: PlanState): { tone: "emerald" | "amber" | "rose"; label: string } {
+  if (s.status === "locked") return { tone: "rose", label: s.lockReason === "revoked" ? "Revoked" : "Lapsed" };
+  if (s.status === "grace") return { tone: "amber", label: "In grace" };
+  if (s.warnExpiringSoon) return { tone: "amber", label: "Expiring soon" };
+  return { tone: "emerald", label: "Active" };
+}
+
+function PlanBanner({ plan, onRenew }: { plan: SubscriptionResponse; onRenew: () => void }) {
+  const s = plan.subscription;
+  let tone: "rose" | "amber" | null = null;
+  let msg = "";
+  if (s.status === "locked") {
+    tone = "rose";
+    msg = s.lockReason === "revoked"
+      ? "Your management permissions have been revoked by an administrator. Contact support to restore access."
+      : "Your subscription has lapsed. Renew your plan to regain access — you can still view your data.";
+  } else if (s.status === "grace") {
+    tone = "amber";
+    msg = `Your ${s.tierName} plan expired. ${s.daysLeftInGrace} day${s.daysLeftInGrace === 1 ? "" : "s"} of grace left to renew before management is locked.`;
+  } else if (s.warnExpiringSoon) {
+    tone = "amber";
+    msg = `Your ${s.tierName} plan expires in ${s.daysUntilExpiry} day${s.daysUntilExpiry === 1 ? "" : "s"}. Renew to avoid interruption.`;
+  }
+  if (!tone) return null;
+  const cls = tone === "rose"
+    ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
+    : "border-amber-500/30 bg-amber-500/10 text-amber-200";
+  return (
+    <div className={`mb-6 flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${cls}`}>
+      <div className="flex items-start gap-2 text-sm">
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{msg}</span>
+      </div>
+      <Button size="sm" variant={tone === "rose" ? "danger" : "secondary"} icon={ArrowUpCircle} onClick={onRenew} className="shrink-0">
+        {s.status === "locked" ? "Renew now" : "Manage plan"}
+      </Button>
+    </div>
+  );
+}
+
+function UsageMeter({ label, current, limit, icon: Icon }: { label: string; current: number; limit: number; icon: any }) {
+  const unlimited = limit === -1;
+  const pct = unlimited ? 0 : Math.min(100, limit === 0 ? 100 : Math.round((current / limit) * 100));
+  const atCap = !unlimited && current >= limit;
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <Icon className="h-4 w-4" /> {label}
+        </div>
+        <div className="text-sm font-black text-white">
+          {current} / {unlimited ? <InfinityIcon className="inline h-4 w-4 align-middle" /> : limit}
+        </div>
+      </div>
+      {!unlimited && (
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+          <div className={`h-full rounded-full ${atCap ? "bg-rose-500" : "bg-indigo-500"}`} style={{ width: `${pct}%` }} />
+        </div>
+      )}
+      {unlimited && <div className="mt-3 text-xs text-emerald-400">Unlimited on your plan</div>}
+      {atCap && <div className="mt-2 text-xs text-rose-400">Limit reached — upgrade to add more.</div>}
+    </Card>
+  );
+}
+
+function PlanTab({ plan, onReload }: { plan: SubscriptionResponse | null; onReload: () => Promise<void> }) {
+  const [busy, setBusy] = useState<string | null>(null);
+
+  if (!plan) {
+    return (
+      <EmptyState icon={Gem} title="Loading your plan…" hint="Fetching your subscription details."
+        action={<Button size="sm" variant="secondary" onClick={onReload}>Retry</Button>} />
+    );
+  }
+
+  const s = plan.subscription;
+  const badge = planStatusBadge(s);
+
+  async function choose(tier: SubscriptionTier) {
+    const isCurrent = tier.id === s.tierId;
+    const verb = isCurrent ? "Renew" : (tier.price > s.price ? "Upgrade to" : "Switch to");
+    if (!(await confirmDialog({
+      title: `${verb} ${tier.name}?`,
+      message: `${tier.price > 0 ? `৳${tier.price}/${tier.billing_interval}. ` : "Free plan. "}Payment is mocked in this build — activation is instant.`,
+      confirmLabel: verb.replace(" to", ""),
+    }))) return;
+    try {
+      setBusy(tier.id);
+      const res = await rentMasterFetch<{ success: boolean; message: string }>("/api/admin/subscription", {
+        method: "POST", role: "owner", body: JSON.stringify({ tierId: tier.id }),
+      });
+      await onReload();
+      toast.success(res.message || "Plan updated.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(null); }
+  }
+
+  return (
+    <div className="space-y-8">
+      <PageHeader title="Your plan" subtitle="Manage your subscription, limits and renewals." />
+
+      {/* Current plan summary */}
+      <Card className="p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 text-slate-950">
+              {s.isFree ? <Sparkles className="h-5 w-5" /> : <Crown className="h-5 w-5" />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-black text-white">{s.tierName}</span>
+                <Badge tone={badge.tone}>{badge.label}</Badge>
+              </div>
+              <div className="text-xs text-slate-400">
+                {s.isFree ? "Free · never expires" : `${formatCurrency(s.price)} / ${s.interval}`}
+              </div>
+            </div>
+          </div>
+          {!s.isFree && (
+            <div className="flex items-center gap-2 text-sm text-slate-300">
+              <CalendarClock className="h-4 w-4 text-slate-500" />
+              {s.status === "grace"
+                ? <span className="text-amber-400">Expired · {s.daysLeftInGrace}d grace left</span>
+                : s.status === "locked"
+                  ? <span className="text-rose-400">Lapsed on {formatDate(s.expiryDate)}</span>
+                  : <span>Renews / expires {formatDate(s.expiryDate)}{s.warnExpiringSoon ? ` · ${s.daysUntilExpiry}d left` : ""}</span>}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Usage */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <UsageMeter label="Properties" current={plan.usage.properties.current} limit={plan.usage.properties.limit} icon={Building2} />
+        <UsageMeter label="Tenants" current={plan.usage.tenants.current} limit={plan.usage.tenants.limit} icon={Users} />
+      </div>
+
+      {/* Available plans */}
+      <div className="space-y-4">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Available plans</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          {[...plan.availableTiers]
+            .sort((a, b) => (isContactTier(a) ? 1 : 0) - (isContactTier(b) ? 1 : 0) || Number(a.price) - Number(b.price))
+            .map((tier) => {
+            const isCurrent = tier.id === s.tierId;
+            const contact = isContactTier(tier);
+            const unlimitedP = tier.max_properties_allowed === -1;
+            const unlimitedT = tier.max_tenants_allowed === -1;
+            const pOver = !unlimitedP && plan.usage.properties.current > tier.max_properties_allowed;
+            const tOver = !unlimitedT && plan.usage.tenants.current > tier.max_tenants_allowed;
+            const blockedDowngrade = !isCurrent && (pOver || tOver);
+            return (
+              <Card key={tier.id} className={`p-6 ${isCurrent ? "border-indigo-500/40" : ""} ${contact ? "border-cyan-500/30" : ""}`}>
+                <div className="flex items-center justify-between">
+                  <div className="text-base font-black text-white">{tier.name}</div>
+                  {isCurrent ? <Badge tone="indigo">Current</Badge> : contact ? <Badge tone="cyan">Custom</Badge> : null}
+                </div>
+                <div className="mt-1 text-2xl font-black text-white">
+                  {contact ? "Contact us" : tier.price > 0 ? formatCurrency(tier.price) : "Free"}
+                  {!contact && tier.price > 0 && <span className="text-sm font-medium text-slate-400"> / {tier.billing_interval}</span>}
+                </div>
+                {tier.description && <p className="mt-2 text-xs text-slate-400">{tier.description}</p>}
+                <ul className="mt-4 space-y-1.5 text-sm text-slate-300">
+                  {contact ? (
+                    <>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />Custom build for your entire building</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />Unlimited properties &amp; tenants</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />1 year free maintenance included</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />Monthly or yearly contract from year 2</li>
+                    </>
+                  ) : (
+                    <>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                        {unlimitedP ? "Unlimited properties" : `Up to ${tier.max_properties_allowed} properties`}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                        {unlimitedT ? "Unlimited tenants" : `Up to ${tier.max_tenants_allowed} tenants`}</li>
+                    </>
+                  )}
+                </ul>
+                <div className="mt-5">
+                  {contact ? (
+                    <a
+                      href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`${tier.name} plan enquiry`)}`}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-600/20 transition-all hover:bg-cyan-500 active:scale-[0.98]"
+                    >
+                      <Send className="h-4 w-4" /> Contact us
+                    </a>
+                  ) : isCurrent && s.isFree ? (
+                    <Button variant="secondary" className="w-full" disabled>Current plan</Button>
+                  ) : blockedDowngrade ? (
+                    <>
+                      <Button variant="secondary" className="w-full" disabled>Downgrade blocked</Button>
+                      <p className="mt-2 text-xs text-rose-400">
+                        You use {plan.usage.properties.current} propert{plan.usage.properties.current === 1 ? "y" : "ies"} / {plan.usage.tenants.current} tenant{plan.usage.tenants.current === 1 ? "" : "s"}. Reduce to {unlimitedP ? "∞" : tier.max_properties_allowed} / {unlimitedT ? "∞" : tier.max_tenants_allowed} first.
+                      </p>
+                    </>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      variant={isCurrent ? "secondary" : tier.price > s.price ? "primary" : "secondary"}
+                      icon={isCurrent ? undefined : ArrowUpCircle}
+                      loading={busy === tier.id}
+                      onClick={() => choose(tier)}
+                    >
+                      {isCurrent ? "Renew plan" : tier.price > s.price ? "Upgrade" : "Switch to this plan"}
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+        <p className="text-xs text-slate-500">Payments are mocked in this build — activation is instant. The free plan never expires; paid plans renew on their billing interval and get a {`10`}-day grace period after expiry.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ OVERVIEW */
+function OverviewTab({
+  properties, tenants, metrics, maintenance, onQuickInvoice, onQuickProperty,
+}: {
+  properties: Property[]; tenants: Tenant[];
+  metrics: { occupied: number; monthlyRevenue: number; outstanding: number; unpaidCount: number; openTickets: number };
+  maintenance: MaintenanceLog[];
+  onQuickInvoice: () => void; onQuickProperty: () => void;
+}) {
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title="Portfolio overview"
+        subtitle="A live snapshot of your properties, income and open work."
+        action={
+          <div className="flex gap-2">
+            <Button variant="secondary" icon={Plus} onClick={onQuickProperty}>Property</Button>
+            <Button icon={Plus} onClick={onQuickInvoice}>New invoice</Button>
+          </div>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Properties" accent="indigo" icon={Building2}
+          value={properties.length}
+          sub={`${metrics.occupied} occupied · ${properties.length - metrics.occupied} vacant`} />
+        <StatCard label="Tenants" accent="cyan" icon={Users}
+          value={tenants.length} sub="Active residents" />
+        <StatCard label="Monthly rent roll" accent="emerald" icon={CircleDollarSign}
+          value={formatCurrency(metrics.monthlyRevenue)} sub="Expected per month" />
+        <StatCard label="Outstanding" accent="rose" icon={ReceiptText}
+          value={formatCurrency(metrics.outstanding)} sub={`${metrics.unpaidCount} unpaid invoice(s)`} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="p-6">
+          <h3 className="mb-4 text-sm font-bold text-slate-200">Occupancy</h3>
+          {properties.length === 0 ? (
+            <p className="text-sm text-slate-500">No properties yet.</p>
+          ) : (
+            <>
+              <div className="mb-3 flex items-end justify-between">
+                <span className="text-3xl font-black text-white">
+                  {Math.round((metrics.occupied / properties.length) * 100)}%
+                </span>
+                <span className="text-xs text-slate-500">
+                  {metrics.occupied}/{properties.length} units filled
+                </span>
+              </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all"
+                  style={{ width: `${(metrics.occupied / properties.length) * 100}%` }}
+                />
+              </div>
+            </>
+          )}
+        </Card>
+
+        <Card className="p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-200">Recent maintenance</h3>
+            <Badge tone={metrics.openTickets ? "amber" : "emerald"}>
+              {metrics.openTickets} open
+            </Badge>
+          </div>
+          <div className="space-y-3">
+            {maintenance.slice(0, 3).map((m) => (
+              <div key={m.id} className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-lg bg-white/[0.04] p-1.5 text-amber-400">
+                  <Wrench className="h-3.5 w-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-slate-200">{m.issue_title}</div>
+                  <div className="text-xs text-slate-500">
+                    {m.properties?.name ?? "Property"} · {formatDate(m.created_at)}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {maintenance.length === 0 && (
+              <p className="text-sm text-slate-500">No maintenance reported. 🎉</p>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ PROPERTIES */
+function PropertiesTab({ properties, disabledIds, onUpgrade, onAdd, onEdit, onVacate, onCharges, onHistory }: {
+  properties: Property[]; disabledIds: string[]; onUpgrade: () => void; onAdd: () => void;
+  onEdit: (p: Property) => void; onVacate: (p: Property) => void;
+  onCharges: (p: Property) => void; onHistory: (p: Property) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? properties.filter((p) =>
+        [p.name, p.address, p.flat_no, p.id].some((v) => String(v ?? "").toLowerCase().includes(q)))
+    : properties;
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Properties"
+        subtitle="Every unit in your real-estate inventory."
+        action={<Button icon={Plus} onClick={onAdd}>Add property</Button>}
+      />
+      {properties.length === 0 ? (
+        <EmptyState icon={Building2} title="No properties yet"
+          hint="Register your first unit to start onboarding tenants and billing rent."
+          action={<Button icon={Plus} onClick={onAdd}>Add property</Button>} />
+      ) : (
+        <>
+        <SearchInput value={query} onChange={setQuery} placeholder="Search by name, address or flat…" />
+        {filtered.length === 0 ? (
+          <EmptyState icon={Building2} title="No matches" hint={`No properties match "${query}".`} />
+        ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((p) => {
+            const disabled = disabledIds.includes(p.id);
+            return (
+            <Card key={p.id} hover={!disabled} className={`flex flex-col gap-4 p-5 ${disabled ? "opacity-60" : ""}`}>
+              <div className="flex items-start justify-between">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
+                  <Home className="h-5 w-5" />
+                </div>
+                {disabled ? (
+                  <Badge tone="rose">Disabled</Badge>
+                ) : (
+                  <Badge tone={p.is_vacant ? "amber" : "emerald"}>
+                    {p.is_vacant ? "Vacant" : "Occupied"}
+                  </Badge>
+                )}
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-100">{p.name}</h3>
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+                  <MapPin className="h-3.5 w-3.5" /> {p.address}
+                </p>
+              </div>
+              <div className="flex items-center justify-between border-t border-white/[0.06] pt-3 text-xs text-slate-500">
+                <span>Flat <span className="font-semibold text-slate-300">{p.flat_no}</span></span>
+                <span className="font-mono">{p.id.slice(0, 8)}…</span>
+              </div>
+              {disabled ? (
+                <Button size="sm" variant="secondary" icon={ArrowUpCircle} onClick={onUpgrade} className="w-full">
+                  Upgrade to re-enable
+                </Button>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(p)} className="flex-1">Edit</Button>
+                    <Button size="sm" variant="secondary" icon={CircleDollarSign} onClick={() => onCharges(p)} className="flex-1">Charges</Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" icon={History} onClick={() => onHistory(p)} className="flex-1">History</Button>
+                    {!p.is_vacant && (
+                      <Button size="sm" variant="ghost" icon={DoorOpen} onClick={() => onVacate(p)} className="flex-1">Vacate</Button>
+                    )}
+                  </div>
+                </>
+              )}
+            </Card>
+            );
+          })}
+        </div>
+        )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================ TENANTS */
+function TenantsTab({
+  tenants, properties, disabledIds, onUpgrade, onAdd, onEdit, onDocs, onResetPasscode,
+}: {
+  tenants: Tenant[]; properties: Property[]; disabledIds: string[]; onUpgrade: () => void; onAdd: () => void;
+  onEdit: (t: Tenant) => void; onDocs: (t: Tenant) => void; onResetPasscode: (t: Tenant) => void;
+}) {
+  const propName = (id: string) => properties.find((p) => p.id === id)?.name;
+  const isDisabled = (id: string) => disabledIds.includes(id);
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? tenants.filter((t) =>
+        [t.name, t.phone, t.properties?.name ?? propName(t.property_id)].some((v) =>
+          String(v ?? "").toLowerCase().includes(q)))
+    : tenants;
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Tenants"
+        subtitle="Onboarded residents and their access credentials."
+        action={<Button icon={Plus} onClick={onAdd}>Onboard tenant</Button>}
+      />
+      {tenants.length === 0 ? (
+        <EmptyState icon={Users} title="No tenants onboarded"
+          hint="Add a tenant to a property. A temporary passcode (last 4 phone digits) is generated automatically."
+          action={<Button icon={Plus} onClick={onAdd}>Onboard tenant</Button>} />
+      ) : (
+        <>
+          <SearchInput value={query} onChange={setQuery} placeholder="Search by name, phone or property…" />
+          {filtered.length === 0 ? (
+            <EmptyState icon={Users} title="No matches" hint={`No tenants match "${query}".`} />
+          ) : (
+          <>
+          {/* Desktop table */}
+          <Card className="hidden overflow-hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th className="p-4">Resident</th>
+                    <th className="p-4">Property</th>
+                    <th className="p-4">Rent</th>
+                    <th className="p-4">Due day</th>
+                    <th className="p-4">Passcode</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {filtered.map((t) => {
+                    const disabled = isDisabled(t.id);
+                    return (
+                    <tr key={t.id} className={`hover:bg-white/[0.02] ${disabled ? "opacity-60" : ""}`}>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2 font-semibold text-slate-100">
+                          {t.name}{disabled && <Badge tone="rose">Disabled</Badge>}
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-slate-500">
+                          <Phone className="h-3 w-3" /> {t.phone}
+                        </div>
+                      </td>
+                      <td className="p-4 text-slate-300">{t.properties?.name ?? propName(t.property_id) ?? "—"}</td>
+                      <td className="p-4 font-semibold text-emerald-400">{formatCurrency(t.monthly_rent)}</td>
+                      <td className="p-4 text-slate-300">{ordinalDay(t.due_date)}</td>
+                      <td className="p-4">
+                        <button onClick={() => onResetPasscode(t)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] px-2 py-1 text-xs text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
+                          title="Generate a new login passcode">
+                          <RotateCcw className="h-3 w-3" /> Reset
+                        </button>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex justify-end gap-2">
+                          {disabled ? (
+                            <Button size="sm" variant="secondary" icon={ArrowUpCircle} onClick={onUpgrade}>Upgrade</Button>
+                          ) : (
+                            <>
+                              <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(t)}>Edit</Button>
+                              <Button size="sm" variant="secondary" icon={FileText} onClick={() => onDocs(t)}>Docs</Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* Mobile cards */}
+          <div className="space-y-3 md:hidden">
+            {filtered.map((t) => {
+              const disabled = isDisabled(t.id);
+              return (
+              <Card key={t.id} className={`p-4 ${disabled ? "opacity-60" : ""}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-semibold text-slate-100">
+                    {t.name}{disabled && <Badge tone="rose">Disabled</Badge>}
+                  </div>
+                  <button onClick={() => onResetPasscode(t)}
+                    className="inline-flex items-center gap-1 rounded-lg bg-white/[0.04] px-2 py-0.5 text-xs text-slate-300 transition hover:bg-white/[0.08]">
+                    <RotateCcw className="h-3 w-3" /> Reset passcode
+                  </button>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-400">
+                  <span>{t.properties?.name ?? propName(t.property_id) ?? "—"}</span>
+                  <span className="text-right font-semibold text-emerald-400">{formatCurrency(t.monthly_rent)}</span>
+                  <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{t.phone}</span>
+                  <span className="text-right">Due {ordinalDay(t.due_date)}</span>
+                </div>
+                <div className="mt-3 flex justify-end gap-2">
+                  {disabled ? (
+                    <Button size="sm" variant="secondary" icon={ArrowUpCircle} onClick={onUpgrade}>Upgrade to re-enable</Button>
+                  ) : (
+                    <>
+                      <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(t)}>Edit</Button>
+                      <Button size="sm" variant="secondary" icon={FileText} onClick={() => onDocs(t)}>Docs</Button>
+                    </>
+                  )}
+                </div>
+              </Card>
+              );
+            })}
+          </div>
+          </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================ BILLING */
+function BillingTab({
+  ledgers, outstanding, onCreate, onStatus, onReceipt, onSignature, hasSignature,
+}: {
+  ledgers: BillingLedger[]; outstanding: number;
+  onCreate: () => void; onStatus: (id: string, s: PaymentStatus) => void;
+  onReceipt: (l: BillingLedger) => void; onSignature: () => void; hasSignature: boolean;
+}) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? ledgers.filter((l) =>
+        [l.tenants?.name, formatMonth(l.billing_month), l.billing_month, l.payment_status].some((v) =>
+          String(v ?? "").toLowerCase().includes(q)))
+    : ledgers;
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Billing ledger"
+        subtitle="Generate rent invoices and track payment status."
+        action={
+          <div className="flex gap-2">
+            <Button variant="secondary" icon={PenLine} onClick={onSignature}>
+              {hasSignature ? "Signature" : "Add signature"}
+            </Button>
+            <Button icon={Plus} onClick={onCreate}>Create invoice</Button>
+          </div>
+        }
+      />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <StatCard label="Invoices" value={ledgers.length} accent="indigo" />
+        <StatCard label="Outstanding" value={formatCurrency(outstanding)} accent="rose" />
+        <StatCard label="Collected"
+          value={formatCurrency(ledgers.filter((l) => l.payment_status === "paid").reduce((s, l) => s + Number(l.total_payable), 0))}
+          accent="emerald" />
+      </div>
+
+      {ledgers.length === 0 ? (
+        <EmptyState icon={ReceiptText} title="No invoices yet"
+          hint="Create your first rent invoice for a tenant."
+          action={<Button icon={Plus} onClick={onCreate}>Create invoice</Button>} />
+      ) : (
+        <>
+        <SearchInput value={query} onChange={setQuery} placeholder="Search by tenant, month or status…" />
+        {filtered.length === 0 ? (
+          <EmptyState icon={ReceiptText} title="No matches" hint={`No invoices match "${query}".`} />
+        ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="p-4">Tenant / Month</th>
+                  <th className="p-4">Rent</th>
+                  <th className="p-4">Extras</th>
+                  <th className="p-4">Total</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4 text-right">Mark as</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {filtered.map((l) => (
+                  <tr key={l.id} className="hover:bg-white/[0.02]">
+                    <td className="p-4">
+                      <div className="font-semibold text-slate-100">{l.tenants?.name ?? "Tenant"}</div>
+                      <div className="text-xs text-slate-500">{formatMonth(l.billing_month)}</div>
+                    </td>
+                    <td className="p-4 text-slate-300">{formatCurrency(l.rent_amount)}</td>
+                    <td className="p-4 text-slate-300">
+                      {formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}
+                      {Number(l.discount) > 0 && (
+                        <span className="ml-1 text-xs text-emerald-400">−{formatCurrency(l.discount)}</span>
+                      )}
+                    </td>
+                    <td className="p-4 font-bold text-white">{formatCurrency(l.total_payable)}</td>
+                    <td className="p-4"><Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge></td>
+                    <td className="p-4">
+                      <div className="flex items-center justify-end gap-1">
+                        {l.payment_status === "paid" && (
+                          <button title="Rent receipt" onClick={() => onReceipt(l)}
+                            className="rounded-lg p-1.5 text-indigo-400 transition hover:bg-indigo-500/10">
+                            <Receipt className="h-4 w-4" />
+                          </button>
+                        )}
+                        <StatusButton active={l.payment_status === "unpaid"} tone="rose" icon={Circle}
+                          onClick={() => onStatus(l.id, "unpaid")} title="Unpaid" />
+                        <StatusButton active={l.payment_status === "sent"} tone="amber" icon={Send}
+                          onClick={() => onStatus(l.id, "sent")} title="Sent" />
+                        <StatusButton active={l.payment_status === "paid"} tone="emerald" icon={CheckCircle2}
+                          onClick={() => onStatus(l.id, "paid")} title="Paid" />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+        )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function StatusButton({
+  active, tone, icon: Icon, onClick, title,
+}: {
+  active: boolean; tone: "rose" | "amber" | "emerald";
+  icon: typeof Circle; onClick: () => void; title: string;
+}) {
+  const tones = {
+    rose: "text-rose-400 hover:bg-rose-500/10",
+    amber: "text-amber-400 hover:bg-amber-500/10",
+    emerald: "text-emerald-400 hover:bg-emerald-500/10",
+  };
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className={`rounded-lg p-1.5 transition ${tones[tone]} ${active ? "bg-white/[0.06] ring-1 ring-white/10" : "text-slate-600"}`}
+    >
+      <Icon className="h-4 w-4" />
+    </button>
+  );
+}
+
+/* ============================================================ MAINTENANCE */
+function MaintenanceTab({ logs, onUpdate }: { logs: MaintenanceLog[]; onUpdate: (m: MaintenanceLog) => void }) {
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Maintenance requests" subtitle="Incident tickets reported across your portfolio." />
+      {logs.length === 0 ? (
+        <EmptyState icon={Wrench} title="No maintenance tickets" hint="When tenants report issues, they'll appear here." />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {logs.map((m) => (
+            <Card key={m.id} className="flex flex-col gap-3 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-amber-500/10 p-2 text-amber-400"><TriangleAlert className="h-4 w-4" /></div>
+                  <h3 className="font-bold text-slate-100">{m.issue_title}</h3>
+                </div>
+                <Badge tone={priorityTone[m.priority_level]}>{m.priority_level}</Badge>
+              </div>
+              {m.issue_description && <p className="text-sm leading-relaxed text-slate-400">{m.issue_description}</p>}
+              <AttachmentStrip raw={m.attachment_file_url} />
+              {m.resolution_remarks && (
+                <div className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
+                  <span className="font-semibold text-slate-400">Owner note: </span>{m.resolution_remarks}
+                </div>
+              )}
+              <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3 text-xs text-slate-500">
+                <span>{m.properties?.name ?? "Property"}</span>
+                {m.tenants?.name && <span>· {m.tenants.name}</span>}
+                <span>· {formatDate(m.created_at)}</span>
+                <Badge tone={maintStatusTone[m.resolution_status]} className="ml-auto">
+                  {m.resolution_status.replace("_", " ")}
+                </Badge>
+              </div>
+              <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onUpdate(m)} className="w-full">
+                Update status
+              </Button>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================ NOTICES */
+function NoticesTab({ notices, onCreate }: { notices: Notice[]; onCreate: () => void }) {
+  const scopeLabel: Record<string, string> = {
+    all_tenants: "All tenants", individual_tenant: "One tenant", all_owners: "All owners",
+    individual_owner: "Payment update",
+  };
+  const senderLabel = (t: Notice["sender_type"]) =>
+    t === "system_admin" ? "System" : t === "tenant" ? "Tenant" : "You";
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Notices" subtitle="Broadcast announcements to your tenants."
+        action={<Button icon={Plus} onClick={onCreate}>New notice</Button>} />
+      {notices.length === 0 ? (
+        <EmptyState icon={Megaphone} title="No notices yet" hint="Broadcast rent reminders, maintenance windows or building updates."
+          action={<Button icon={Plus} onClick={onCreate}>New notice</Button>} />
+      ) : (
+        <div className="space-y-4">
+          {notices.map((n) => (
+            <Card key={n.id} className="space-y-2 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-bold text-indigo-400">{n.title}</h3>
+                <span className="shrink-0 font-mono text-[10px] text-slate-500">{formatDate(n.created_at)}</span>
+              </div>
+              <p className="text-sm leading-relaxed text-slate-300">{n.content}</p>
+              <div className="flex items-center gap-2 pt-1">
+                <Badge tone="indigo">{scopeLabel[n.target_scope] ?? n.target_scope}</Badge>
+                <Badge tone="slate">{senderLabel(n.sender_type)}</Badge>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================ MODALS */
+function PropertyModal({
+  open, onClose, onCreated,
+}: { open: boolean; onClose: () => void; onCreated: (p: Property) => void }) {
+  const [form, setForm] = useState({ name: "", address: "", flatNo: "" });
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch("/api/admin/properties", {
+        method: "POST", role: "owner", body: JSON.stringify(form),
+      });
+      if (res.success) {
+        onCreated(res.data);
+        setForm({ name: "", address: "", flatNo: "" });
+        onClose();
+        toast.success("Property added.");
+      }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Register property" subtitle="Add a new unit to your inventory.">
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Property name" required>
+          <TextInput required placeholder="e.g. Grand Crimson Palace" value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label="Address" required>
+          <TextInput required placeholder="e.g. 12 Gulshan Ave, Dhaka" value={form.address}
+            onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        </Field>
+        <Field label="Flat / Unit no." required>
+          <TextInput required placeholder="e.g. 4B" value={form.flatNo}
+            onChange={(e) => setForm({ ...form, flatNo: e.target.value })} />
+        </Field>
+        <Button type="submit" loading={saving} className="w-full">Save property</Button>
+      </form>
+    </Modal>
+  );
+}
+
+function TenantModal({
+  open, onClose, properties, onCreated,
+}: {
+  open: boolean; onClose: () => void; properties: Property[]; onCreated: (t: Tenant, passcode?: string) => void;
+}) {
+  const empty = {
+    propertyId: "", name: "", phone: "", familyMembers: "1", nid: "",
+    monthlyRent: "", dueDate: "5", rentedDate: "", serviceCharge: "0", advanceAmount: "0",
+  };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+  const vacant = properties.filter((p) => p.is_vacant);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch("/api/admin/tenants", {
+        method: "POST", role: "owner",
+        body: JSON.stringify({
+          propertyId: form.propertyId, name: form.name, phone: form.phone,
+          familyMembers: Number(form.familyMembers) || 1, nid: form.nid || "",
+          monthlyRent: form.monthlyRent, dueDate: form.dueDate,
+          rentedDate: form.rentedDate || null,
+          serviceCharge: Number(form.serviceCharge) || 0,
+          advanceAmount: Number(form.advanceAmount) || 0,
+        }),
+      });
+      if (res.success) { onCreated(res.data, res.passcode); setForm(empty); onClose(); toast.success("Tenant onboarded."); }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} size="lg" title="Onboard tenant"
+      subtitle="A secure login passcode is generated and shown to you once — share it with the tenant.">
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Property" required>
+          <Select required value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
+            <option value="">Select a property…</option>
+            {(vacant.length ? vacant : properties).map((p) => (
+              <option key={p.id} value={p.id}>{p.name} · Flat {p.flat_no}{p.is_vacant ? "" : " (occupied)"}</option>
+            ))}
+          </Select>
+        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Full name" required>
+            <TextInput required placeholder="Shovon Rahman" value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </Field>
+          <Field label="Phone" required>
+            <TextInput required placeholder="01712345678" value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Monthly rent (৳)" required>
+            <TextInput required type="number" min="0" placeholder="15000" value={form.monthlyRent}
+              onChange={(e) => setForm({ ...form, monthlyRent: e.target.value })} />
+          </Field>
+          <Field label="Rent due day" required hint="Day of month (1–31)">
+            <TextInput required type="number" min="1" max="31" value={form.dueDate}
+              onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Service charge (৳)">
+            <TextInput type="number" min="0" value={form.serviceCharge}
+              onChange={(e) => setForm({ ...form, serviceCharge: e.target.value })} />
+          </Field>
+          <Field label="Advance / deposit (৳)">
+            <TextInput type="number" min="0" value={form.advanceAmount}
+              onChange={(e) => setForm({ ...form, advanceAmount: e.target.value })} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Family members">
+            <TextInput type="number" min="1" value={form.familyMembers}
+              onChange={(e) => setForm({ ...form, familyMembers: e.target.value })} />
+          </Field>
+          <Field label="Rented since">
+            <TextInput type="date" value={form.rentedDate}
+              onChange={(e) => setForm({ ...form, rentedDate: e.target.value })} />
+          </Field>
+        </div>
+        <Field label="National ID (NID)" hint="Stored hashed for verification.">
+          <TextInput placeholder="NID number" value={form.nid}
+            onChange={(e) => setForm({ ...form, nid: e.target.value })} />
+        </Field>
+        <Button type="submit" loading={saving} className="w-full">Onboard & generate passcode</Button>
+      </form>
+    </Modal>
+  );
+}
+
+function InvoiceModal({
+  open, onClose, tenants, onCreated,
+}: { open: boolean; onClose: () => void; tenants: Tenant[]; onCreated: (l: BillingLedger) => void }) {
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const empty = {
+    tenantId: "", billingMonth: thisMonth, rentAmount: "", serviceCharge: "0",
+    extraCharge: "0", extraChargeRemarks: "", discount: "0",
+  };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+  const selected = tenants.find((t) => t.id === form.tenantId);
+
+  const total =
+    (Number(form.rentAmount) || 0) + (Number(form.serviceCharge) || 0) +
+    (Number(form.extraCharge) || 0) - (Number(form.discount) || 0);
+
+  function pickTenant(id: string) {
+    const t = tenants.find((x) => x.id === id);
+    setForm((f) => ({
+      ...f, tenantId: id,
+      rentAmount: t ? String(t.monthly_rent) : f.rentAmount,
+      serviceCharge: t ? String(t.service_charge ?? 0) : f.serviceCharge,
+    }));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selected) return;
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch("/api/admin/billing", {
+        method: "POST", role: "owner",
+        body: JSON.stringify({
+          tenantId: selected.id, propertyId: selected.property_id,
+          billingMonth: form.billingMonth, rentAmount: form.rentAmount,
+          serviceCharge: form.serviceCharge, extraCharge: form.extraCharge,
+          extraChargeRemarks: form.extraChargeRemarks || null, discount: form.discount,
+        }),
+      });
+      if (res.success) {
+        // Enrich with tenant name for immediate table display
+        onCreated({ ...res.data, tenants: { name: selected.name, phone: selected.phone } });
+        setForm(empty); onClose();
+        toast.success("Invoice created.");
+      }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} size="lg" title="Create invoice"
+      subtitle="Generate a monthly rent invoice for a tenant.">
+      {tenants.length === 0 ? (
+        <p className="text-sm text-slate-400">Onboard a tenant first to create invoices.</p>
+      ) : (
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Tenant" required>
+              <Select required value={form.tenantId} onChange={(e) => pickTenant(e.target.value)}>
+                <option value="">Select tenant…</option>
+                {tenants.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.phone}</option>)}
+              </Select>
+            </Field>
+            <Field label="Billing month" required>
+              <TextInput required type="month" value={form.billingMonth}
+                onChange={(e) => setForm({ ...form, billingMonth: e.target.value })} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Rent (৳)" required>
+              <TextInput required type="number" min="0" value={form.rentAmount}
+                onChange={(e) => setForm({ ...form, rentAmount: e.target.value })} />
+            </Field>
+            <Field label="Service charge (৳)">
+              <TextInput type="number" min="0" value={form.serviceCharge}
+                onChange={(e) => setForm({ ...form, serviceCharge: e.target.value })} />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Extra charge (৳)">
+              <TextInput type="number" min="0" value={form.extraCharge}
+                onChange={(e) => setForm({ ...form, extraCharge: e.target.value })} />
+            </Field>
+            <Field label="Discount (৳)">
+              <TextInput type="number" min="0" value={form.discount}
+                onChange={(e) => setForm({ ...form, discount: e.target.value })} />
+            </Field>
+          </div>
+          <Field label="Note (optional)" hint="Appears on the receipt — e.g. explain an extra charge.">
+            <TextArea rows={2} placeholder="e.g. Extra charge is for the shared water-tank repair."
+              value={form.extraChargeRemarks}
+              onChange={(e) => setForm({ ...form, extraChargeRemarks: e.target.value })} />
+          </Field>
+          <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
+            <span className="text-sm font-semibold text-slate-300">Total payable</span>
+            <span className="text-xl font-black text-emerald-400">{formatCurrency(total)}</span>
+          </div>
+          <Button type="submit" loading={saving} className="w-full">Generate invoice</Button>
+        </form>
+      )}
+    </Modal>
+  );
+}
+
+function NoticeModal({
+  open, onClose, tenants, onCreated,
+}: { open: boolean; onClose: () => void; tenants: Tenant[]; onCreated: (n: Notice) => void }) {
+  const empty = { targetScope: "all_tenants", targetTenantId: "", title: "", content: "" };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch("/api/admin/notices", {
+        method: "POST", role: "owner",
+        body: JSON.stringify({
+          senderType: "owner", targetScope: form.targetScope,
+          targetTenantId: form.targetScope === "individual_tenant" ? form.targetTenantId : null,
+          title: form.title, content: form.content,
+        }),
+      });
+      if (res.success) { onCreated(res.data); setForm(empty); onClose(); toast.success("Notice sent."); }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Broadcast notice" subtitle="Send an announcement to your tenants.">
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Audience" required>
+          <Select value={form.targetScope} onChange={(e) => setForm({ ...form, targetScope: e.target.value })}>
+            <option value="all_tenants">All tenants</option>
+            <option value="individual_tenant">A specific tenant</option>
+          </Select>
+        </Field>
+        {form.targetScope === "individual_tenant" && (
+          <Field label="Tenant" required>
+            <Select required value={form.targetTenantId}
+              onChange={(e) => setForm({ ...form, targetTenantId: e.target.value })}>
+              <option value="">Select tenant…</option>
+              {tenants.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.phone}</option>)}
+            </Select>
+          </Field>
+        )}
+        <Field label="Title" required>
+          <TextInput required placeholder="e.g. Water supply maintenance" value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </Field>
+        <Field label="Message" required>
+          <TextArea required rows={4} placeholder="Write your announcement…" value={form.content}
+            onChange={(e) => setForm({ ...form, content: e.target.value })} />
+        </Field>
+        <Button type="submit" loading={saving} icon={Inbox} className="w-full">Broadcast notice</Button>
+      </form>
+    </Modal>
+  );
+}
+
+/* ============================================================ EDIT MODALS */
+function EditPropertyModal({
+  property, onClose, onSaved,
+}: { property: Property | null; onClose: () => void; onSaved: (p: Property) => void }) {
+  const [form, setForm] = useState({ name: "", address: "", flatNo: "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (property) setForm({ name: property.name, address: property.address, flatNo: property.flat_no });
+  }, [property]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!property) return;
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch(`/api/admin/properties/${property.id}`, {
+        method: "PATCH", role: "owner",
+        body: JSON.stringify({ name: form.name, address: form.address, flatNo: form.flatNo }),
+      });
+      if (res.success) { onSaved(res.data); onClose(); toast.success("Property updated."); }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={!!property} onClose={onClose} title="Edit property" subtitle="Update this unit's details.">
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Property name" required>
+          <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </Field>
+        <Field label="Address" required>
+          <TextInput required value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        </Field>
+        <Field label="Flat / Unit no." required>
+          <TextInput required value={form.flatNo} onChange={(e) => setForm({ ...form, flatNo: e.target.value })} />
+        </Field>
+        <Button type="submit" loading={saving} className="w-full">Save changes</Button>
+      </form>
+    </Modal>
+  );
+}
+
+const SERVICE_CHARGE_FIELDS = [
+  { key: "caretaker", label: "Caretaker" },
+  { key: "security_guard", label: "Security guard" },
+  { key: "lift_maintenance", label: "Lift maintenance" },
+  { key: "water", label: "Water" },
+  { key: "common_electricity", label: "Common electricity" },
+  { key: "common_gas", label: "Common gas" },
+  { key: "dust_collectors", label: "Dust collectors" },
+] as const;
+
+function ServiceChargeModal({ property, onClose }: { property: Property | null; onClose: () => void }) {
+  const blank = Object.fromEntries(SERVICE_CHARGE_FIELDS.map((f) => [f.key, "0"])) as Record<string, string>;
+  const [form, setForm] = useState<Record<string, string>>(blank);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!property) return;
+    setForm(blank);
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await rentMasterFetch(
+          `/api/admin/service-charge?propertyId=${encodeURIComponent(property.id)}`,
+          { role: "owner" }
+        );
+        if (res.data) {
+          setForm(Object.fromEntries(
+            SERVICE_CHARGE_FIELDS.map((f) => [f.key, String(res.data[f.key] ?? 0)])
+          ) as Record<string, string>);
+        }
+      } catch { /* start blank on error */ }
+      finally { setLoading(false); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [property]);
+
+  const total = SERVICE_CHARGE_FIELDS.reduce((s, f) => s + (Number(form[f.key]) || 0), 0);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!property) return;
+    try {
+      setSaving(true);
+      const payload: Record<string, any> = { propertyId: property.id };
+      for (const f of SERVICE_CHARGE_FIELDS) payload[f.key] = Number(form[f.key]) || 0;
+      const res = await rentMasterFetch("/api/admin/service-charge", {
+        method: "PUT", role: "owner", body: JSON.stringify(payload),
+      });
+      if (res.success) { onClose(); toast.success("Service charges saved."); }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={!!property} onClose={onClose} size="lg"
+      title="Service charge breakdown"
+      subtitle={property ? `${property.name} · Flat ${property.flat_no}` : undefined}>
+      {loading ? (
+        <div className="py-8 text-center text-sm text-slate-400">Loading breakdown…</div>
+      ) : (
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {SERVICE_CHARGE_FIELDS.map((f) => (
+              <Field key={f.key} label={`${f.label} (৳)`}>
+                <TextInput type="number" min="0" value={form[f.key]}
+                  onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
+              </Field>
+            ))}
+          </div>
+          <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
+            <span className="text-sm font-semibold text-slate-300">Total service charge</span>
+            <span className="text-xl font-black text-emerald-400">{formatCurrency(total)}</span>
+          </div>
+          <Button type="submit" loading={saving} className="w-full">Save breakdown</Button>
+        </form>
+      )}
+    </Modal>
+  );
+}
+
+function EditTenantModal({
+  tenant, onClose, onSaved,
+}: { tenant: Tenant | null; onClose: () => void; onSaved: (t: Tenant) => void }) {
+  const empty = { name: "", phone: "", monthlyRent: "", serviceCharge: "", advanceAmount: "", dueDate: "", familyMembers: "" };
+  const [form, setForm] = useState(empty);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (tenant) setForm({
+      name: tenant.name, phone: tenant.phone,
+      monthlyRent: String(tenant.monthly_rent ?? ""),
+      serviceCharge: String(tenant.service_charge ?? 0),
+      advanceAmount: String(tenant.advance_amount ?? 0),
+      dueDate: String(tenant.due_date ?? ""),
+      familyMembers: String(tenant.family_members ?? 1),
+    });
+  }, [tenant]);
+
+  const [revisions, setRevisions] = useState<RentRevision[]>([]);
+  useEffect(() => {
+    if (!tenant) { setRevisions([]); return; }
+    (async () => {
+      try {
+        const res = await rentMasterFetch(`/api/admin/rent-revisions?tenantId=${encodeURIComponent(tenant.id)}`, { role: "owner" });
+        setRevisions(res.data || []);
+      } catch { setRevisions([]); }
+    })();
+  }, [tenant]);
+
+  const rentChanged = !!tenant && Number(form.monthlyRent) !== Number(tenant.monthly_rent);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!tenant) return;
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch(`/api/admin/tenants/${tenant.id}`, {
+        method: "PATCH", role: "owner",
+        body: JSON.stringify({
+          name: form.name, phone: form.phone,
+          monthlyRent: form.monthlyRent, serviceCharge: form.serviceCharge,
+          advanceAmount: form.advanceAmount, dueDate: form.dueDate, familyMembers: form.familyMembers,
+        }),
+      });
+      if (res.success) { onSaved(res.data); onClose(); toast.success("Tenant updated."); }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={!!tenant} onClose={onClose} size="lg" title="Edit tenant" subtitle="Update resident details or revise rent.">
+      <form onSubmit={submit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Full name" required>
+            <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </Field>
+          <Field label="Phone" required>
+            <TextInput required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Monthly rent (৳)" required>
+            <TextInput required type="number" min="0" value={form.monthlyRent}
+              onChange={(e) => setForm({ ...form, monthlyRent: e.target.value })} />
+          </Field>
+          <Field label="Rent due day" required hint="Day of month (1–31)">
+            <TextInput required type="number" min="1" max="31" value={form.dueDate}
+              onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Service charge (৳)">
+            <TextInput type="number" min="0" value={form.serviceCharge}
+              onChange={(e) => setForm({ ...form, serviceCharge: e.target.value })} />
+          </Field>
+          <Field label="Advance / deposit (৳)">
+            <TextInput type="number" min="0" value={form.advanceAmount}
+              onChange={(e) => setForm({ ...form, advanceAmount: e.target.value })} />
+          </Field>
+        </div>
+        <Field label="Family members">
+          <TextInput type="number" min="1" value={form.familyMembers}
+            onChange={(e) => setForm({ ...form, familyMembers: e.target.value })} />
+        </Field>
+        {rentChanged && (
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300">
+            Rent will change to {formatCurrency(Number(form.monthlyRent) || 0)} — the previous rent is archived for history.
+          </div>
+        )}
+        <Button type="submit" loading={saving} className="w-full">Save changes</Button>
+      </form>
+
+      {revisions.length > 0 && (
+        <div className="mt-6 space-y-2">
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Rent revision history</h4>
+          {revisions.map((r) => (
+            <div key={r.id} className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs">
+              <span className="text-slate-400">{formatDate(r.changed_at)}</span>
+              <span className="text-slate-200">
+                {formatCurrency(r.old_rent)} <span className="text-slate-500">→</span>{" "}
+                <span className="font-semibold text-emerald-400">{formatCurrency(r.new_rent)}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/* ============================================================ PROPERTY HISTORY */
+function PropertyHistoryModal({ property, onClose }: { property: Property | null; onClose: () => void }) {
+  const [rows, setRows] = useState<OccupancyHistory[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!property) return;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await rentMasterFetch(`/api/admin/occupancy?propertyId=${encodeURIComponent(property.id)}`, { role: "owner" });
+        setRows(res.data || []);
+      } catch { setRows([]); }
+      finally { setLoading(false); }
+    })();
+  }, [property]);
+
+  return (
+    <Modal open={!!property} onClose={onClose} size="lg" title="Occupancy history"
+      subtitle={property ? `${property.name} · past residents` : undefined}>
+      {loading ? (
+        <p className="text-sm text-slate-500">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-slate-400">
+          No past tenants archived yet. When you vacate this unit, the outgoing resident is recorded here.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((o) => (
+            <div key={o.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="font-semibold text-slate-100">{o.tenant_name}</div>
+                <span className="text-xs text-slate-500">{o.tenant_phone}</span>
+              </div>
+              <div className="mt-2 grid grid-cols-1 gap-1.5 text-xs text-slate-400 sm:grid-cols-3">
+                <span>From: {o.lease_start ? formatDate(o.lease_start) : "—"}</span>
+                <span>To: {o.lease_end ? formatDate(o.lease_end) : "—"}</span>
+                <span className="font-semibold text-emerald-400">Rent paid: {formatCurrency(o.total_rent_paid ?? 0)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/* ============================================================ OWNER SIGNATURE */
+function SignatureModal({
+  open, onClose, current, onSaved,
+}: {
+  open: boolean; onClose: () => void; current: string | null; onSaved: (url: string) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function pick(f: File | null) {
+    if (!f) return;
+    if (!f.type.startsWith("image/")) { toast.warning("Please choose an image (a transparent PNG works best)."); return; }
+    if (f.size > 8 * 1024 * 1024) { toast.warning("Image must be under 8MB."); return; }
+    setPreview((p) => { if (p) URL.revokeObjectURL(p); return URL.createObjectURL(f); });
+    setFile(f);
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return;
+    try {
+      setSaving(true);
+      const url = await uploadFile(file, { role: "owner", folder: "signatures" });
+      const res = await rentMasterFetch("/api/admin/owner/signature", {
+        method: "POST", role: "owner", body: JSON.stringify({ signatureUrl: url }),
+      });
+      if (res.success) {
+        onSaved(url);
+        setPreview((p) => { if (p) URL.revokeObjectURL(p); return ""; });
+        setFile(null);
+        onClose();
+        toast.success("Signature saved.");
+      }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Your signature"
+      subtitle="Attached to every rent receipt you issue.">
+      <form onSubmit={submit} className="space-y-4">
+        {(preview || current) && (
+          <div className="rounded-xl border border-white/[0.08] bg-white p-4 text-center">
+            <img src={preview || current || ""} alt="Signature" className="mx-auto max-h-24 object-contain" />
+          </div>
+        )}
+        <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] px-4 py-6 text-center text-sm text-slate-400 transition hover:border-indigo-400/40 hover:text-slate-300">
+          <Upload className="h-5 w-5" />
+          <span>{current ? "Replace signature image" : "Upload signature image"}</span>
+          <span className="text-[11px] text-slate-500">Transparent PNG recommended</span>
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+        </label>
+        <Button type="submit" loading={saving} disabled={!file} className="w-full">Save signature</Button>
+      </form>
+    </Modal>
+  );
+}
+
+/* ============================================================ MAINTENANCE STATUS */
+function MaintenanceStatusModal({
+  log, onClose, onSaved,
+}: { log: MaintenanceLog | null; onClose: () => void; onSaved: (m: MaintenanceLog) => void }) {
+  const [status, setStatus] = useState<ResolutionStatus>("reported");
+  const [remarks, setRemarks] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (log) { setStatus(log.resolution_status); setRemarks(log.resolution_remarks ?? ""); }
+  }, [log]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!log) return;
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch(`/api/admin/maintenance/${log.id}`, {
+        method: "PATCH", role: "owner",
+        body: JSON.stringify({ resolutionStatus: status, resolutionRemarks: remarks }),
+      });
+      if (res.success) { onSaved(res.data); onClose(); toast.success("Request updated."); }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={!!log} onClose={onClose} title="Update maintenance status" subtitle={log ? log.issue_title : undefined}>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Status" required>
+          <Select value={status} onChange={(e) => setStatus(e.target.value as ResolutionStatus)}>
+            <option value="reported">Reported</option>
+            <option value="in_progress">In progress</option>
+            <option value="resolved">Resolved</option>
+          </Select>
+        </Field>
+        <Field label="Remarks" hint="Shared with the tenant on their request.">
+          <TextArea rows={4} placeholder="e.g. Plumber scheduled for Friday; parts ordered."
+            value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+        </Field>
+        <Button type="submit" loading={saving} className="w-full">Save update</Button>
+      </form>
+    </Modal>
+  );
+}
+
+/* ============================================================ TENANT DOCUMENTS */
+function OwnerDocumentsModal({ tenant, onClose }: { tenant: Tenant | null; onClose: () => void }) {
+  const [docs, setDocs] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [title, setTitle] = useState("");
+  const [docType, setDocType] = useState("deed");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    if (!tenant) return;
+    setTitle(""); setDocType("deed"); setFile(null);
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await rentMasterFetch(`/api/admin/documents?tenantId=${encodeURIComponent(tenant.id)}`, { role: "owner" });
+        setDocs(res.data || []);
+      } catch { setDocs([]); }
+      finally { setLoading(false); }
+    })();
+  }, [tenant]);
+
+  async function upload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!tenant || !file || !title.trim()) return;
+    try {
+      setUploading(true);
+      const url = await uploadFile(file, { role: "owner", folder: "documents" });
+      const res = await rentMasterFetch("/api/admin/documents", {
+        method: "POST", role: "owner",
+        body: JSON.stringify({ tenantId: tenant.id, title: title.trim(), docType, fileUrl: url }),
+      });
+      if (res.success) { setDocs((d) => [res.data, ...d]); setTitle(""); setFile(null); toast.success("Document uploaded."); }
+    } catch (e: any) { toast.error(`Upload failed: ${e.message}`); }
+    finally { setUploading(false); }
+  }
+
+  async function remove(id: string) {
+    if (!(await confirmDialog({
+      title: "Delete document?",
+      message: "This permanently removes the document.",
+      confirmLabel: "Delete",
+      danger: true,
+    }))) return;
+    const prev = docs;
+    setDocs((d) => d.filter((x) => x.id !== id));
+    try {
+      await rentMasterFetch(`/api/admin/documents/${id}`, { method: "DELETE", role: "owner" });
+      toast.success("Document deleted.");
+    } catch (e: any) { setDocs(prev); toast.error(`Delete failed: ${e.message}`); }
+  }
+
+  return (
+    <Modal open={!!tenant} onClose={onClose} size="lg" title="Tenant documents"
+      subtitle={tenant ? `${tenant.name} · visible only to this tenant` : undefined}>
+      <form onSubmit={upload} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Document title" required>
+            <TextInput required placeholder="e.g. Property deed" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </Field>
+          <Field label="Type">
+            <Select value={docType} onChange={(e) => setDocType(e.target.value)}>
+              <option value="deed">Deed</option>
+              <option value="agreement">Agreement</option>
+              <option value="receipt">Receipt</option>
+              <option value="other">Other</option>
+            </Select>
+          </Field>
+        </div>
+        <Field label="File" required hint="PDF or image, up to 8MB.">
+          {file ? (
+            <div className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-sm text-slate-200">
+              <span className="truncate">{file.name}</span>
+              <button type="button" onClick={() => setFile(null)} className="ml-2 text-slate-400 transition hover:text-rose-400"><X className="h-4 w-4" /></button>
+            </div>
+          ) : (
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] px-4 py-4 text-sm text-slate-400 transition hover:border-indigo-400/40 hover:text-slate-300">
+              <Upload className="h-4 w-4" /> Choose a file
+              <input type="file" accept="image/*,application/pdf" className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            </label>
+          )}
+        </Field>
+        <Button type="submit" loading={uploading} disabled={!file || !title.trim()} icon={Upload} className="w-full">
+          Upload document
+        </Button>
+      </form>
+
+      <div className="mt-6 space-y-2">
+        <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Existing documents</h4>
+        {loading ? (
+          <p className="text-sm text-slate-500">Loading…</p>
+        ) : docs.length === 0 ? (
+          <p className="text-sm text-slate-500">No documents yet for this tenant.</p>
+        ) : (
+          docs.map((d) => (
+            <div key={d.id} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+              <FileText className="h-4 w-4 shrink-0 text-indigo-400" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-slate-200">{d.title}</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500">{d.doc_type ?? "document"} · {formatDate(d.created_at)}</div>
+              </div>
+              <a href={d.file_url} target="_blank" rel="noreferrer" title="Open"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/[0.06] hover:text-indigo-400"><Download className="h-4 w-4" /></a>
+              <button type="button" onClick={() => remove(d.id)} title="Delete"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-400"><Trash2 className="h-4 w-4" /></button>
+            </div>
+          ))
+        )}
+      </div>
+    </Modal>
+  );
+}

@@ -1,0 +1,12 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="44" fill="#030712"/>
+  <rect x="12" y="12" width="168" height="168" rx="36" fill="url(#g)" opacity="0.14"/>
+  <path d="M56 132V80l40-28 40 28v52h-28v-32H84v32H56Z" fill="url(#g)"/>
+  <text x="96" y="164" font-family="system-ui, sans-serif" font-size="20" font-weight="800" fill="#e2e8f0" text-anchor="middle" letter-spacing="2">RM</text>
+</svg>
