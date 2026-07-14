@@ -14,28 +14,45 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return output;
 }
 
-/**
- * Ensure a push subscription exists and is registered with the backend. Safe to call on
- * every login — it's idempotent and fails silently if unsupported / permission denied.
- * `token` is the Bearer session token needed to authenticate the register call.
- */
-export async function ensurePushSubscription(token?: string): Promise<void> {
-  try {
-    if (
-      typeof window === "undefined" ||
-      !("serviceWorker" in navigator) ||
-      !("PushManager" in window) ||
-      !("Notification" in window) ||
-      !VAPID_PUBLIC_KEY
-    ) {
-      return;
-    }
+export type PushPermission = "granted" | "default" | "denied" | "unsupported";
 
-    // The SW is disabled in `next dev`; `ready` never resolves there, so bail after a
-    // short wait instead of hanging the login flow.
+/** What the browser currently allows, without prompting. */
+export function getPushPermission(): PushPermission {
+  if (
+    typeof window === "undefined" ||
+    !("serviceWorker" in navigator) ||
+    !("PushManager" in window) ||
+    !("Notification" in window) ||
+    !VAPID_PUBLIC_KEY
+  ) {
+    return "unsupported";
+  }
+  return Notification.permission as PushPermission;
+}
+
+/**
+ * Ensure a push subscription exists and is registered with the backend. Idempotent and
+ * safe to call on every login *and* on every dashboard mount — the latter is what heals a
+ * device whose earlier registration failed (a subscription can exist in the browser while
+ * the backend has no record of it, e.g. if the register call was blocked by CORS).
+ *
+ * `token` is the Bearer session token needed to authenticate the register call.
+ * Pass `prompt: false` to skip devices that haven't granted permission yet, so a silent
+ * background re-registration never triggers a permission dialog out of nowhere.
+ */
+export async function ensurePushSubscription(
+  token?: string,
+  { prompt = true }: { prompt?: boolean } = {},
+): Promise<void> {
+  try {
+    if (getPushPermission() === "unsupported") return;
+    if (!prompt && Notification.permission !== "granted") return;
+
+    // The SW is disabled in `next dev`; `ready` never resolves there, so bail instead of
+    // hanging. A cold PWA start on Android can take a few seconds to activate the worker.
     const registration = await Promise.race([
       navigator.serviceWorker.ready,
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)),
     ]);
     if (!registration) return;
 
@@ -50,7 +67,7 @@ export async function ensurePushSubscription(token?: string): Promise<void> {
       });
     }
 
-    await fetch(`${BACKEND_API_BASE}/api/notifications/register`, {
+    const res = await fetch(`${BACKEND_API_BASE}/api/notifications/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -61,8 +78,14 @@ export async function ensurePushSubscription(token?: string): Promise<void> {
         deviceDetails: /Android/i.test(navigator.userAgent) ? "android" : "web",
       }),
     });
+
+    // Don't fail the caller, but don't vanish either: a silent register failure here is
+    // exactly how push ends up dead with no trace.
+    if (!res.ok) {
+      console.error(`[push] register failed (${res.status}):`, await res.text().catch(() => ""));
+    }
   } catch (err) {
-    // Never let push setup break the login flow.
+    // Never let push setup break the login or dashboard render.
     console.warn("[push] subscription skipped:", err);
   }
 }

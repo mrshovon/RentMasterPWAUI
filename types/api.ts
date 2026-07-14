@@ -22,7 +22,8 @@ export interface Property {
 
 export interface Tenant {
   id: string;
-  property_id: string;
+  // null when the tenant is unassigned — moved out, or between units.
+  property_id: string | null;
   name: string;
   phone: string;
   family_members: number;
@@ -34,8 +35,11 @@ export interface Tenant {
   service_charge: number;
   advance_amount: number;
   created_at: string;
-  // Relational join (GET /api/admin/tenants)
-  properties?: { id: string; name: string; owner_id: string };
+  // Owner override: lets a tenant with no property still sign in. Unassigned tenants are
+  // blocked by default, so this is only meaningful when property_id is null.
+  allow_login_unassigned: boolean;
+  // Relational join (GET /api/admin/tenants) — null when unassigned.
+  properties?: { id: string; name: string; owner_id: string } | null;
 }
 
 export interface BillingLedger {
@@ -234,6 +238,30 @@ export interface AdminOwner {
 export interface AdminOwnerDetail extends AdminOwner {
   propertyCount: number;
   tenantCount: number;
+}
+
+// ---- Support tickets (owner -> system admin) ----
+export type TicketStatus = "submitted" | "assigned" | "in_progress" | "done";
+export type TicketCategory = "billing" | "technical" | "account" | "feature_request" | "other";
+
+export interface SupportTicket {
+  id: string;
+  ticket_no: number;
+  owner_id: string;
+  subject: string;
+  description: string;
+  category: TicketCategory;
+  priority: PriorityLevel;
+  status: TicketStatus;
+  attachment_file_url: string | null; // one URL, or several JSON-encoded (see parseAttachments)
+  admin_remarks: string | null;
+  assigned_to: string | null;
+  assigned_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // Attached by the admin queue endpoint only (owners are auth users, not a table).
+  owner?: { name: string | null; email: string | null; phone: string | null } | null;
 }
 
 // Generic envelope returned by every backend route

@@ -16,8 +16,22 @@ interface FetchOptions extends RequestInit {
   role?: "owner" | "tenant" | "admin";
 }
 
+// Errors carry the HTTP status and the backend's machine-readable `code` when it sends one
+// (SUBSCRIPTION_LOCKED, ITEM_DISABLED, LIMIT_REACHED, LOGIN_BLOCKED, …), so callers can branch
+// on *why* a call failed instead of string-matching the message.
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 // Reads the real session token (if the user logged in) from localStorage.
-function getSessionToken(): string | null {
+export function getSessionToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
     return JSON.parse(localStorage.getItem("rentmaster_session") || "{}").token || null;
@@ -42,7 +56,9 @@ export async function apiLogin(payload: {
     throw new Error(`Cannot reach backend at ${BACKEND_API_BASE}. Is the API server running on :3000?`);
   }
   const json = await res.json().catch(() => ({}));
-  if (!res.ok || !json.success) throw new Error(json.error || "Login failed.");
+  if (!res.ok || !json.success) {
+    throw new ApiError(json.error || "Login failed.", res.status, json.code);
+  }
   return json;
 }
 
@@ -118,8 +134,10 @@ export async function rentMasterFetch<T = any>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error || `Request failed (${response.status}) — ${endpoint}`
+      throw new ApiError(
+        errorData.error || `Request failed (${response.status}) — ${endpoint}`,
+        response.status,
+        errorData.code
       );
     }
 

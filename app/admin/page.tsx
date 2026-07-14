@@ -4,33 +4,55 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, CreditCard, Megaphone, Plus, Ban, KeyRound,
   Trash2, Mail, CheckCircle2, ShieldOff, ShieldCheck, Inbox, Building2, Eye,
-  RotateCcw, CircleDollarSign, Pencil, Power, Percent,
+  RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy,
 } from "lucide-react";
 import { rentMasterFetch } from "../../lib/api-service";
 import { toast } from "../../components/toast";
 import { confirmDialog } from "../../components/confirm";
 import { useSessionGuard } from "../../lib/use-session";
 import { useTabState } from "../../lib/use-tab";
-import { AdminOwner, AdminOwnerDetail, SubscriptionTier } from "../../types/api";
+import { usePendingAction } from "../../lib/use-pending";
+import {
+  AdminOwner, AdminOwnerDetail, SubscriptionTier,
+  SupportTicket, TicketStatus, TicketCategory, PriorityLevel,
+} from "../../types/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
+import { AttachmentStrip } from "../../components/attachments";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
-  PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput,
+  PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
 } from "../../components/ui";
+
+const ticketStatusTone: Record<TicketStatus, "slate" | "indigo" | "cyan" | "emerald"> = {
+  submitted: "slate", assigned: "indigo", in_progress: "cyan", done: "emerald",
+};
+const ticketStatusLabel: Record<TicketStatus, string> = {
+  submitted: "Submitted", assigned: "Assigned", in_progress: "In progress", done: "Done",
+};
+const ticketCategoryLabel: Record<TicketCategory, string> = {
+  billing: "Billing", technical: "Technical", account: "Account",
+  feature_request: "Feature request", other: "Other",
+};
+const ticketPriorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
+  low: "slate", medium: "amber", high: "rose", urgent: "rose",
+};
 
 export default function AdminDashboard() {
   const { session, checkingSession, logout } = useSessionGuard("admin");
+  const { isPending, run } = usePendingAction();
   const [tab, setTab] = useTabState("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [owners, setOwners] = useState<AdminOwner[]>([]);
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [tierModal, setTierModal] = useState<{ mode: "create" | "edit"; tier?: SubscriptionTier } | null>(null);
+  const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
 
   async function refreshOwners() {
     const res = await rentMasterFetch("/api/super-admin/owners", { role: "admin" });
@@ -45,13 +67,15 @@ export default function AdminDashboard() {
     (async () => {
       try {
         setLoading(true);
-        const [o, t] = await Promise.allSettled([
+        const [o, t, s] = await Promise.allSettled([
           rentMasterFetch("/api/super-admin/owners", { role: "admin" }),
           rentMasterFetch("/api/super-admin/tiers", { role: "admin" }),
+          rentMasterFetch("/api/super-admin/support-tickets", { role: "admin" }),
         ]);
         if (o.status === "fulfilled") setOwners(o.value.data || []);
         if (t.status === "fulfilled") setTiers(t.value.data || []);
-        const err = [o, t].find((r) => r.status === "rejected");
+        if (s.status === "fulfilled") setTickets(s.value.data || []);
+        const err = [o, t, s].find((r) => r.status === "rejected");
         if (err && err.status === "rejected") setError((err.reason as Error).message);
       } finally {
         setLoading(false);
@@ -64,6 +88,7 @@ export default function AdminDashboard() {
     active: owners.filter((o) => !o.suspended).length,
     suspended: owners.filter((o) => o.suspended).length,
     subscribed: owners.filter((o) => o.subscription?.status === "active").length,
+    openTickets: tickets.filter((t) => t.status !== "done").length,
   };
 
   const nav: NavItem[] = [
@@ -71,7 +96,13 @@ export default function AdminDashboard() {
     { key: "owners", label: "Owners", icon: Users, badge: owners.length },
     { key: "subscriptions", label: "Plans", icon: CreditCard },
     { key: "notices", label: "Circulate", icon: Megaphone },
+    { key: "tickets", label: "Tickets", icon: LifeBuoy, badge: metrics.openTickets },
   ];
+
+  // The PATCH response is the bare row (no owner join) — keep the enrichment we already have.
+  function applyTicketUpdate(updated: SupportTicket) {
+    setTickets((xs) => xs.map((x) => (x.id === updated.id ? { ...x, ...updated, owner: x.owner } : x)));
+  }
 
   async function quickToggleSuspend(o: AdminOwner) {
     const action = o.suspended ? "reactivate" : "suspend";
@@ -81,13 +112,16 @@ export default function AdminDashboard() {
       confirmLabel: "Suspend",
       danger: true,
     }))) return;
-    try {
-      await rentMasterFetch(`/api/super-admin/owners/${o.id}`, {
-        method: "PATCH", role: "admin", body: JSON.stringify({ action }),
-      });
-      await refreshOwners();
-      toast.success(action === "suspend" ? "Owner suspended." : "Owner reactivated.");
-    } catch (e: any) { toast.error(e.message); }
+    // Mutate + refetch is two round-trips; without a pending state the row just sits there.
+    await run(`owner:${o.id}`, async () => {
+      try {
+        await rentMasterFetch(`/api/super-admin/owners/${o.id}`, {
+          method: "PATCH", role: "admin", body: JSON.stringify({ action }),
+        });
+        await refreshOwners();
+        toast.success(action === "suspend" ? "Owner suspended." : "Owner reactivated.");
+      } catch (e: any) { toast.error(e.message); }
+    });
   }
 
   async function deleteOwner(o: AdminOwner) {
@@ -97,23 +131,27 @@ export default function AdminDashboard() {
       confirmLabel: "Delete",
       danger: true,
     }))) return;
-    try {
-      await rentMasterFetch(`/api/super-admin/owners/${o.id}`, { method: "DELETE", role: "admin" });
-      await refreshOwners();
-      toast.success("Owner account deleted.");
-    } catch (e: any) { toast.error(e.message); }
+    await run(`owner:${o.id}`, async () => {
+      try {
+        await rentMasterFetch(`/api/super-admin/owners/${o.id}`, { method: "DELETE", role: "admin" });
+        await refreshOwners();
+        toast.success("Owner account deleted.");
+      } catch (e: any) { toast.error(e.message); }
+    });
   }
 
   async function toggleTier(t: SubscriptionTier) {
     const activating = t.is_active === false;
-    try {
-      await rentMasterFetch(`/api/super-admin/tiers/${t.id}`, {
-        method: "PATCH", role: "admin",
-        body: JSON.stringify({ action: activating ? "activate" : "deactivate" }),
-      });
-      await refreshTiers();
-      toast.success(activating ? "Plan activated." : "Plan deactivated.");
-    } catch (e: any) { toast.error(e.message); }
+    await run(`tier:${t.id}`, async () => {
+      try {
+        await rentMasterFetch(`/api/super-admin/tiers/${t.id}`, {
+          method: "PATCH", role: "admin",
+          body: JSON.stringify({ action: activating ? "activate" : "deactivate" }),
+        });
+        await refreshTiers();
+        toast.success(activating ? "Plan activated." : "Plan deactivated.");
+      } catch (e: any) { toast.error(e.message); }
+    });
   }
 
   async function deleteTier(t: SubscriptionTier) {
@@ -123,11 +161,13 @@ export default function AdminDashboard() {
       confirmLabel: "Delete",
       danger: true,
     }))) return;
-    try {
-      await rentMasterFetch(`/api/super-admin/tiers/${t.id}`, { method: "DELETE", role: "admin" });
-      await refreshTiers();
-      toast.success("Plan deleted.");
-    } catch (e: any) { toast.error(e.message); }
+    await run(`tier:${t.id}`, async () => {
+      try {
+        await rentMasterFetch(`/api/super-admin/tiers/${t.id}`, { method: "DELETE", role: "admin" });
+        await refreshTiers();
+        toast.success("Plan deleted.");
+      } catch (e: any) { toast.error(e.message); }
+    });
   }
 
   if (checkingSession || loading)
@@ -180,6 +220,7 @@ export default function AdminDashboard() {
           onView={setDetailId}
           onToggleSuspend={quickToggleSuspend}
           onDelete={deleteOwner}
+          isPending={isPending}
         />
       )}
 
@@ -190,10 +231,13 @@ export default function AdminDashboard() {
           onEdit={(t) => setTierModal({ mode: "edit", tier: t })}
           onToggle={toggleTier}
           onDelete={deleteTier}
+          isPending={isPending}
         />
       )}
 
       {tab === "notices" && <CirculateTab />}
+
+      {tab === "tickets" && <TicketsTab tickets={tickets} onOpen={setActiveTicket} />}
 
       <CreateOwnerModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={refreshOwners} />
       <OwnerDetailModal
@@ -203,19 +247,25 @@ export default function AdminDashboard() {
         onChanged={refreshOwners}
       />
       <TierModal state={tierModal} onClose={() => setTierModal(null)} onSaved={refreshTiers} />
+      <TicketStatusModal
+        ticket={activeTicket}
+        onClose={() => setActiveTicket(null)}
+        onSaved={applyTicketUpdate}
+      />
     </DashboardShell>
   );
 }
 
 /* ============================================================ OWNERS TAB */
 function OwnersTab({
-  owners, onAdd, onView, onToggleSuspend, onDelete,
+  owners, onAdd, onView, onToggleSuspend, onDelete, isPending,
 }: {
   owners: AdminOwner[];
   onAdd: () => void;
   onView: (id: string) => void;
   onToggleSuspend: (o: AdminOwner) => void;
   onDelete: (o: AdminOwner) => void;
+  isPending: (key: string) => boolean;
 }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -271,8 +321,10 @@ function OwnersTab({
                       <div className="flex items-center justify-end gap-1">
                         <IconBtn title="View / manage" tone="indigo" icon={Eye} onClick={() => onView(o.id)} />
                         <IconBtn title={o.suspended ? "Reactivate" : "Suspend"} tone={o.suspended ? "emerald" : "amber"}
-                          icon={o.suspended ? RotateCcw : Ban} onClick={() => onToggleSuspend(o)} />
-                        <IconBtn title="Delete" tone="rose" icon={Trash2} onClick={() => onDelete(o)} />
+                          icon={o.suspended ? RotateCcw : Ban} onClick={() => onToggleSuspend(o)}
+                          loading={isPending(`owner:${o.id}`)} />
+                        <IconBtn title="Delete" tone="rose" icon={Trash2} onClick={() => onDelete(o)}
+                          loading={isPending(`owner:${o.id}`)} />
                       </div>
                     </td>
                   </tr>
@@ -289,9 +341,10 @@ function OwnersTab({
 }
 
 function IconBtn({
-  title, tone, icon: Icon, onClick,
+  title, tone, icon: Icon, onClick, loading,
 }: {
   title: string; tone: "indigo" | "amber" | "emerald" | "rose"; icon: typeof Eye; onClick: () => void;
+  loading?: boolean;
 }) {
   const tones = {
     indigo: "text-indigo-400 hover:bg-indigo-500/10",
@@ -300,9 +353,210 @@ function IconBtn({
     rose: "text-rose-400 hover:bg-rose-500/10",
   };
   return (
-    <button title={title} onClick={onClick} className={`rounded-lg p-1.5 transition ${tones[tone]}`}>
-      <Icon className="h-4 w-4" />
+    <button
+      title={title}
+      onClick={onClick}
+      disabled={loading}
+      className={`rounded-lg p-1.5 transition disabled:pointer-events-none disabled:opacity-50 ${tones[tone]}`}
+    >
+      {loading ? <Spinner className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
     </button>
+  );
+}
+
+/* ============================================================ SUPPORT TICKETS TAB */
+const TICKET_FILTERS: { key: TicketStatus | "all"; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "submitted", label: "Submitted" },
+  { key: "assigned", label: "Assigned" },
+  { key: "in_progress", label: "In progress" },
+  { key: "done", label: "Done" },
+];
+
+function ticketAge(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "Today";
+  return days === 1 ? "1 day" : `${days} days`;
+}
+
+function TicketsTab({
+  tickets, onOpen,
+}: {
+  tickets: SupportTicket[]; onOpen: (t: SupportTicket) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<TicketStatus | "all">("all");
+
+  const q = query.trim().toLowerCase();
+  const filtered = tickets
+    .filter((t) => filter === "all" || t.status === filter)
+    .filter((t) =>
+      !q ||
+      [t.subject, t.description, t.owner?.name, t.owner?.email, `#${t.ticket_no}`]
+        .some((v) => String(v ?? "").toLowerCase().includes(q)));
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Support tickets" subtitle="Issues and queries raised by property owners." />
+
+      {tickets.length === 0 ? (
+        <EmptyState icon={LifeBuoy} title="No tickets" hint="When an owner raises a ticket, it lands here." />
+      ) : (
+        <>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex-1"><SearchInput value={query} onChange={setQuery} placeholder="Search by subject, owner or #number…" /></div>
+            <div className="flex flex-wrap gap-1.5">
+              {TICKET_FILTERS.map((f) => {
+                const count = f.key === "all" ? tickets.length : tickets.filter((t) => t.status === f.key).length;
+                const isActive = filter === f.key;
+                return (
+                  <button
+                    key={f.key}
+                    onClick={() => setFilter(f.key)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      isActive
+                        ? "bg-amber-500/15 text-amber-300"
+                        : "text-slate-500 hover:bg-white/[0.05] hover:text-slate-300"
+                    }`}
+                  >
+                    {f.label} <span className="opacity-60">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {filtered.length === 0 ? (
+            <EmptyState icon={LifeBuoy} title="No matches" hint="No tickets match the current search or filter." />
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[860px] text-left text-sm">
+                  <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                    <tr>
+                      <th className="p-4">#</th>
+                      <th className="p-4">Owner</th>
+                      <th className="p-4">Subject</th>
+                      <th className="p-4">Category</th>
+                      <th className="p-4">Priority</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Age</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04]">
+                    {filtered.map((t) => (
+                      <tr key={t.id} className="hover:bg-white/[0.02]">
+                        <td className="p-4 font-mono text-xs text-slate-500">#{t.ticket_no}</td>
+                        <td className="p-4">
+                          <div className="font-semibold text-slate-100">{t.owner?.name || "—"}</div>
+                          <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" /> {t.owner?.email || "unknown"}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="max-w-[260px] truncate font-medium text-slate-200">{t.subject}</div>
+                        </td>
+                        <td className="p-4"><Badge tone="slate">{ticketCategoryLabel[t.category]}</Badge></td>
+                        <td className="p-4"><Badge tone={ticketPriorityTone[t.priority]}>{t.priority}</Badge></td>
+                        <td className="p-4"><Badge tone={ticketStatusTone[t.status]}>{ticketStatusLabel[t.status]}</Badge></td>
+                        <td className="p-4 text-xs text-slate-500">{ticketAge(t.created_at)}</td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <IconBtn title="Open / update" tone="indigo" icon={Eye} onClick={() => onOpen(t)} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function TicketStatusModal({
+  ticket, onClose, onSaved,
+}: {
+  ticket: SupportTicket | null;
+  onClose: () => void;
+  onSaved: (t: SupportTicket) => void;
+}) {
+  const [status, setStatus] = useState<TicketStatus>("submitted");
+  const [remarks, setRemarks] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (ticket) {
+      setStatus(ticket.status);
+      setRemarks(ticket.admin_remarks || "");
+    }
+  }, [ticket]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ticket) return;
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch(`/api/super-admin/support-tickets/${ticket.id}`, {
+        method: "PATCH", role: "admin",
+        body: JSON.stringify({ status, adminRemarks: remarks }),
+      });
+      if (res.success) {
+        onSaved(res.data);
+        onClose();
+        toast.success(`Ticket #${ticket.ticket_no} updated.`);
+      }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal
+      open={!!ticket}
+      onClose={onClose}
+      size="lg"
+      title={ticket ? `Ticket #${ticket.ticket_no}` : "Ticket"}
+      subtitle={ticket?.subject}
+    >
+      {ticket && (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={ticketPriorityTone[ticket.priority]}>{ticket.priority}</Badge>
+            <Badge tone="slate">{ticketCategoryLabel[ticket.category]}</Badge>
+            <Badge tone={ticketStatusTone[ticket.status]}>{ticketStatusLabel[ticket.status]}</Badge>
+            <span className="ml-auto text-xs text-slate-500">Raised {formatDate(ticket.created_at)}</span>
+          </div>
+
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              From {ticket.owner?.name || "owner"}{ticket.owner?.email ? ` · ${ticket.owner.email}` : ""}
+            </div>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{ticket.description}</p>
+          </div>
+
+          <AttachmentStrip raw={ticket.attachment_file_url} />
+
+          <form onSubmit={submit} className="space-y-4 border-t border-white/[0.06] pt-5">
+            <Field label="Status" required>
+              <Select value={status} onChange={(e) => setStatus(e.target.value as TicketStatus)}>
+                <option value="submitted">Submitted</option>
+                <option value="assigned">Assigned</option>
+                <option value="in_progress">In progress</option>
+                <option value="done">Done</option>
+              </Select>
+            </Field>
+            <Field label="Resolution note" hint="Shared with the owner on their ticket.">
+              <TextArea rows={4} value={remarks} onChange={(e) => setRemarks(e.target.value)}
+                placeholder="What was done, or what you need from them…" />
+            </Field>
+            <Button type="submit" loading={saving} className="w-full">Save update</Button>
+          </form>
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -313,11 +567,12 @@ function discountedPrice(t: SubscriptionTier) {
 }
 
 function PlansTab({
-  tiers, onCreate, onEdit, onToggle, onDelete,
+  tiers, onCreate, onEdit, onToggle, onDelete, isPending,
 }: {
   tiers: SubscriptionTier[];
   onCreate: () => void; onEdit: (t: SubscriptionTier) => void;
   onToggle: (t: SubscriptionTier) => void; onDelete: (t: SubscriptionTier) => void;
+  isPending: (key: string) => boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -372,10 +627,12 @@ function PlansTab({
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(t)} className="flex-1">Edit</Button>
-                  <Button size="sm" variant="secondary" icon={Power} onClick={() => onToggle(t)} className="flex-1">
+                  <Button size="sm" variant="secondary" icon={Power} onClick={() => onToggle(t)} className="flex-1"
+                    loading={isPending(`tier:${t.id}`)}>
                     {inactive ? "Activate" : "Deactivate"}
                   </Button>
-                  <IconBtn title="Delete" tone="rose" icon={Trash2} onClick={() => onDelete(t)} />
+                  <IconBtn title="Delete" tone="rose" icon={Trash2} onClick={() => onDelete(t)}
+                    loading={isPending(`tier:${t.id}`)} />
                 </div>
               </Card>
             );

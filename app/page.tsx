@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { ArrowRight, Phone, Lock, Mail } from "lucide-react";
 import { apiLogin } from "../lib/api-service";
-import { ensurePushSubscription } from "../lib/push";
 import { Button } from "../components/ui";
 
 export default function EntryGatewayPage() {
@@ -15,17 +14,18 @@ export default function EntryGatewayPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function persist(role: "owner" | "tenant" | "admin", userId: string, name: string, token?: string) {
+  // Redirect immediately. Push setup deliberately does NOT happen here: PushToggle (rendered
+  // in DashboardShell) re-registers permitted devices on every dashboard mount and otherwise
+  // prompts from an explicit button. Awaiting it here stalled the redirect for seconds —
+  // navigator.serviceWorker.ready never resolves in `next dev`, where the SW is disabled.
+  // `replace` (not `href`) so Back doesn't land on the login screen while signed in.
+  function persist(role: "owner" | "tenant" | "admin", userId: string, name: string, token?: string) {
     localStorage.setItem("rentmaster_session", JSON.stringify({ role, userId, name, token }));
-    // Ask for push permission during the login gesture, but never let it block the redirect
-    // for more than a moment (permission prompt / network can hang).
-    await Promise.race([
-      ensurePushSubscription(token),
-      new Promise((resolve) => setTimeout(resolve, 6000)),
-    ]);
-    window.location.href = `/${role}`;
+    window.location.replace(`/${role}`);
   }
 
+  // NOTE: `loading` is intentionally left true on success — the button must keep spinning until
+  // the page navigates away, or the UI looks idle-but-done while the redirect is in flight.
   async function loginTenant(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -34,8 +34,10 @@ export default function EntryGatewayPage() {
       setLoading(true);
       const r = await apiLogin({ mode: "tenant", phone: phone.trim(), passcode: pass.trim() });
       persist("tenant", r.id, r.name, r.token);
-    } catch (err: any) { setError(err.message); }
-    finally { setLoading(false); }
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
   }
 
   async function loginOwner(e: React.FormEvent) {
@@ -46,8 +48,10 @@ export default function EntryGatewayPage() {
       setLoading(true);
       const r = await apiLogin({ mode: "owner", email: email.trim(), password: ownerPass });
       persist(r.role === "admin" ? "admin" : "owner", r.id, r.name, r.token);
-    } catch (err: any) { setError(err.message); }
-    finally { setLoading(false); }
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
   }
 
   return (

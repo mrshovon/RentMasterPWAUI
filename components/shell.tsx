@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import { LogOut, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
+import { PushToggle } from "./push-toggle";
 
 export interface NavItem {
   key: string;
@@ -132,13 +133,18 @@ export function DashboardShell({
         </header>
 
         <main className="flex-1 px-4 pb-28 pt-6 md:px-8 md:pb-10 lg:px-10">
-          <div className="mx-auto w-full max-w-6xl animate-slide-up">{children}</div>
+          <div className="mx-auto w-full max-w-6xl animate-slide-up">
+            <PushToggle />
+            {children}
+          </div>
         </main>
       </div>
 
       {/* ---------------- Mobile bottom nav ---------------- */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-slate-950/90 backdrop-blur-xl md:hidden">
-        <div className="mx-auto flex max-w-lg items-stretch justify-around">
+        {/* Scrolls rather than shrinks: past ~6 items, flex-1 would crush each tab to a
+            few dozen pixels. Fixed-width items + horizontal scroll keeps them tappable. */}
+        <div className="mx-auto flex max-w-lg items-stretch justify-start overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {nav.map((item) => {
             const isActive = item.key === active;
             const Icon = item.icon;
@@ -147,7 +153,7 @@ export function DashboardShell({
                 key={item.key}
                 onClick={() => onNavigate(item.key)}
                 className={cn(
-                  "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition-colors",
+                  "relative flex min-w-[4.5rem] shrink-0 grow flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition-colors",
                   isActive ? "text-indigo-400" : "text-slate-500"
                 )}
               >

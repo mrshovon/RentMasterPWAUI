@@ -8,7 +8,7 @@ import {
   FileText, Download, History, Receipt, type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { rentMasterFetch, uploadFile, DEMO_TENANT_ID } from "../../lib/api-service";
+import { rentMasterFetch, uploadFile, DEMO_TENANT_ID, ApiError } from "../../lib/api-service";
 import { toast } from "../../components/toast";
 import { buildReceiptHtml } from "../../lib/receipt";
 import { ReceiptModal } from "../../components/receipt-modal";
@@ -61,6 +61,14 @@ export default function TenantDashboard() {
           rentMasterFetch("/api/admin/notices", { role: "tenant" }),
           rentMasterFetch("/api/admin/tenants/me", { role: "tenant" }),
         ]);
+        // The owner has cut this tenant's access (unassigned, no override). Tenant JWTs carry no
+        // revocation, so this mount check is what actually ends an already-signed-in session.
+        if (p.status === "rejected" && (p.reason as ApiError)?.code === "LOGIN_BLOCKED") {
+          toast.error((p.reason as ApiError).message);
+          logout();
+          return;
+        }
+
         if (b.status === "fulfilled") setLedgers(b.value.data || []);
         if (m.status === "fulfilled") setLogs(m.value.data || []);
         if (n.status === "fulfilled") setNotices(n.value.data || []);
