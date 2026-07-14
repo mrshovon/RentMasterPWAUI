@@ -857,6 +857,49 @@ function PropertiesTab({ properties, disabledIds, onUpgrade, onAdd, onEdit, onVa
 }
 
 /* ============================================================ TENANTS */
+
+// The tenant list renders twice — a desktop table and a mobile card list. These two controls live
+// in both, so they're shared components: inlining them once let the mobile layout silently miss the
+// login toggle and the passcode pending state entirely.
+
+// Only meaningful for an unassigned tenant: with no property they're locked out of the resident
+// portal by default, and this is the owner's per-tenant exception.
+function LoginAccessToggle({ tenant, onToggle }: { tenant: Tenant; onToggle: (t: Tenant) => void }) {
+  const allowed = tenant.allow_login_unassigned;
+  return (
+    <button
+      onClick={() => onToggle(tenant)}
+      title={allowed
+        ? "Signed-in access is allowed. Click to block it."
+        : "Blocked from signing in. Click to allow it anyway."}
+      className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold transition ${
+        allowed
+          ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+          : "bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
+      }`}
+    >
+      {allowed
+        ? <><KeyRound className="h-3 w-3" /> Login allowed</>
+        : <><Lock className="h-3 w-3" /> Login blocked</>}
+    </button>
+  );
+}
+
+function ResetPasscodeButton({
+  tenant, onReset, pending, label = "Reset",
+}: { tenant: Tenant; onReset: (t: Tenant) => void; pending: boolean; label?: string }) {
+  return (
+    <button
+      onClick={() => onReset(tenant)}
+      disabled={pending}
+      title="Generate a new login passcode"
+      className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] px-2 py-1 text-xs text-slate-300 transition hover:bg-white/[0.08] hover:text-white disabled:pointer-events-none disabled:opacity-50"
+    >
+      {pending ? <Spinner className="h-3 w-3" /> : <RotateCcw className="h-3 w-3" />} {label}
+    </button>
+  );
+}
+
 function TenantsTab({
   tenants, properties, disabledIds, onUpgrade, onAdd, onEdit, onDocs, onResetPasscode, onToggleLogin,
   isPending,
@@ -926,35 +969,18 @@ function TenantsTab({
                           // where the owner can see *why* it applies.
                           <div className="space-y-1.5">
                             <Badge tone="amber">Unassigned</Badge>
-                            <button
-                              onClick={() => onToggleLogin(t)}
-                              title={t.allow_login_unassigned
-                                ? "Signed-in access is allowed. Click to block it."
-                                : "Blocked from signing in. Click to allow it anyway."}
-                              className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold transition ${
-                                t.allow_login_unassigned
-                                  ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                                  : "bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
-                              }`}
-                            >
-                              {t.allow_login_unassigned
-                                ? <><KeyRound className="h-3 w-3" /> Login allowed</>
-                                : <><Lock className="h-3 w-3" /> Login blocked</>}
-                            </button>
+                            <LoginAccessToggle tenant={t} onToggle={onToggleLogin} />
                           </div>
                         )}
                       </td>
                       <td className="p-4 font-semibold text-emerald-400">{formatCurrency(t.monthly_rent)}</td>
                       <td className="p-4 text-slate-300">{ordinalDay(t.due_date)}</td>
                       <td className="p-4">
-                        <button onClick={() => onResetPasscode(t)}
-                          disabled={isPending(`passcode:${t.id}`)}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] px-2 py-1 text-xs text-slate-300 transition hover:bg-white/[0.08] hover:text-white disabled:pointer-events-none disabled:opacity-50"
-                          title="Generate a new login passcode">
-                          {isPending(`passcode:${t.id}`)
-                            ? <Spinner className="h-3 w-3" />
-                            : <RotateCcw className="h-3 w-3" />} Reset
-                        </button>
+                        <ResetPasscodeButton
+                          tenant={t}
+                          onReset={onResetPasscode}
+                          pending={isPending(`passcode:${t.id}`)}
+                        />
                       </td>
                       <td className="p-4">
                         <div className="flex justify-end gap-2">
@@ -982,14 +1008,16 @@ function TenantsTab({
               const disabled = isDisabled(t.id);
               return (
               <Card key={t.id} className={`p-4 ${disabled ? "opacity-60" : ""}`}>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 font-semibold text-slate-100">
                     {t.name}{disabled && <Badge tone="rose">Disabled</Badge>}
                   </div>
-                  <button onClick={() => onResetPasscode(t)}
-                    className="inline-flex items-center gap-1 rounded-lg bg-white/[0.04] px-2 py-0.5 text-xs text-slate-300 transition hover:bg-white/[0.08]">
-                    <RotateCcw className="h-3 w-3" /> Reset passcode
-                  </button>
+                  <ResetPasscodeButton
+                    tenant={t}
+                    onReset={onResetPasscode}
+                    pending={isPending(`passcode:${t.id}`)}
+                    label="Reset passcode"
+                  />
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-400">
                   <span>
@@ -1001,6 +1029,12 @@ function TenantsTab({
                   <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{t.phone}</span>
                   <span className="text-right">Due {ordinalDay(t.due_date)}</span>
                 </div>
+                {/* Its own row, not squeezed into the grid cell beside the rent — it needs a real tap target. */}
+                {!t.property_id && (
+                  <div className="mt-3">
+                    <LoginAccessToggle tenant={t} onToggle={onToggleLogin} />
+                  </div>
+                )}
                 <div className="mt-3 flex justify-end gap-2">
                   {disabled ? (
                     <Button size="sm" variant="secondary" icon={ArrowUpCircle} onClick={onUpgrade}>Upgrade to re-enable</Button>
