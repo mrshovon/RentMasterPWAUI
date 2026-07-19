@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Phone, Lock, Mail } from "lucide-react";
-import { apiLogin } from "../lib/api-service";
-import { Button } from "../components/ui";
+import { ArrowRight, Phone, Lock, Mail, User } from "lucide-react";
+import { apiLogin, apiForgotPassword, apiSignup } from "../lib/api-service";
+import { Button, Modal, Field, TextInput } from "../components/ui";
+import { toast } from "../components/toast";
 
 export default function EntryGatewayPage() {
   const [tab, setTab] = useState<"tenant" | "owner">("tenant");
@@ -13,6 +14,8 @@ export default function EntryGatewayPage() {
   const [ownerPass, setOwnerPass] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [signupOpen, setSignupOpen] = useState(false);
 
   // Redirect immediately. Push setup deliberately does NOT happen here: PushToggle (rendered
   // in DashboardShell) re-registers permitted devices on every dashboard mount and otherwise
@@ -181,12 +184,135 @@ export default function EntryGatewayPage() {
                   <Button type="submit" loading={loading} className="w-full" icon={ArrowRight}>
                     Sign in
                   </Button>
+                  <button type="button" onClick={() => setForgotOpen(true)}
+                    className="block w-full text-center text-xs font-medium text-slate-400 transition hover:text-indigo-400">
+                    Forgot password?
+                  </button>
+                  <p className="text-center text-xs text-slate-500">
+                    New here?{" "}
+                    <button type="button" onClick={() => setSignupOpen(true)}
+                      className="font-semibold text-indigo-400 transition hover:text-indigo-300">
+                      Create an owner account
+                    </button>
+                  </p>
                 </form>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      <ForgotPasswordModal open={forgotOpen} onClose={() => setForgotOpen(false)} initialEmail={email} />
+      <SignupModal open={signupOpen} onClose={() => setSignupOpen(false)}
+        onSuccess={(id, name, token) => persist("owner", id, name, token)} />
     </div>
+  );
+}
+
+// Owner self-signup. Creates an auto-confirmed owner (free tier by default) and, on success,
+// persists the returned session so the new owner lands straight on their dashboard.
+function SignupModal({
+  open, onClose, onSuccess,
+}: {
+  open: boolean; onClose: () => void; onSuccess: (id: string, name: string, token?: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) { toast.error("Enter your name."); return; }
+    if (!email.trim() || !email.includes("@")) { toast.error("Enter a valid email."); return; }
+    if (password.length < 8) { toast.error("Password must be at least 8 characters."); return; }
+    try {
+      setSubmitting(true);
+      const r = await apiSignup({ name: name.trim(), email: email.trim(), phone: phone.trim(), password });
+      toast.success("Welcome to RentMaster!");
+      onSuccess(r.id, r.name, r.token);
+    } catch (err: any) {
+      toast.error(err.message);
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Create your owner account"
+      subtitle="Start free — you can upgrade your plan anytime.">
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Your name" required>
+          <TextInput required placeholder="Jane Landlord" value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Email" required>
+            <TextInput type="email" required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field>
+          <Field label="Phone">
+            <TextInput placeholder="01712345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </Field>
+        </div>
+        <Field label="Password" required hint="At least 8 characters.">
+          <TextInput type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
+        <Button type="submit" loading={submitting} className="w-full" icon={User}>
+          Create account
+        </Button>
+      </form>
+    </Modal>
+  );
+}
+
+// Owner self-service password reset, step 1. Posts the email to the backend, which emails a
+// recovery link. The response is deliberately generic, so we always show the same confirmation.
+function ForgotPasswordModal({
+  open, onClose, initialEmail,
+}: {
+  open: boolean; onClose: () => void; initialEmail: string;
+}) {
+  const [email, setEmail] = useState(initialEmail);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || !email.includes("@")) { toast.error("Enter a valid email."); return; }
+    try {
+      setSending(true);
+      await apiForgotPassword(email.trim());
+      setSent(true);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function close() { setSent(false); onClose(); }
+
+  return (
+    <Modal open={open} onClose={close} title="Reset your password"
+      subtitle="We'll email you a secure link to set a new password.">
+      {sent ? (
+        <div className="space-y-5">
+          <p className="text-sm text-slate-300">
+            If an account exists for <span className="font-semibold text-white">{email.trim()}</span>, a password
+            reset link is on its way. Check your inbox (and spam folder).
+          </p>
+          <Button className="w-full" onClick={close}>Done</Button>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="space-y-4">
+          <Field label="Account email" required>
+            <TextInput type="email" required placeholder="owner@example.com" value={email}
+              onChange={(e) => setEmail(e.target.value)} />
+          </Field>
+          <Button type="submit" loading={sending} className="w-full" icon={ArrowRight}>
+            Send reset link
+          </Button>
+        </form>
+      )}
+    </Modal>
   );
 }

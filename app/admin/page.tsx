@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, CreditCard, Megaphone, Plus, Ban, KeyRound,
   Trash2, Mail, CheckCircle2, ShieldOff, ShieldCheck, Inbox, Building2, Eye,
-  RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy,
+  RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User,
+  Wallet, Upload, Image as ImageIcon, X, Check,
 } from "lucide-react";
-import { rentMasterFetch } from "../../lib/api-service";
+import { rentMasterFetch, uploadFile } from "../../lib/api-service";
 import { toast } from "../../components/toast";
 import { confirmDialog } from "../../components/confirm";
 import { useSessionGuard } from "../../lib/use-session";
@@ -15,6 +16,8 @@ import { usePendingAction } from "../../lib/use-pending";
 import {
   AdminOwner, AdminOwnerDetail, SubscriptionTier,
   SupportTicket, TicketStatus, TicketCategory, PriorityLevel,
+  PasswordResetRecord, ResetMethod, ContactMessage, ContactStatus,
+  PaymentSubmission, PaymentSubmissionStatus, PaymentConfig,
 } from "../../types/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
@@ -48,11 +51,16 @@ export default function AdminDashboard() {
   const [owners, setOwners] = useState<AdminOwner[]>([]);
   const [tiers, setTiers] = useState<SubscriptionTier[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [resets, setResets] = useState<PasswordResetRecord[]>([]);
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [payments, setPayments] = useState<PaymentSubmission[]>([]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [tierModal, setTierModal] = useState<{ mode: "create" | "edit"; tier?: SubscriptionTier } | null>(null);
   const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
+  const [activeMessage, setActiveMessage] = useState<ContactMessage | null>(null);
+  const [activePayment, setActivePayment] = useState<PaymentSubmission | null>(null);
 
   async function refreshOwners() {
     const res = await rentMasterFetch("/api/super-admin/owners", { role: "admin" });
@@ -67,14 +75,20 @@ export default function AdminDashboard() {
     (async () => {
       try {
         setLoading(true);
-        const [o, t, s] = await Promise.allSettled([
+        const [o, t, s, r, c, p] = await Promise.allSettled([
           rentMasterFetch("/api/super-admin/owners", { role: "admin" }),
           rentMasterFetch("/api/super-admin/tiers", { role: "admin" }),
           rentMasterFetch("/api/super-admin/support-tickets", { role: "admin" }),
+          rentMasterFetch("/api/super-admin/password-resets", { role: "admin" }),
+          rentMasterFetch("/api/super-admin/contact-messages", { role: "admin" }),
+          rentMasterFetch("/api/super-admin/payments", { role: "admin" }),
         ]);
         if (o.status === "fulfilled") setOwners(o.value.data || []);
         if (t.status === "fulfilled") setTiers(t.value.data || []);
         if (s.status === "fulfilled") setTickets(s.value.data || []);
+        if (r.status === "fulfilled") setResets(r.value.data || []);
+        if (c.status === "fulfilled") setMessages(c.value.data || []);
+        if (p.status === "fulfilled") setPayments(p.value.data || []);
         const err = [o, t, s].find((r) => r.status === "rejected");
         if (err && err.status === "rejected") setError((err.reason as Error).message);
       } finally {
@@ -89,15 +103,30 @@ export default function AdminDashboard() {
     suspended: owners.filter((o) => o.suspended).length,
     subscribed: owners.filter((o) => o.subscription?.status === "active").length,
     openTickets: tickets.filter((t) => t.status !== "done").length,
+    newMessages: messages.filter((m) => m.status === "new").length,
+    pendingPayments: payments.filter((p) => p.status === "pending").length,
   };
 
   const nav: NavItem[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
     { key: "owners", label: "Owners", icon: Users, badge: owners.length },
     { key: "subscriptions", label: "Plans", icon: CreditCard },
+    { key: "payments", label: "Payments", icon: CircleDollarSign, badge: metrics.pendingPayments },
+    { key: "payment-setup", label: "Payment setup", icon: Wallet },
     { key: "notices", label: "Circulate", icon: Megaphone },
     { key: "tickets", label: "Tickets", icon: LifeBuoy, badge: metrics.openTickets },
+    { key: "messages", label: "Messages", icon: Mail, badge: metrics.newMessages },
+    { key: "reset-log", label: "Reset log", icon: KeyRound },
   ];
+
+  function applyMessageUpdate(updated: ContactMessage) {
+    setMessages((xs) => xs.map((x) => (x.id === updated.id ? { ...x, ...updated, owner: x.owner } : x)));
+  }
+
+  // The PATCH response is the bare row (no owner join / tier_name) — keep the enrichment we have.
+  function applyPaymentUpdate(updated: PaymentSubmission) {
+    setPayments((xs) => xs.map((x) => (x.id === updated.id ? { ...x, ...updated, owner: x.owner, tier_name: x.tier_name } : x)));
+  }
 
   // The PATCH response is the bare row (no owner join) — keep the enrichment we already have.
   function applyTicketUpdate(updated: SupportTicket) {
@@ -235,9 +264,17 @@ export default function AdminDashboard() {
         />
       )}
 
+      {tab === "payments" && <PaymentsTab payments={payments} onOpen={setActivePayment} />}
+
+      {tab === "payment-setup" && <PaymentSetupTab />}
+
       {tab === "notices" && <CirculateTab />}
 
       {tab === "tickets" && <TicketsTab tickets={tickets} onOpen={setActiveTicket} />}
+
+      {tab === "messages" && <MessagesTab messages={messages} onOpen={setActiveMessage} />}
+
+      {tab === "reset-log" && <ResetLogTab resets={resets} />}
 
       <CreateOwnerModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={refreshOwners} />
       <OwnerDetailModal
@@ -251,6 +288,16 @@ export default function AdminDashboard() {
         ticket={activeTicket}
         onClose={() => setActiveTicket(null)}
         onSaved={applyTicketUpdate}
+      />
+      <ContactMessageModal
+        message={activeMessage}
+        onClose={() => setActiveMessage(null)}
+        onSaved={applyMessageUpdate}
+      />
+      <PaymentDecisionModal
+        payment={activePayment}
+        onClose={() => setActivePayment(null)}
+        onSaved={applyPaymentUpdate}
       />
     </DashboardShell>
   );
@@ -560,10 +607,594 @@ function TicketStatusModal({
   );
 }
 
+/* ============================================================ CONTACT MESSAGES TAB */
+const CONTACT_STATUS_TONE: Record<ContactStatus, "slate" | "indigo" | "emerald" | "amber"> = {
+  new: "indigo", in_progress: "amber", resolved: "emerald", archived: "slate",
+};
+const CONTACT_STATUS_LABEL: Record<ContactStatus, string> = {
+  new: "New", in_progress: "In progress", resolved: "Resolved", archived: "Archived",
+};
+const CONTACT_FILTERS: { key: ContactStatus | "all"; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "new", label: "New" },
+  { key: "in_progress", label: "In progress" },
+  { key: "resolved", label: "Resolved" },
+  { key: "archived", label: "Archived" },
+];
+
+function MessagesTab({
+  messages, onOpen,
+}: {
+  messages: ContactMessage[]; onOpen: (m: ContactMessage) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<ContactStatus | "all">("all");
+
+  const q = query.trim().toLowerCase();
+  const filtered = messages
+    .filter((m) => filter === "all" || m.status === filter)
+    .filter((m) =>
+      !q ||
+      [m.name, m.email, m.phone, m.message, m.owner?.name, m.owner?.email, `#${m.message_no}`]
+        .some((v) => String(v ?? "").toLowerCase().includes(q)));
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Contact messages" subtitle="Enquiries owners sent from the Contact us button." />
+
+      {messages.length === 0 ? (
+        <EmptyState icon={Mail} title="No messages" hint="When an owner sends an enquiry, it lands here." />
+      ) : (
+        <>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex-1"><SearchInput value={query} onChange={setQuery} placeholder="Search by name, email or message…" /></div>
+            <div className="flex flex-wrap gap-1.5">
+              {CONTACT_FILTERS.map((f) => {
+                const count = f.key === "all" ? messages.length : messages.filter((m) => m.status === f.key).length;
+                const isActive = filter === f.key;
+                return (
+                  <button
+                    key={f.key}
+                    onClick={() => setFilter(f.key)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      isActive ? "bg-amber-500/15 text-amber-300" : "text-slate-500 hover:bg-white/[0.05] hover:text-slate-300"
+                    }`}
+                  >
+                    {f.label} <span className="opacity-60">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {filtered.length === 0 ? (
+            <EmptyState icon={Mail} title="No matches" hint="No messages match the current search or filter." />
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[820px] text-left text-sm">
+                  <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                    <tr>
+                      <th className="p-4">#</th>
+                      <th className="p-4">From</th>
+                      <th className="p-4">Message</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Received</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04]">
+                    {filtered.map((m) => (
+                      <tr key={m.id} className="hover:bg-white/[0.02]">
+                        <td className="p-4 font-mono text-xs text-slate-500">#{m.message_no}</td>
+                        <td className="p-4">
+                          <div className="font-semibold text-slate-100">{m.name || m.owner?.name || "—"}</div>
+                          <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" /> {m.email || m.owner?.email || "unknown"}</div>
+                        </td>
+                        <td className="p-4"><div className="max-w-[280px] truncate text-slate-300">{m.message}</div></td>
+                        <td className="p-4"><Badge tone={CONTACT_STATUS_TONE[m.status]}>{CONTACT_STATUS_LABEL[m.status]}</Badge></td>
+                        <td className="p-4 text-xs text-slate-500">{formatDate(m.created_at)}</td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <IconBtn title="Open / update" tone="indigo" icon={Eye} onClick={() => onOpen(m)} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ContactMessageModal({
+  message, onClose, onSaved,
+}: {
+  message: ContactMessage | null; onClose: () => void; onSaved: (m: ContactMessage) => void;
+}) {
+  const [status, setStatus] = useState<ContactStatus>("new");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (message) { setStatus(message.status); setNotes(message.admin_notes || ""); }
+  }, [message]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!message) return;
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch(`/api/super-admin/contact-messages/${message.id}`, {
+        method: "PATCH", role: "admin",
+        body: JSON.stringify({ status, adminNotes: notes }),
+      });
+      if (res.success) { onSaved(res.data); onClose(); toast.success(`Message #${message.message_no} updated.`); }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={!!message} onClose={onClose} size="lg"
+      title={message ? `Message #${message.message_no}` : "Message"}
+      subtitle={message ? (message.name || message.owner?.name || undefined) : undefined}>
+      {message && (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={CONTACT_STATUS_TONE[message.status]}>{CONTACT_STATUS_LABEL[message.status]}</Badge>
+            <span className="ml-auto text-xs text-slate-500">Received {formatDate(message.created_at)}</span>
+          </div>
+
+          <div className="grid gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm sm:grid-cols-3">
+            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Name</div><div className="text-slate-200">{message.name || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Email</div><div className="text-slate-200">{message.email || message.owner?.email || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Phone</div><div className="text-slate-200">{message.phone || "—"}</div></div>
+          </div>
+
+          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Message</div>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{message.message}</p>
+          </div>
+
+          <form onSubmit={submit} className="space-y-4 border-t border-white/[0.06] pt-5">
+            <Field label="Status" required>
+              <Select value={status} onChange={(e) => setStatus(e.target.value as ContactStatus)}>
+                <option value="new">New</option>
+                <option value="in_progress">In progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="archived">Archived</option>
+              </Select>
+            </Field>
+            <Field label="Internal note" hint="Not shown to the owner.">
+              <TextArea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)}
+                placeholder="Follow-up details, who's handling it…" />
+            </Field>
+            <Button type="submit" loading={saving} className="w-full">Save update</Button>
+          </form>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/* ============================================================ PAYMENTS TAB */
+const PAYMENT_FILTERS: { key: PaymentSubmissionStatus | "all"; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
+  { key: "approved", label: "Approved" },
+  { key: "rejected", label: "Rejected" },
+];
+const PAYMENT_STATUS_TONE: Record<PaymentSubmissionStatus, "amber" | "emerald" | "rose"> = {
+  pending: "amber", approved: "emerald", rejected: "rose",
+};
+const PAYMENT_STATUS_LABEL: Record<PaymentSubmissionStatus, string> = {
+  pending: "Pending", approved: "Approved", rejected: "Rejected",
+};
+
+function PaymentsTab({
+  payments, onOpen,
+}: {
+  payments: PaymentSubmission[]; onOpen: (p: PaymentSubmission) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<PaymentSubmissionStatus | "all">("pending");
+
+  const q = query.trim().toLowerCase();
+  const filtered = payments
+    .filter((p) => filter === "all" || p.status === filter)
+    .filter((p) =>
+      !q ||
+      [p.owner?.name, p.owner?.email, p.txn_id, p.sender_msisdn, p.tier_name, `#${p.payment_no}`]
+        .some((v) => String(v ?? "").toLowerCase().includes(q)));
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Payments" subtitle="bKash payments owners submitted for plan activation. Approve to activate their plan." />
+
+      {payments.length === 0 ? (
+        <EmptyState icon={CircleDollarSign} title="No payments" hint="When an owner submits a payment, it lands here." />
+      ) : (
+        <>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex-1"><SearchInput value={query} onChange={setQuery} placeholder="Search by owner, txn id or number…" /></div>
+            <div className="flex flex-wrap gap-1.5">
+              {PAYMENT_FILTERS.map((f) => {
+                const count = f.key === "all" ? payments.length : payments.filter((p) => p.status === f.key).length;
+                const isActive = filter === f.key;
+                return (
+                  <button
+                    key={f.key}
+                    onClick={() => setFilter(f.key)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      isActive ? "bg-amber-500/15 text-amber-300" : "text-slate-500 hover:bg-white/[0.05] hover:text-slate-300"
+                    }`}
+                  >
+                    {f.label} <span className="opacity-60">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {filtered.length === 0 ? (
+            <EmptyState icon={CircleDollarSign} title="No matches" hint="No payments match the current search or filter." />
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left text-sm">
+                  <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                    <tr>
+                      <th className="p-4">#</th>
+                      <th className="p-4">Owner</th>
+                      <th className="p-4">Plan</th>
+                      <th className="p-4">Amount</th>
+                      <th className="p-4">Sender / Txn</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Submitted</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04]">
+                    {filtered.map((p) => (
+                      <tr key={p.id} className="hover:bg-white/[0.02]">
+                        <td className="p-4 font-mono text-xs text-slate-500">#{p.payment_no}</td>
+                        <td className="p-4">
+                          <div className="font-semibold text-slate-100">{p.owner?.name || "—"}</div>
+                          <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" /> {p.owner?.email || p.owner_email || "unknown"}</div>
+                        </td>
+                        <td className="p-4"><div className="max-w-[180px] truncate font-medium text-slate-200">{p.tier_name || p.tier_id}</div></td>
+                        <td className="p-4 font-semibold text-slate-100">{formatCurrency(Number(p.amount || 0))}</td>
+                        <td className="p-4">
+                          <div className="text-slate-300">{p.sender_msisdn || "—"}</div>
+                          <div className="font-mono text-xs text-slate-500">{p.txn_id || "—"}</div>
+                        </td>
+                        <td className="p-4"><Badge tone={PAYMENT_STATUS_TONE[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</Badge></td>
+                        <td className="p-4 text-xs text-slate-500">{formatDate(p.created_at)}</td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-end gap-1">
+                            <IconBtn title="Review" tone="indigo" icon={Eye} onClick={() => onOpen(p)} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function PaymentDecisionModal({
+  payment, onClose, onSaved,
+}: {
+  payment: PaymentSubmission | null; onClose: () => void; onSaved: (p: PaymentSubmission) => void;
+}) {
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState<null | "approved" | "rejected">(null);
+
+  useEffect(() => { if (payment) setNotes(payment.admin_notes || ""); }, [payment]);
+
+  async function decide(status: "approved" | "rejected") {
+    if (!payment) return;
+    if (status === "rejected" && !notes.trim()) { toast.error("Add a remark so the owner knows why."); return; }
+    try {
+      setSaving(status);
+      const res = await rentMasterFetch(`/api/super-admin/payments/${payment.id}`, {
+        method: "PATCH", role: "admin",
+        body: JSON.stringify({ status, adminNotes: notes }),
+      });
+      if (res.success) {
+        onSaved(res.data);
+        onClose();
+        toast.success(status === "approved" ? `Payment #${payment.payment_no} approved — plan activated.` : `Payment #${payment.payment_no} rejected.`);
+      }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(null); }
+  }
+
+  const decided = payment && payment.status !== "pending";
+
+  return (
+    <Modal open={!!payment} onClose={onClose} size="lg"
+      title={payment ? `Payment #${payment.payment_no}` : "Payment"}
+      subtitle={payment ? (payment.tier_name || payment.tier_id) : undefined}>
+      {payment && (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={PAYMENT_STATUS_TONE[payment.status]}>{PAYMENT_STATUS_LABEL[payment.status]}</Badge>
+            <span className="ml-auto text-xs text-slate-500">Submitted {formatDate(payment.created_at)}</span>
+          </div>
+
+          <div className="grid gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm sm:grid-cols-2">
+            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Owner</div><div className="text-slate-200">{payment.owner?.name || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Email</div><div className="text-slate-200">{payment.owner?.email || payment.owner_email || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Plan</div><div className="text-slate-200">{payment.tier_name || payment.tier_id}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Amount</div><div className="font-semibold text-slate-100">{formatCurrency(Number(payment.amount || 0))}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Paid from</div><div className="font-mono text-slate-200">{payment.sender_msisdn || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Transaction id</div><div className="font-mono text-slate-200">{payment.txn_id || "—"}</div></div>
+          </div>
+
+          {decided ? (
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-slate-300">
+              This payment was already <strong>{PAYMENT_STATUS_LABEL[payment.status].toLowerCase()}</strong>
+              {payment.admin_notes ? <> — {payment.admin_notes}</> : null}.
+            </div>
+          ) : (
+            <div className="space-y-4 border-t border-white/[0.06] pt-5">
+              <Field label="Remarks" hint="Required to reject — shown to the owner as the reason.">
+                <TextArea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g. Transaction id not found, amount mismatch…" />
+              </Field>
+              <div className="flex gap-3">
+                <Button variant="secondary" icon={X} className="flex-1" loading={saving === "rejected"}
+                  onClick={() => decide("rejected")}>Reject</Button>
+                <Button icon={Check} className="flex-1" loading={saving === "approved"}
+                  onClick={() => decide("approved")}>Approve &amp; activate</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/* ============================================================ PAYMENT SETUP TAB */
+const MFS_PROVIDERS = ["bKash", "Nagad", "Rocket", "Upay", "mCash", "Tap", "Other"];
+
+function PaymentSetupTab() {
+  const [config, setConfig] = useState<PaymentConfig>({ provider: "bKash", walletNumber: "", instructions: "", qrUrl: null });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: PaymentConfig }>("/api/super-admin/payment-config", { role: "admin" });
+        if (res.data) setConfig(res.data);
+      } catch { /* keep defaults */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  async function onPickQr(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    try {
+      setUploading(true);
+      const url = await uploadFile(file, { role: "owner", folder: "payments" });
+      setConfig((c) => ({ ...c, qrUrl: url }));
+      toast.success("QR uploaded — remember to Save.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setUploading(false); }
+  }
+
+  async function save() {
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ data: PaymentConfig }>("/api/super-admin/payment-config", {
+        method: "PUT", role: "admin", body: JSON.stringify(config),
+      });
+      if (res.data) setConfig(res.data);
+      toast.success("Payment setup saved.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  if (loading) return <EmptyState icon={Wallet} title="Loading payment setup…" hint="Fetching the current configuration." />;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Payment setup" subtitle="The bKash details owners pay into when upgrading a plan." />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="space-y-4 p-6">
+          <Field label="Mobile payment service (MFS)" hint="Which service this number and QR belong to.">
+            <Select value={MFS_PROVIDERS.includes(config.provider) ? config.provider : "Other"}
+              onChange={(e) => setConfig((c) => ({ ...c, provider: e.target.value === "Other" ? "" : e.target.value }))}>
+              {MFS_PROVIDERS.map((p) => <option key={p} value={p}>{p}</option>)}
+            </Select>
+          </Field>
+          {!MFS_PROVIDERS.slice(0, -1).includes(config.provider) && (
+            <Field label="Service name" hint="Name of the MFS owners will pay with.">
+              <TextInput value={config.provider} onChange={(e) => setConfig((c) => ({ ...c, provider: e.target.value }))}
+                placeholder="e.g. SureCash" />
+            </Field>
+          )}
+          <Field label={`${config.provider || "MFS"} number`} hint="The personal number owners send money to.">
+            <TextInput value={config.walletNumber} onChange={(e) => setConfig((c) => ({ ...c, walletNumber: e.target.value }))}
+              placeholder="01XXXXXXXXX" />
+          </Field>
+          <Field label="Instructions" hint="Steps shown to the owner on the payment screen.">
+            <TextArea rows={5} value={config.instructions} onChange={(e) => setConfig((c) => ({ ...c, instructions: e.target.value }))}
+              placeholder={"1. Open bKash and choose Send Money\n2. Send the plan amount to the number above\n3. Enter the transaction id below"} />
+          </Field>
+          <Button icon={CheckCircle2} loading={saving} onClick={save} className="w-full">Save payment setup</Button>
+        </Card>
+
+        <Card className="space-y-4 p-6">
+          <div className="text-sm font-bold text-slate-200">{config.provider || "MFS"} QR code</div>
+          <div className="flex items-center justify-center rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] p-6">
+            {config.qrUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={config.qrUrl} alt="bKash QR" className="h-52 w-52 rounded-lg bg-white object-contain p-2" />
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-slate-500">
+                <ImageIcon className="h-10 w-10" />
+                <span className="text-xs">No QR uploaded yet</span>
+              </div>
+            )}
+          </div>
+          <label className="block">
+            <input type="file" accept="image/*" className="hidden" onChange={onPickQr} />
+            <span className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06]">
+              {uploading ? <Spinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
+              {config.qrUrl ? "Replace QR image" : "Upload QR image"}
+            </span>
+          </label>
+          {config.qrUrl && (
+            <Button variant="secondary" icon={Trash2} className="w-full" onClick={() => setConfig((c) => ({ ...c, qrUrl: null }))}>
+              Remove QR
+            </Button>
+          )}
+          <p className="text-xs text-slate-500">Upload then click <strong>Save payment setup</strong> to publish. Owners see this QR on their payment screen.</p>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ PASSWORD RESET LOG TAB */
+const RESET_METHOD_LABEL: Record<ResetMethod, string> = {
+  admin_reset: "Admin reset", self_service_email: "Email reset", self_change: "Self change",
+};
+const RESET_METHOD_TONE: Record<ResetMethod, "amber" | "indigo" | "emerald"> = {
+  admin_reset: "amber", self_service_email: "indigo", self_change: "emerald",
+};
+
+function ResetLogTab({ resets }: { resets: PasswordResetRecord[] }) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? resets.filter((r) =>
+        [r.owner?.email, r.owner_email, r.owner?.name, RESET_METHOD_LABEL[r.reset_method], r.actor?.name, r.actor?.email]
+          .some((v) => String(v ?? "").toLowerCase().includes(q)))
+    : resets;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Password reset log" subtitle="Every owner password change, newest first. Admin-only." />
+
+      {resets.length === 0 ? (
+        <EmptyState icon={KeyRound} title="No resets yet" hint="Password resets by owners or admins will appear here." />
+      ) : (
+        <>
+          <SearchInput value={query} onChange={setQuery} placeholder="Search by owner, method or admin…" />
+          {filtered.length === 0 ? (
+            <EmptyState icon={KeyRound} title="No matches" hint={`No resets match "${query}".`} />
+          ) : (
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-left text-sm">
+                  <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                    <tr>
+                      <th className="p-4">#</th>
+                      <th className="p-4">Owner</th>
+                      <th className="p-4">Method</th>
+                      <th className="p-4">Performed by</th>
+                      <th className="p-4">When</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04]">
+                    {filtered.map((r) => (
+                      <tr key={r.id} className="hover:bg-white/[0.02]">
+                        <td className="p-4 font-mono text-xs text-slate-500">#{r.reset_no}</td>
+                        <td className="p-4">
+                          <div className="font-semibold text-slate-100">{r.owner?.name || "—"}</div>
+                          <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" /> {r.owner?.email || r.owner_email || "unknown"}</div>
+                        </td>
+                        <td className="p-4"><Badge tone={RESET_METHOD_TONE[r.reset_method]}>{RESET_METHOD_LABEL[r.reset_method]}</Badge></td>
+                        <td className="p-4">
+                          {r.reset_method === "admin_reset"
+                            ? <span className="flex items-center gap-1 text-slate-300"><ShieldCheck className="h-3.5 w-3.5 text-amber-400" />{r.actor?.name || r.actor?.email || "Admin"}</span>
+                            : <span className="flex items-center gap-1 text-slate-400"><User className="h-3.5 w-3.5" />Owner (self-service)</span>}
+                        </td>
+                        <td className="p-4 text-xs text-slate-500">{formatDate(r.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ============================================================ PLANS TAB */
 function discountedPrice(t: SubscriptionTier) {
   const d = Number(t.discount_percent || 0);
   return d > 0 ? Number(t.price) * (1 - d / 100) : Number(t.price);
+}
+
+// Which plan new self-signed-up owners land on. Empty => free (no history row). Non-custom only.
+function DefaultSignupPlanCard({ tiers }: { tiers: SubscriptionTier[] }) {
+  const [tierId, setTierId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const selectable = tiers.filter((t) => t.billing_interval !== "custom" && t.is_active !== false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: { defaultSignupTier: { tierId: string } } }>("/api/super-admin/settings", { role: "admin" });
+        setTierId(res.data?.defaultSignupTier?.tierId || "");
+      } catch { /* keep default */ }
+    })();
+  }, []);
+
+  async function save(next: string) {
+    setTierId(next);
+    try {
+      setSaving(true);
+      await rentMasterFetch("/api/super-admin/settings", {
+        method: "PATCH", role: "admin", body: JSON.stringify({ tierId: next }),
+      });
+      toast.success("Default signup plan updated.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Card className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400"><User className="h-5 w-5" /></div>
+        <div>
+          <div className="text-sm font-bold text-slate-100">Default plan for new signups</div>
+          <p className="mt-0.5 text-xs text-slate-400">The plan a newly self-registered owner starts on. Leave as Free unless you&apos;re running a promotion.</p>
+        </div>
+      </div>
+      <div className="sm:w-56">
+        <Select value={tierId} onChange={(e) => save(e.target.value)} disabled={saving}>
+          <option value="">Free (default)</option>
+          {selectable.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </Select>
+      </div>
+    </Card>
+  );
 }
 
 function PlansTab({
@@ -578,6 +1209,7 @@ function PlansTab({
     <div className="space-y-6">
       <PageHeader title="Subscription plans" subtitle="Create, edit, discount or deactivate the plans owners can subscribe to."
         action={<Button icon={Plus} onClick={onCreate}>New plan</Button>} />
+      <DefaultSignupPlanCard tiers={tiers} />
       {tiers.length === 0 ? (
         <EmptyState icon={CreditCard} title="No plans configured" hint="Create your first subscription plan."
           action={<Button icon={Plus} onClick={onCreate}>New plan</Button>} />

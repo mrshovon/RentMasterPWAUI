@@ -6,13 +6,14 @@ import {
   Plus, MapPin, KeyRound, Phone, CircleDollarSign, Home, TriangleAlert,
   CheckCircle2, Send, Circle, Inbox, Pencil, DoorOpen, FileText, Trash2, Upload, Download, X, History,
   Receipt, PenLine, Gem, Crown, Sparkles, ArrowUpCircle, Infinity as InfinityIcon, CalendarClock, Copy, RotateCcw,
-  LifeBuoy, MessageSquare, Lock,
+  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle,
 } from "lucide-react";
 import { rentMasterFetch, uploadFile, DEMO_OWNER_ID } from "../../lib/api-service";
 import { toast } from "../../components/toast";
 import { confirmDialog } from "../../components/confirm";
 import { buildReceiptHtml } from "../../lib/receipt";
 import { ReceiptModal } from "../../components/receipt-modal";
+import { resolveReceiptMessage } from "../../lib/whatsapp";
 import { useSessionGuard } from "../../lib/use-session";
 import { useTabState } from "../../lib/use-tab";
 import { usePendingAction } from "../../lib/use-pending";
@@ -21,6 +22,7 @@ import {
   PaymentStatus, PriorityLevel, ResolutionStatus, Document, OccupancyHistory, RentRevision,
   PlanState, PlanUsage, SubscriptionResponse, SubscriptionTier,
   SupportTicket, TicketStatus, TicketCategory,
+  PaymentSubmission, PaymentConfig,
 } from "../../types/api";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
@@ -79,7 +81,8 @@ export default function OwnerDashboard() {
   const [historyProp, setHistoryProp] = useState<Property | null>(null);
   const [ownerSignature, setOwnerSignature] = useState<string | null>(null);
   const [sigOpen, setSigOpen] = useState(false);
-  const [receiptHtml, setReceiptHtml] = useState<string | null>(null);
+  const [whatsappTemplate, setWhatsappTemplate] = useState<string>("");
+  const [receipt, setReceipt] = useState<{ html: string; phone: string | null; message: string } | null>(null);
   const [revealPasscode, setRevealPasscode] = useState<{ name: string; code: string } | null>(null);
 
   // Reset a tenant's login passcode (random; shown once). Passcodes are not derivable
@@ -201,6 +204,7 @@ export default function OwnerDashboard() {
     { key: "notices", label: "Notices", icon: Megaphone },
     { key: "plan", label: "Plan", icon: Gem },
     { key: "support", label: "Support", icon: LifeBuoy, badge: metrics.openSupport },
+    { key: "settings", label: "Settings", icon: Settings },
   ];
 
   // ---- Status mutation (PATCH) ----
@@ -230,17 +234,28 @@ export default function OwnerDashboard() {
     })();
   }, []);
 
-  // Build an "Owner Copy" receipt for a paid invoice and open the preview.
+  // Load the owner's WhatsApp receipt message template (from Settings / auth metadata).
+  const loadWhatsappTemplate = async () => {
+    try {
+      const res = await rentMasterFetch<{ whatsappMessageTemplate: string | null }>(
+        "/api/admin/owner/settings", { role: "owner" });
+      setWhatsappTemplate(res.whatsappMessageTemplate || "");
+    } catch { /* non-fatal — Settings tab shows an empty field */ }
+  };
+  useEffect(() => { loadWhatsappTemplate(); }, []);
+
+  // Build an "Owner Copy" receipt (paid OR due) and open the preview, ready to share via WhatsApp.
   function openOwnerReceipt(l: BillingLedger) {
     const t = tenants.find((x) => x.id === l.tenant_id);
     const prop = properties.find((p) => p.id === l.property_id);
-    setReceiptHtml(buildReceiptHtml({
+    const tenantName = l.tenants?.name || t?.name || "Tenant";
+    const html = buildReceiptHtml({
       copyLabel: "Owner Copy",
       ownerName: session?.name || "Owner",
       propertyAddress: prop?.address || null,
       refNo: l.property_id,
       billingMonth: l.billing_month,
-      tenantName: l.tenants?.name || t?.name || "Tenant",
+      tenantName,
       houseRent: l.rent_amount,
       serviceCharge: l.service_charge,
       extraCharge: l.extra_charge,
@@ -251,7 +266,15 @@ export default function OwnerDashboard() {
       dueDay: t?.due_date,
       note: l.extra_charge_remarks,
       signatureUrl: ownerSignature,
-    }));
+    });
+    const message = resolveReceiptMessage(whatsappTemplate, {
+      tenant: tenantName,
+      month: formatMonth(l.billing_month),
+      amount: formatCurrency(l.total_payable),
+      status: l.payment_status,
+      property: prop?.name || "",
+    });
+    setReceipt({ html, phone: l.tenants?.phone || t?.phone || null, message });
   }
 
   // ---- Vacate a property (archives occupancy on the backend) ----
@@ -333,7 +356,7 @@ export default function OwnerDashboard() {
       )}
 
       {tab === "plan" && (
-        <PlanTab plan={plan} onReload={loadPlan} />
+        <PlanTab plan={plan} onReload={loadPlan} ownerName={session?.name || null} />
       )}
 
       {tab === "billing" && (
@@ -356,6 +379,10 @@ export default function OwnerDashboard() {
 
       {tab === "support" && (
         <SupportTab tickets={tickets} onCreate={() => setTicketOpen(true)} />
+      )}
+
+      {tab === "settings" && (
+        <SettingsTab template={whatsappTemplate} onTemplateSaved={setWhatsappTemplate} />
       )}
 
       {/* ---------- Modals ---------- */}
@@ -432,7 +459,8 @@ export default function OwnerDashboard() {
       <OwnerDocumentsModal tenant={docsTenant} onClose={() => setDocsTenant(null)} />
       <PropertyHistoryModal property={historyProp} onClose={() => setHistoryProp(null)} />
       <SignatureModal open={sigOpen} onClose={() => setSigOpen(false)} current={ownerSignature} onSaved={setOwnerSignature} />
-      <ReceiptModal open={!!receiptHtml} onClose={() => setReceiptHtml(null)} html={receiptHtml || ""} />
+      <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)}
+        html={receipt?.html || ""} phone={receipt?.phone} message={receipt?.message} />
 
       <Modal open={!!revealPasscode} onClose={() => setRevealPasscode(null)} title="Tenant login passcode">
         <div className="space-y-5">
@@ -457,8 +485,6 @@ export default function OwnerDashboard() {
 }
 
 /* ============================================================ PLAN */
-// Where "Contact us" enquiries for the custom Whole-Building plan are sent.
-const CONTACT_EMAIL = "sales@rentmaster.app";
 // A tier with a "custom" billing interval is a contact-us / enterprise plan
 // (no self-service price, set up by the admin after the customer gets in touch).
 const isContactTier = (t: SubscriptionTier) => t.billing_interval === "custom";
@@ -528,8 +554,20 @@ function UsageMeter({ label, current, limit, icon: Icon }: { label: string; curr
   );
 }
 
-function PlanTab({ plan, onReload }: { plan: SubscriptionResponse | null; onReload: () => Promise<void> }) {
+function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | null; onReload: () => Promise<void>; ownerName: string | null }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [contactTier, setContactTier] = useState<SubscriptionTier | null>(null);
+  const [paymentTier, setPaymentTier] = useState<SubscriptionTier | null>(null);
+  const [payments, setPayments] = useState<PaymentSubmission[]>([]);
+
+  // The owner's own payment submissions, so we can show a pending badge / rejection remarks.
+  async function loadPayments() {
+    try {
+      const res = await rentMasterFetch<{ data: PaymentSubmission[] }>("/api/admin/payments", { role: "owner" });
+      setPayments(res.data || []);
+    } catch { /* non-fatal */ }
+  }
+  useEffect(() => { loadPayments(); }, []);
 
   if (!plan) {
     return (
@@ -540,13 +578,24 @@ function PlanTab({ plan, onReload }: { plan: SubscriptionResponse | null; onRelo
 
   const s = plan.subscription;
   const badge = planStatusBadge(s);
+  const pendingPayment = payments.find((p) => p.status === "pending") || null;
+  // Show the most recent rejection only if nothing newer (pending/approved) supersedes it.
+  const latestPayment = payments[0] || null;
+  const rejectedPayment = latestPayment?.status === "rejected" ? latestPayment : null;
 
+  // Free tiers activate instantly; paid tiers go through the bKash payment screen (submit -> admin
+  // approval). Custom tiers use Contact us (handled by their own button, not choose()).
   async function choose(tier: SubscriptionTier) {
+    if (Number(tier.price) > 0) {
+      if (pendingPayment) { toast.warning("You already have a payment awaiting approval."); return; }
+      setPaymentTier(tier);
+      return;
+    }
     const isCurrent = tier.id === s.tierId;
-    const verb = isCurrent ? "Renew" : (tier.price > s.price ? "Upgrade to" : "Switch to");
+    const verb = isCurrent ? "Renew" : "Switch to";
     if (!(await confirmDialog({
       title: `${verb} ${tier.name}?`,
-      message: `${tier.price > 0 ? `৳${tier.price}/${tier.billing_interval}. ` : "Free plan. "}Payment is mocked in this build — activation is instant.`,
+      message: "Free plan — activation is instant.",
       confirmLabel: verb.replace(" to", ""),
     }))) return;
     try {
@@ -593,6 +642,36 @@ function PlanTab({ plan, onReload }: { plan: SubscriptionResponse | null; onRelo
           )}
         </div>
       </Card>
+
+      {/* Payment awaiting approval */}
+      {pendingPayment && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+          <div>
+            <div className="font-bold text-amber-100">Payment awaiting approval</div>
+            <p className="mt-0.5 text-amber-200/90">
+              We&apos;ve received your payment for the <strong>{pendingPayment.tier_name || pendingPayment.tier_id}</strong> plan
+              (৳{Number(pendingPayment.amount || 0)}, txn {pendingPayment.txn_id}). Our team will review and activate it shortly.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Last payment was rejected */}
+      {!pendingPayment && rejectedPayment && (
+        <div className="flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
+          <div>
+            <div className="font-bold text-rose-100">Your last payment could not be approved</div>
+            <p className="mt-0.5 text-rose-200/90">
+              {rejectedPayment.admin_notes
+                ? <>Reason: {rejectedPayment.admin_notes}</>
+                : "Please review your payment details and try again."}
+              {" "}You can submit a new payment below.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Usage */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -644,12 +723,9 @@ function PlanTab({ plan, onReload }: { plan: SubscriptionResponse | null; onRelo
                 </ul>
                 <div className="mt-5">
                   {contact ? (
-                    <a
-                      href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`${tier.name} plan enquiry`)}`}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-600/20 transition-all hover:bg-cyan-500 active:scale-[0.98]"
-                    >
-                      <Send className="h-4 w-4" /> Contact us
-                    </a>
+                    <Button className="w-full" icon={Send} onClick={() => setContactTier(tier)}>
+                      Contact us
+                    </Button>
                   ) : isCurrent && s.isFree ? (
                     <Button variant="secondary" className="w-full" disabled>Current plan</Button>
                   ) : blockedDowngrade ? (
@@ -675,9 +751,199 @@ function PlanTab({ plan, onReload }: { plan: SubscriptionResponse | null; onRelo
             );
           })}
         </div>
-        <p className="text-xs text-slate-500">Payments are mocked in this build — activation is instant. The free plan never expires; paid plans renew on their billing interval and get a {`10`}-day grace period after expiry.</p>
+        <p className="text-xs text-slate-500">Paid plans are activated after our team confirms your bKash payment. The free plan never expires; paid plans renew on their billing interval and get a {`10`}-day grace period after expiry.</p>
       </div>
+
+      <ContactModal tier={contactTier} ownerName={ownerName} onClose={() => setContactTier(null)} />
+      <PaymentModal
+        tier={paymentTier}
+        onClose={() => setPaymentTier(null)}
+        onSubmitted={async () => { setPaymentTier(null); await loadPayments(); }}
+      />
     </div>
+  );
+}
+
+/* ============================================================ PAYMENT (bKash manual) */
+function PaymentModal({
+  tier, onClose, onSubmitted,
+}: {
+  tier: SubscriptionTier | null; onClose: () => void; onSubmitted: () => Promise<void>;
+}) {
+  const [config, setConfig] = useState<PaymentConfig | null>(null);
+  const [senderMsisdn, setSenderMsisdn] = useState("");
+  const [txnId, setTxnId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [sending, setSending] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
+  const providerName = config?.provider || "bKash";
+
+  useEffect(() => {
+    setZoomed(false);
+    if (!tier) return;
+    setSenderMsisdn(""); setTxnId(""); setAmount(String(tier.price ?? ""));
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: PaymentConfig }>("/api/admin/payment-config", { role: "owner" });
+        setConfig(res.data);
+      } catch { setConfig(null); }
+    })();
+  }, [tier]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!senderMsisdn.trim()) { toast.error("Enter the mobile number you paid from."); return; }
+    if (!txnId.trim()) { toast.error("Enter the bKash transaction id."); return; }
+    try {
+      setSending(true);
+      await rentMasterFetch("/api/admin/payments", {
+        method: "POST", role: "owner",
+        body: JSON.stringify({
+          tierId: tier?.id,
+          amount: amount ? Number(amount) : undefined,
+          senderMsisdn: senderMsisdn.trim(),
+          txnId: txnId.trim(),
+        }),
+      });
+      toast.success("Payment submitted — we'll activate your plan once it's approved.");
+      await onSubmitted();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSending(false); }
+  }
+
+  return (
+    <Modal open={!!tier} onClose={onClose} title="Complete your payment"
+      subtitle={tier ? `${tier.name} · ৳${tier.price} / ${tier.billing_interval}` : undefined}>
+      <div className="space-y-5">
+        {/* Pay-to details */}
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Pay with {providerName}</div>
+          {config?.qrUrl ? (
+            <div className="mt-3 flex flex-col items-center gap-1">
+              <button type="button" onClick={() => setZoomed(true)}
+                className="rounded-lg ring-1 ring-white/10 transition hover:ring-indigo-400/50"
+                title="Tap to enlarge and scan">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={config.qrUrl} alt={`${providerName} QR code`} className="h-44 w-44 rounded-lg bg-white object-contain p-2" />
+              </button>
+              <span className="text-[11px] text-slate-500">Tap the QR to enlarge and scan</span>
+            </div>
+          ) : null}
+          {config?.walletNumber ? (
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2">
+              <div>
+                <div className="text-[11px] text-slate-500">{providerName} number</div>
+                <div className="font-mono text-base font-bold text-white">{config.walletNumber}</div>
+              </div>
+              <Button size="sm" variant="secondary" icon={Copy}
+                onClick={() => { navigator.clipboard?.writeText(config.walletNumber); toast.success("Number copied."); }}>
+                Copy
+              </Button>
+            </div>
+          ) : null}
+          {config?.instructions ? (
+            <p className="mt-3 whitespace-pre-wrap text-xs text-slate-400">{config.instructions}</p>
+          ) : null}
+          {!config?.qrUrl && !config?.walletNumber && (
+            <p className="mt-3 text-xs text-amber-400">Payment details haven&apos;t been set up yet. Please contact us.</p>
+          )}
+        </div>
+
+        {/* Enlarged QR lightbox — tap anywhere to close */}
+        {zoomed && config?.qrUrl && (
+          <div
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-4 bg-black/80 p-6 backdrop-blur-sm"
+            onClick={() => setZoomed(false)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={config.qrUrl} alt={`${providerName} QR code`}
+              className="max-h-[80vh] w-auto max-w-[90vw] rounded-2xl bg-white object-contain p-4 shadow-2xl" />
+            <span className="text-sm text-white/80">Tap anywhere to close</span>
+          </div>
+        )}
+
+        {/* Proof of payment */}
+        <form onSubmit={submit} className="space-y-4">
+          <p className="text-xs text-slate-400">After paying, enter your payment details below so we can verify and activate your plan.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Mobile number you paid from" required>
+              <TextInput value={senderMsisdn} onChange={(e) => setSenderMsisdn(e.target.value)} placeholder="01712345678" required />
+            </Field>
+            <Field label="Amount (৳)">
+              <TextInput type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={String(tier?.price ?? "")} />
+            </Field>
+          </div>
+          <Field label="bKash transaction id" required>
+            <TextInput value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="e.g. 8N7A6B5C4D" required />
+          </Field>
+          <Button type="submit" loading={sending} icon={CircleDollarSign} className="w-full">Submit for approval</Button>
+        </form>
+      </div>
+    </Modal>
+  );
+}
+
+/* ============================================================ CONTACT US */
+function ContactModal({
+  tier, ownerName, onClose,
+}: {
+  tier: SubscriptionTier | null; ownerName: string | null; onClose: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  // Prefill the sender name and a starter message whenever a tier's modal opens.
+  useEffect(() => {
+    if (tier) {
+      setName(ownerName || "");
+      setMessage(`I'm interested in the ${tier.name} plan. Please get in touch.`);
+      setEmail(""); setPhone("");
+    }
+  }, [tier, ownerName]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!message.trim()) { toast.error("Please add a message."); return; }
+    try {
+      setSending(true);
+      await rentMasterFetch("/api/admin/contact-messages", {
+        method: "POST", role: "owner",
+        body: JSON.stringify({
+          name: name.trim(), email: email.trim(), phone: phone.trim(),
+          tierId: tier?.id, message: message.trim(),
+        }),
+      });
+      toast.success("Thanks — our team will reach out to you soon.");
+      onClose();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSending(false); }
+  }
+
+  return (
+    <Modal open={!!tier} onClose={onClose} title="Contact us"
+      subtitle={tier ? `Enquiry about the ${tier.name} plan` : undefined}>
+      <form onSubmit={submit} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Your name">
+            <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+          </Field>
+          <Field label="Phone">
+            <TextInput value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01712345678" />
+          </Field>
+        </div>
+        <Field label="Email">
+          <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+        </Field>
+        <Field label="Message" required>
+          <TextArea rows={4} required value={message} onChange={(e) => setMessage(e.target.value)}
+            placeholder="Tell us about your building and what you need…" />
+        </Field>
+        <Button type="submit" loading={sending} icon={Send} className="w-full">Send enquiry</Button>
+      </form>
+    </Modal>
   );
 }
 
@@ -1135,12 +1401,10 @@ function BillingTab({
                     <td className="p-4"><Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge></td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-1">
-                        {l.payment_status === "paid" && (
-                          <button title="Rent receipt" onClick={() => onReceipt(l)}
-                            className="rounded-lg p-1.5 text-indigo-400 transition hover:bg-indigo-500/10">
-                            <Receipt className="h-4 w-4" />
-                          </button>
-                        )}
+                        <button title="Receipt & share" onClick={() => onReceipt(l)}
+                          className="rounded-lg p-1.5 text-indigo-400 transition hover:bg-indigo-500/10">
+                          <Receipt className="h-4 w-4" />
+                        </button>
                         <StatusButton active={l.payment_status === "unpaid"} tone="rose" icon={Circle}
                           onClick={() => onStatus(l.id, "unpaid")} title="Unpaid" />
                         <StatusButton active={l.payment_status === "sent"} tone="amber" icon={Send}
@@ -2099,6 +2363,118 @@ function SignatureModal({
         <Button type="submit" loading={saving} disabled={!file} className="w-full">Save signature</Button>
       </form>
     </Modal>
+  );
+}
+
+/* ============================================================ SETTINGS */
+const WA_PLACEHOLDERS = ["{tenant}", "{month}", "{amount}", "{status}", "{property}"];
+
+function SettingsTab({
+  template, onTemplateSaved,
+}: {
+  template: string; onTemplateSaved: (t: string) => void;
+}) {
+  const [text, setText] = useState(template);
+  const [savingMsg, setSavingMsg] = useState(false);
+
+  // Keep the field in sync if the template loads after the tab first mounts.
+  useEffect(() => { setText(template); }, [template]);
+
+  async function saveTemplate(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setSavingMsg(true);
+      const res = await rentMasterFetch<{ whatsappMessageTemplate: string }>("/api/admin/owner/settings", {
+        method: "POST", role: "owner", body: JSON.stringify({ whatsappMessageTemplate: text }),
+      });
+      onTemplateSaved(res.whatsappMessageTemplate ?? text);
+      toast.success("Message template saved.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSavingMsg(false); }
+  }
+
+  return (
+    <div className="space-y-8">
+      <PageHeader title="Settings" subtitle="System preferences for your account." />
+
+      {/* WhatsApp receipt message */}
+      <Card className="p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400"><MessageCircle className="h-4 w-4" /></div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-100">WhatsApp receipt message</h3>
+            <p className="text-xs text-slate-500">Sent alongside a rent receipt when you share it to WhatsApp.</p>
+          </div>
+        </div>
+        <form onSubmit={saveTemplate} className="space-y-4">
+          <Field label="Message template"
+            hint="Leave blank to use a sensible default. Placeholders are filled in per receipt.">
+            <TextArea rows={4} value={text} onChange={(e) => setText(e.target.value)}
+              placeholder="Hello {tenant}, please find your rent receipt for {month}. Amount: {amount} ({status})." />
+          </Field>
+          <div className="flex flex-wrap gap-1.5">
+            {WA_PLACEHOLDERS.map((p) => (
+              <button key={p} type="button"
+                onClick={() => setText((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${p}`)}
+                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300">
+                {p}
+              </button>
+            ))}
+          </div>
+          <Button type="submit" loading={savingMsg}>Save message</Button>
+        </form>
+      </Card>
+
+      {/* Change password */}
+      <ChangePasswordCard />
+    </div>
+  );
+}
+
+function ChangePasswordCard() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (next.length < 8) { toast.error("New password must be at least 8 characters."); return; }
+    if (next !== confirm) { toast.error("New passwords do not match."); return; }
+    try {
+      setSaving(true);
+      await rentMasterFetch("/api/admin/owner/password", {
+        method: "POST", role: "owner",
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      setCurrent(""); setNext(""); setConfirm("");
+      toast.success("Password updated.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400"><Lock className="h-4 w-4" /></div>
+        <div>
+          <h3 className="text-sm font-bold text-slate-100">Change password</h3>
+          <p className="text-xs text-slate-500">Update the password you use to sign in.</p>
+        </div>
+      </div>
+      <form onSubmit={submit} className="max-w-md space-y-4">
+        <Field label="Current password" required>
+          <TextInput type="password" required value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="••••••••" />
+        </Field>
+        <Field label="New password" required hint="At least 8 characters.">
+          <TextInput type="password" required value={next} onChange={(e) => setNext(e.target.value)} placeholder="••••••••" />
+        </Field>
+        <Field label="Confirm new password" required>
+          <TextInput type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" />
+        </Field>
+        <Button type="submit" loading={saving}>Update password</Button>
+      </form>
+    </Card>
   );
 }
 

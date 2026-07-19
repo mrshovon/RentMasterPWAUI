@@ -264,6 +264,76 @@ export interface SupportTicket {
   owner?: { name: string | null; email: string | null; phone: string | null } | null;
 }
 
+// ---- Password reset history (admin-only audit view) ----
+export type ResetMethod = "admin_reset" | "self_service_email" | "self_change";
+
+export interface PasswordResetRecord {
+  id: string;
+  reset_no: number;
+  owner_id: string;
+  owner_email: string | null;
+  reset_by: string | null;
+  reset_method: ResetMethod;
+  ip: string | null;
+  created_at: string;
+  // Attached by the admin queue endpoint (owners/admins are auth users, not a table).
+  owner?: { name: string | null; email: string | null } | null;
+  actor?: { name: string | null; email: string | null } | null;
+}
+
+// ---- Contact-us messages (owner -> system admin, from the custom plan card) ----
+export type ContactStatus = "new" | "in_progress" | "resolved" | "archived";
+
+export interface ContactMessage {
+  id: string;
+  message_no: number;
+  owner_id: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  tier_id: string | null;
+  message: string;
+  status: ContactStatus;
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  // Attached by the admin queue endpoint only.
+  owner?: { name: string | null; email: string | null; phone: string | null } | null;
+}
+
+// ---- Payment submissions (owner manual bKash payment -> admin approval) ----
+// NB: distinct from the billing PaymentStatus (unpaid/sent/paid) defined above.
+export type PaymentSubmissionStatus = "pending" | "approved" | "rejected";
+
+export interface PaymentSubmission {
+  id: string;
+  payment_no: number;
+  owner_id: string;
+  owner_email: string | null;
+  provider: string;
+  tier_id: string;
+  amount: number | null;
+  sender_msisdn: string | null;
+  txn_id: string | null;
+  status: PaymentSubmissionStatus;
+  admin_notes: string | null; // rejection remarks; visible to the owner
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // Attached by the admin queue endpoint only.
+  owner?: { name: string | null; email: string | null; phone: string | null } | null;
+  tier_name?: string;
+}
+
+// ---- Payment setup (admin-configured MFS pay-to details) ----
+export interface PaymentConfig {
+  provider: string; // which MFS: bKash, Nagad, Rocket, …
+  walletNumber: string;
+  instructions: string;
+  qrUrl: string | null;
+}
+
 // Generic envelope returned by every backend route
 export interface ApiEnvelope<T> {
   success: boolean;

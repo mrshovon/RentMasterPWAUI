@@ -62,6 +62,56 @@ export async function apiLogin(payload: {
   return json;
 }
 
+// Owner self-signup → creates an auto-confirmed owner and returns a session (same shape as
+// apiLogin) so the caller can persist() and land on /owner. Throws with the backend's message.
+export async function apiSignup(payload: {
+  name: string; email: string; phone?: string; password: string;
+}): Promise<{ token: string; role: string; id: string; name: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${BACKEND_API_BASE}/api/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error(`Cannot reach backend at ${BACKEND_API_BASE}. Is the API server running on :3000?`);
+  }
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.success) {
+    throw new ApiError(json.error || "Sign up failed.", res.status, json.code);
+  }
+  return json;
+}
+
+// Request a password-reset email (owner self-service). The backend always returns a generic
+// success even if the email doesn't exist, so this never reveals whether an account is present.
+export async function apiForgotPassword(email: string): Promise<void> {
+  try {
+    await fetch(`${BACKEND_API_BASE}/api/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    throw new Error(`Cannot reach backend at ${BACKEND_API_BASE}. Is the API server running on :3000?`);
+  }
+}
+
+// After the reset page changes the password via the Supabase recovery session, tell the backend
+// so it can write the audit-log row. Best-effort — a failure here must not block the user.
+export async function apiResetComplete(accessToken: string): Promise<void> {
+  try {
+    await fetch(`${BACKEND_API_BASE}/api/auth/reset-complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken }),
+    });
+  } catch {
+    /* non-fatal: the password change already succeeded on Supabase */
+  }
+}
+
 // Multipart file upload — cannot go through rentMasterFetch (which forces a JSON
 // content-type). Sends the file to the backend storage route and returns the public URL.
 export async function uploadFile(
