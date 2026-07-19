@@ -5,6 +5,8 @@ import { ArrowRight, Phone, Lock, Mail, User } from "lucide-react";
 import { apiLogin, apiForgotPassword, apiSignup } from "../lib/api-service";
 import { Button, Modal, Field, TextInput } from "../components/ui";
 import { toast } from "../components/toast";
+import { DownloadAndroid } from "../components/download-android";
+import { APP_VERSION } from "../lib/app-config";
 
 export default function EntryGatewayPage() {
   const [tab, setTab] = useState<"tenant" | "owner">("tenant");
@@ -87,7 +89,10 @@ export default function EntryGatewayPage() {
             </p>
           </div>
 
-          <div className="font-mono text-xs text-slate-600">RentMaster PWA · v3.0</div>
+          <div className="flex items-center gap-4">
+            <span className="font-mono text-xs text-slate-600">RentMaster · v{APP_VERSION}</span>
+            <DownloadAndroid variant="link" />
+          </div>
         </div>
 
         {/* Form panel */}
@@ -197,6 +202,11 @@ export default function EntryGatewayPage() {
                   </p>
                 </form>
               )}
+            </div>
+
+            {/* Mobile download link (the brand panel with its link is desktop-only). Browser-only. */}
+            <div className="flex justify-center lg:hidden">
+              <DownloadAndroid variant="link" />
             </div>
           </div>
         </div>

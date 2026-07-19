@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { LogOut, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
 import { PushToggle } from "./push-toggle";
+import { DownloadAndroid } from "./download-android";
 
 export interface NavItem {
   key: string;
@@ -100,7 +101,9 @@ export function DashboardShell({
           </nav>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-1">
+          {/* Renders only in a browser (hidden inside the installed Android app). */}
+          <DownloadAndroid variant="sidebar" />
           <button
             onClick={onLogout}
             className="flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-400"
@@ -135,6 +138,10 @@ export function DashboardShell({
         <main className="flex-1 px-4 pb-28 pt-6 md:px-8 md:pb-10 lg:px-10">
           <div className="mx-auto w-full max-w-6xl animate-slide-up">
             <PushToggle />
+            {/* Mobile-only download affordance (desktop uses the sidebar row). Browser-only. */}
+            <div className="mb-3 flex justify-end md:hidden">
+              <DownloadAndroid variant="link" />
+            </div>
             {children}
           </div>
         </main>

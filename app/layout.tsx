@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Toaster } from "../components/toast";
 import { ConfirmHost } from "../components/confirm";
+import { UpdateGate } from "../components/update-gate";
 
 export const metadata: Metadata = {
   title: "RentMaster — Property Management",
@@ -38,6 +39,7 @@ export default function RootLayout({
         {children}
         <Toaster />
         <ConfirmHost />
+        <UpdateGate />
       </body>
     </html>
   );
