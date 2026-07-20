@@ -33,3 +33,13 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 *.pem
+
+# Android signing secrets — NEVER commit (keystore + passwords live in CI secrets)
+*.jks
+*.keystore
+android/keystore.properties
+android/key.properties
+# Gradle/Android local state (android/.gitignore also covers these)
+android/.gradle/
+android/local.properties
+android/app/release/

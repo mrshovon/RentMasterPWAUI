@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>RentMaster</title>
+    <style>
+      html, body {
+        margin: 0; height: 100%;
+        background: #030712; color: #94a3b8;
+        font-family: system-ui, -apple-system, sans-serif;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .spinner {
+        width: 40px; height: 40px; border-radius: 50%;
+        border: 3px solid rgba(148,163,184,0.2); border-top-color: #6366f1;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <!-- Fallback loader. With capacitor server.url set, the live site loads over this. -->
+    <div class="spinner" aria-label="Loading RentMaster"></div>
+  </body>
+</html>
