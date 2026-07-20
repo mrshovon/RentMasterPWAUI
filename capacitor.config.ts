@@ -11,7 +11,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // ⚠️ Set NEXT_PUBLIC_APP_URL (or edit PROD_URL) to your real Vercel domain before building.
 // =============================================================================
 
-const PROD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://rentmaster.vercel.app";
+const PROD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://rent-master-pwa-ui.vercel.app";
 
 const config: CapacitorConfig = {
   appId: "com.rentmaster.app",

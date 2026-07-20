@@ -23,4 +23,4 @@ export const RELEASES_PAGE = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/
 // Production web URL the Android shell loads (Capacitor server.url). Overridable at
 // build time via NEXT_PUBLIC_APP_URL. ⚠️ REPLACE the fallback with your real Vercel domain.
 export const PROD_WEB_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://rentmaster.vercel.app";
+  process.env.NEXT_PUBLIC_APP_URL || "https://rent-master-pwa-ui.vercel.app";
