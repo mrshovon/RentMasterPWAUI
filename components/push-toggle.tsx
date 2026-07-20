@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Bell, BellOff } from "lucide-react";
 import { ensurePushSubscription, getPushPermission, type PushPermission } from "../lib/push";
+import { ensureNativePush } from "../lib/native-push";
+import { isNativeApp } from "../lib/platform";
 import { getSessionToken } from "../lib/api-service";
 import { Button } from "./ui";
 
@@ -22,6 +24,13 @@ export function PushToggle() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    // Inside the native app, notifications go through FCM (not Web Push). Register the
+    // native token and render nothing — the OS handles the permission prompt.
+    if (isNativeApp()) {
+      void ensureNativePush();
+      setPermission("granted");
+      return;
+    }
     const current = getPushPermission();
     setPermission(current);
     // Already permitted: re-register quietly, never prompt.
