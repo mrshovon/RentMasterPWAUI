@@ -72,15 +72,41 @@ export async function checkForUpdate(): Promise<UpdateStatus> {
   return { hasUpdate, current: APP_VERSION, latest };
 }
 
-// Start the upgrade. Browser: open the APK (or releases page). The native install
-// path (download + system installer) is layered in during Phase D.
+// Start the upgrade.
+//  - Browser: open the APK asset (or releases page) in a new tab.
+//  - Native app: download the APK, then hand it to the system package installer
+//    (needs REQUEST_INSTALL_PACKAGES). Falls back to opening the URL if that fails.
 export async function startUpgrade(release: ReleaseInfo | null): Promise<void> {
   const url = release?.apkUrl || release?.htmlUrl || RELEASES_PAGE;
+
   if (!isNativeApp()) {
     if (typeof window !== "undefined") window.open(url, "_blank", "noopener,noreferrer");
     return;
   }
-  // Native install flow is implemented in Phase D (Filesystem + FileOpener). Until
-  // then, open the APK URL so the system browser downloads it.
-  if (typeof window !== "undefined") window.open(url, "_blank");
+
+  // No direct APK asset — just open the release page in the browser.
+  if (!release?.apkUrl) {
+    if (typeof window !== "undefined") window.open(url, "_blank");
+    return;
+  }
+
+  try {
+    const { Filesystem, Directory } = await import("@capacitor/filesystem");
+    const { FileOpener } = await import("@capacitor-community/file-opener");
+    const result = await Filesystem.downloadFile({
+      url: release.apkUrl,
+      path: `rentmaster-${release.version}.apk`,
+      directory: Directory.Cache,
+    });
+    const filePath = (result as { path?: string }).path;
+    if (!filePath) throw new Error("APK download returned no path");
+    // Opening an .apk triggers the Android package installer prompt.
+    await FileOpener.open({
+      filePath,
+      contentType: "application/vnd.android.package-archive",
+    });
+  } catch (err) {
+    console.error("[updates] native install failed, falling back to browser:", err);
+    if (typeof window !== "undefined") window.open(release.apkUrl, "_blank");
+  }
 }
