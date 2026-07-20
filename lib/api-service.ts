@@ -30,21 +30,100 @@ export class ApiError extends Error {
   }
 }
 
-// Reads the real session token (if the user logged in) from localStorage.
-export function getSessionToken(): string | null {
+const SESSION_KEY = "rentmaster_session";
+
+// The shape we persist in localStorage. `refreshToken`/`expiresAt` are present for owner/admin
+// (Supabase) sessions and drive silent token renewal; tenants have a long-lived JWT and neither.
+export interface StoredSession {
+  role: "owner" | "tenant" | "admin";
+  userId: string;
+  name: string;
+  token?: string;
+  refreshToken?: string;
+  expiresAt?: number; // unix seconds (Supabase session.expires_at)
+}
+
+export function getStoredSession(): StoredSession | null {
   if (typeof window === "undefined") return null;
   try {
-    return JSON.parse(localStorage.getItem("rentmaster_session") || "{}").token || null;
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as StoredSession) : null;
   } catch {
     return null;
   }
 }
 
-// Real login → returns { token, role, id, name }. Throws on bad credentials.
+export function setStoredSession(session: StoredSession): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch { /* ignore */ }
+}
+
+export function clearSession(): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+}
+
+// Reads the real access token (if the user logged in) from localStorage.
+export function getSessionToken(): string | null {
+  return getStoredSession()?.token || null;
+}
+
+// Single-flight refresh: concurrent callers share one in-flight request so we never send the
+// (rotating) refresh token twice in parallel, which Supabase would treat as reuse and revoke.
+let refreshInFlight: Promise<string | null> | null = null;
+
+export function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    const session = getStoredSession();
+    if (!session?.refreshToken) return null; // tenants / no refresh token -> can't refresh
+    try {
+      const res = await fetch(`${BACKEND_API_BASE}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: session.refreshToken }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success || !json.token) {
+        clearSession();
+        return null;
+      }
+      setStoredSession({
+        ...session,
+        token: json.token,
+        refreshToken: json.refreshToken ?? session.refreshToken,
+        expiresAt: json.expiresAt ?? session.expiresAt,
+      });
+      return json.token as string;
+    } catch {
+      // Network error — keep the session (don't log the user out over a blip).
+      return session.token || null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
+// Returns a currently-valid access token, refreshing first if it's expired/near expiry.
+// Returns null if there's no session or the refresh failed (caller should treat as logged out).
+export async function ensureValidToken(): Promise<string | null> {
+  const session = getStoredSession();
+  if (!session) return null;
+  if (session.refreshToken && session.expiresAt) {
+    const now = Math.floor(Date.now() / 1000);
+    if (session.expiresAt - now <= 60) {
+      return refreshAccessToken();
+    }
+  }
+  return session.token || null;
+}
+
+// Real login → returns { token, refreshToken?, expiresAt?, role, id, name }. Throws on bad creds.
 export async function apiLogin(payload: {
   mode: "owner" | "admin" | "tenant";
   email?: string; password?: string; phone?: string; passcode?: string;
-}): Promise<{ token: string; role: string; id: string; name: string }> {
+}): Promise<{ token: string; refreshToken?: string; expiresAt?: number; role: string; id: string; name: string }> {
   let res: Response;
   try {
     res = await fetch(`${BACKEND_API_BASE}/api/auth/login`, {
@@ -66,7 +145,7 @@ export async function apiLogin(payload: {
 // apiLogin) so the caller can persist() and land on /owner. Throws with the backend's message.
 export async function apiSignup(payload: {
   name: string; email: string; phone?: string; password: string;
-}): Promise<{ token: string; role: string; id: string; name: string }> {
+}): Promise<{ token: string; refreshToken?: string; expiresAt?: number; role: string; id: string; name: string }> {
   let res: Response;
   try {
     res = await fetch(`${BACKEND_API_BASE}/api/auth/signup`, {
@@ -158,29 +237,43 @@ export async function rentMasterFetch<T = any>(
   options: FetchOptions = {}
 ): Promise<T> {
   const { role = "owner", ...nativeOptions } = options;
-
-  const headers = new Headers(nativeOptions.headers);
-  headers.set("Content-Type", "application/json");
-
-  // Real session token when logged in; otherwise fall back to demo identity headers
-  // (the backend keeps BYPASS_FOR_TESTING as a fallback for the one-click demo).
-  const token = getSessionToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  } else if (role === "tenant") {
-    headers.set("x-rentmaster-tenant-id", DEMO_TENANT_ID);
-  } else {
-    headers.set("x-rentmaster-uid", DEMO_OWNER_ID);
-  }
-
   const targetUrl = `${BACKEND_API_BASE}${endpoint}`;
 
+  // Builds headers for one attempt, using the given bearer token (or demo identity fallback).
+  function buildHeaders(bearer: string | null): Headers {
+    const headers = new Headers(nativeOptions.headers);
+    headers.set("Content-Type", "application/json");
+    if (bearer) {
+      headers.set("Authorization", `Bearer ${bearer}`);
+    } else if (role === "tenant") {
+      headers.set("x-rentmaster-tenant-id", DEMO_TENANT_ID);
+    } else {
+      headers.set("x-rentmaster-uid", DEMO_OWNER_ID);
+    }
+    return headers;
+  }
+
+  async function attempt(bearer: string | null): Promise<Response> {
+    return fetch(targetUrl, { ...nativeOptions, headers: buildHeaders(bearer), cache: "no-store" });
+  }
+
   try {
-    const response = await fetch(targetUrl, {
-      ...nativeOptions,
-      headers,
-      cache: "no-store",
-    });
+    let response = await attempt(getSessionToken());
+
+    // Access token expired: try one silent refresh, then retry the request. If refresh fails,
+    // the session is dead — clear it and bounce to login (owner/admin only; tenants have no
+    // refresh token so this is skipped).
+    if (response.status === 401 && getStoredSession()?.refreshToken) {
+      const fresh = await refreshAccessToken();
+      if (fresh) {
+        response = await attempt(fresh);
+      } else {
+        clearSession();
+        if (typeof window !== "undefined" && window.location.pathname !== "/") {
+          window.location.replace("/");
+        }
+      }
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));

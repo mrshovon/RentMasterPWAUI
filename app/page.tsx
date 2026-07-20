@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, Phone, Lock, Mail, User } from "lucide-react";
-import { apiLogin, apiForgotPassword, apiSignup } from "../lib/api-service";
+import {
+  apiLogin, apiForgotPassword, apiSignup,
+  getStoredSession, setStoredSession, clearSession, ensureValidToken,
+} from "../lib/api-service";
 import { Button, Modal, Field, TextInput } from "../components/ui";
 import { toast } from "../components/toast";
 import { DownloadAndroid } from "../components/download-android";
@@ -18,14 +21,35 @@ export default function EntryGatewayPage() {
   const [loading, setLoading] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
+  // True until we've checked for an existing session, so the login form never flashes for an
+  // already-logged-in user (the PWA start_url is "/", so every launch lands here first).
+  const [checking, setChecking] = useState(true);
 
-  // Redirect immediately. Push setup deliberately does NOT happen here: PushToggle (rendered
-  // in DashboardShell) re-registers permitted devices on every dashboard mount and otherwise
-  // prompts from an explicit button. Awaiting it here stalled the redirect for seconds —
-  // navigator.serviceWorker.ready never resolves in `next dev`, where the SW is disabled.
-  // `replace` (not `href`) so Back doesn't land on the login screen while signed in.
-  function persist(role: "owner" | "tenant" | "admin", userId: string, name: string, token?: string) {
-    localStorage.setItem("rentmaster_session", JSON.stringify({ role, userId, name, token }));
+  // On open: if a session already exists, refresh its token if needed and forward to the
+  // dashboard. Only fall back to the login form when there's no session (or the refresh failed).
+  useEffect(() => {
+    const session = getStoredSession();
+    if (!session) { setChecking(false); return; }
+    (async () => {
+      const token = await ensureValidToken();
+      if (token || !session.refreshToken) {
+        // Valid (or a tenant with a long-lived JWT and no refresh token) -> go to the dashboard.
+        window.location.replace(`/${session.role}`);
+      } else {
+        clearSession();
+        setChecking(false);
+      }
+    })();
+  }, []);
+
+  // Push setup deliberately does NOT happen here: PushToggle (rendered in DashboardShell)
+  // re-registers permitted devices on every dashboard mount and otherwise prompts from an
+  // explicit button. `replace` (not `href`) so Back doesn't land on the login screen while signed in.
+  function persist(
+    role: "owner" | "tenant" | "admin", userId: string, name: string,
+    token?: string, refreshToken?: string, expiresAt?: number,
+  ) {
+    setStoredSession({ role, userId, name, token, refreshToken, expiresAt });
     window.location.replace(`/${role}`);
   }
 
@@ -52,11 +76,20 @@ export default function EntryGatewayPage() {
     try {
       setLoading(true);
       const r = await apiLogin({ mode: "owner", email: email.trim(), password: ownerPass });
-      persist(r.role === "admin" ? "admin" : "owner", r.id, r.name, r.token);
+      persist(r.role === "admin" ? "admin" : "owner", r.id, r.name, r.token, r.refreshToken, r.expiresAt);
     } catch (err: any) {
       setError(err.message);
       setLoading(false);
     }
+  }
+
+  // While checking for an existing session, show a neutral loader instead of the login form.
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950">
+        <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-white/10 border-t-indigo-500" />
+      </div>
+    );
   }
 
   return (
@@ -214,7 +247,7 @@ export default function EntryGatewayPage() {
 
       <ForgotPasswordModal open={forgotOpen} onClose={() => setForgotOpen(false)} initialEmail={email} />
       <SignupModal open={signupOpen} onClose={() => setSignupOpen(false)}
-        onSuccess={(id, name, token) => persist("owner", id, name, token)} />
+        onSuccess={(id, name, token, refreshToken, expiresAt) => persist("owner", id, name, token, refreshToken, expiresAt)} />
     </div>
   );
 }
@@ -224,7 +257,8 @@ export default function EntryGatewayPage() {
 function SignupModal({
   open, onClose, onSuccess,
 }: {
-  open: boolean; onClose: () => void; onSuccess: (id: string, name: string, token?: string) => void;
+  open: boolean; onClose: () => void;
+  onSuccess: (id: string, name: string, token?: string, refreshToken?: string, expiresAt?: number) => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -241,7 +275,7 @@ function SignupModal({
       setSubmitting(true);
       const r = await apiSignup({ name: name.trim(), email: email.trim(), phone: phone.trim(), password });
       toast.success("Welcome to RentMaster!");
-      onSuccess(r.id, r.name, r.token);
+      onSuccess(r.id, r.name, r.token, r.refreshToken, r.expiresAt);
     } catch (err: any) {
       toast.error(err.message);
       setSubmitting(false);
