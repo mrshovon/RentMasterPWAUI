@@ -90,6 +90,25 @@ export interface Notice {
   created_at: string;
 }
 
+// ---- Rent reminders (owner-scheduled, to tenants) ----
+export type ReminderRecurrence = "once" | "monthly";
+export type ReminderStatus = "pending" | "sent" | "canceled";
+
+export interface Reminder {
+  id: string;
+  reminder_no: number;
+  owner_id: string;
+  target_all: boolean;
+  tenant_ids: string[];
+  message: string;
+  scheduled_date: string; // "YYYY-MM-DD"
+  recurrence: ReminderRecurrence;
+  status: ReminderStatus;
+  last_sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Tenant self-profile (GET /api/admin/tenants/me)
 export interface OwnerContact {
   name: string | null;

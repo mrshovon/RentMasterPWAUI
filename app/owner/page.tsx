@@ -23,6 +23,7 @@ import {
   PlanState, PlanUsage, SubscriptionResponse, SubscriptionTier,
   SupportTicket, TicketStatus, TicketCategory,
   PaymentSubmission, PaymentConfig,
+  Reminder, ReminderRecurrence,
 } from "../../types/api";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
@@ -73,6 +74,9 @@ export default function OwnerDashboard() {
   const [tenantOpen, setTenantOpen] = useState(false);
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderTemplate, setReminderTemplate] = useState<string>("");
   const [editProp, setEditProp] = useState<Property | null>(null);
   const [editTenant, setEditTenant] = useState<Tenant | null>(null);
   const [chargeProp, setChargeProp] = useState<Property | null>(null);
@@ -128,13 +132,14 @@ export default function OwnerDashboard() {
     (async () => {
       try {
         setLoading(true);
-        const [p, t, b, m, n, s] = await Promise.allSettled([
+        const [p, t, b, m, n, s, rm] = await Promise.allSettled([
           rentMasterFetch("/api/admin/properties", { role: "owner" }),
           rentMasterFetch("/api/admin/tenants", { role: "owner" }),
           rentMasterFetch("/api/admin/billing", { role: "owner" }),
           rentMasterFetch("/api/admin/maintenance", { role: "owner" }),
           rentMasterFetch("/api/admin/notices", { role: "owner" }),
           rentMasterFetch("/api/admin/support-tickets", { role: "owner" }),
+          rentMasterFetch("/api/admin/reminders", { role: "owner" }),
         ]);
         if (p.status === "fulfilled") setProperties(p.value.data || []);
         if (t.status === "fulfilled") setTenants(t.value.data || []);
@@ -142,6 +147,7 @@ export default function OwnerDashboard() {
         if (m.status === "fulfilled") setMaintenance(m.value.data || []);
         if (n.status === "fulfilled") setNotices(n.value.data || []);
         if (s.status === "fulfilled") setTickets(s.value.data || []);
+        if (rm.status === "fulfilled") setReminders(rm.value.data || []);
         const firstErr = [p, t, b, m, n, s].find((r) => r.status === "rejected");
         if (firstErr && firstErr.status === "rejected")
           setError((firstErr.reason as Error).message);
@@ -192,8 +198,9 @@ export default function OwnerDashboard() {
     const unpaidCount = ledgers.filter((l) => l.payment_status !== "paid").length;
     const openTickets = maintenance.filter((m) => m.resolution_status !== "resolved").length;
     const openSupport = tickets.filter((t) => t.status !== "done").length;
-    return { occupied, monthlyRevenue, outstanding, unpaidCount, openTickets, openSupport };
-  }, [properties, tenants, ledgers, maintenance, tickets]);
+    const pendingReminders = reminders.filter((r) => r.status === "pending").length;
+    return { occupied, monthlyRevenue, outstanding, unpaidCount, openTickets, openSupport, pendingReminders };
+  }, [properties, tenants, ledgers, maintenance, tickets, reminders]);
 
   const nav: NavItem[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
@@ -202,6 +209,7 @@ export default function OwnerDashboard() {
     { key: "billing", label: "Billing", icon: ReceiptText, badge: metrics.unpaidCount },
     { key: "maintenance", label: "Requests", icon: Wrench, badge: metrics.openTickets },
     { key: "notices", label: "Notices", icon: Megaphone },
+    { key: "reminders", label: "Reminders", icon: CalendarClock, badge: metrics.pendingReminders },
     { key: "plan", label: "Plan", icon: Gem },
     { key: "support", label: "Support", icon: LifeBuoy, badge: metrics.openSupport },
     { key: "settings", label: "Settings", icon: Settings },
@@ -234,15 +242,24 @@ export default function OwnerDashboard() {
     })();
   }, []);
 
-  // Load the owner's WhatsApp receipt message template (from Settings / auth metadata).
+  // Load the owner's message templates (WhatsApp receipt + rent reminder) from Settings/auth metadata.
   const loadWhatsappTemplate = async () => {
     try {
-      const res = await rentMasterFetch<{ whatsappMessageTemplate: string | null }>(
+      const res = await rentMasterFetch<{ whatsappMessageTemplate: string | null; reminderMessageTemplate: string | null }>(
         "/api/admin/owner/settings", { role: "owner" });
       setWhatsappTemplate(res.whatsappMessageTemplate || "");
+      setReminderTemplate(res.reminderMessageTemplate || "");
     } catch { /* non-fatal — Settings tab shows an empty field */ }
   };
   useEffect(() => { loadWhatsappTemplate(); }, []);
+
+  // Reload just the reminders list (after create/cancel/delete).
+  const loadReminders = async () => {
+    try {
+      const res = await rentMasterFetch<{ data: Reminder[] }>("/api/admin/reminders", { role: "owner" });
+      setReminders(res.data || []);
+    } catch { /* non-fatal */ }
+  };
 
   // Build an "Owner Copy" receipt (paid OR due) and open the preview, ready to share via WhatsApp.
   function openOwnerReceipt(l: BillingLedger) {
@@ -377,12 +394,26 @@ export default function OwnerDashboard() {
         <NoticesTab notices={notices} onCreate={() => setNoticeOpen(true)} />
       )}
 
+      {tab === "reminders" && (
+        <RemindersTab
+          reminders={reminders}
+          tenants={tenants}
+          onCreate={() => setReminderOpen(true)}
+          onChanged={loadReminders}
+        />
+      )}
+
       {tab === "support" && (
         <SupportTab tickets={tickets} onCreate={() => setTicketOpen(true)} />
       )}
 
       {tab === "settings" && (
-        <SettingsTab template={whatsappTemplate} onTemplateSaved={setWhatsappTemplate} />
+        <SettingsTab
+          template={whatsappTemplate}
+          onTemplateSaved={setWhatsappTemplate}
+          reminderTemplate={reminderTemplate}
+          onReminderTemplateSaved={setReminderTemplate}
+        />
       )}
 
       {/* ---------- Modals ---------- */}
@@ -418,6 +449,13 @@ export default function OwnerDashboard() {
         onClose={() => setNoticeOpen(false)}
         tenants={tenants}
         onCreated={(n) => setNotices((x) => [n, ...x])}
+      />
+      <ReminderModal
+        open={reminderOpen}
+        onClose={() => setReminderOpen(false)}
+        tenants={tenants}
+        template={reminderTemplate}
+        onCreated={loadReminders}
       />
       <EditPropertyModal
         property={editProp}
@@ -2000,6 +2038,239 @@ function NoticeModal({
   );
 }
 
+/* ============================================================ RENT REMINDERS */
+const REMINDER_PLACEHOLDERS = ["{tenant}", "{amount}", "{property}", "{month}", "{due_date}"];
+
+const reminderStatusTone: Record<Reminder["status"], "amber" | "emerald" | "slate"> = {
+  pending: "amber", sent: "emerald", canceled: "slate",
+};
+const reminderStatusLabel: Record<Reminder["status"], string> = {
+  pending: "Scheduled", sent: "Sent", canceled: "Canceled",
+};
+
+function RemindersTab({
+  reminders, tenants, onCreate, onChanged,
+}: {
+  reminders: Reminder[]; tenants: Tenant[]; onCreate: () => void; onChanged: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const nameById = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const t of tenants) m[t.id] = t.name;
+    return m;
+  }, [tenants]);
+
+  function recipients(r: Reminder): string {
+    if (r.target_all) return "All tenants";
+    const names = r.tenant_ids.map((id) => nameById[id] || "tenant");
+    if (names.length <= 2) return names.join(", ");
+    return `${names.slice(0, 2).join(", ")} +${names.length - 2} more`;
+  }
+
+  async function act(id: string, action: "cancel" | "send_now" | "delete") {
+    if (action === "cancel" && !(await confirmDialog({ title: "Cancel reminder?", message: "It won't be sent.", confirmLabel: "Cancel it", danger: true }))) return;
+    if (action === "delete" && !(await confirmDialog({ title: "Delete reminder?", message: "This removes it permanently.", confirmLabel: "Delete", danger: true }))) return;
+    try {
+      setBusy(id);
+      if (action === "delete") {
+        await rentMasterFetch(`/api/admin/reminders/${id}`, { method: "DELETE", role: "owner" });
+        toast.success("Reminder deleted.");
+      } else {
+        const res = await rentMasterFetch<{ delivered?: number }>(`/api/admin/reminders/${id}`, {
+          method: "PATCH", role: "owner", body: JSON.stringify({ action }),
+        });
+        toast.success(action === "cancel" ? "Reminder canceled." : `Reminder sent to ${res.delivered ?? 0} tenant(s).`);
+      }
+      await onChanged();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(null); }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Rent reminders" subtitle="Schedule reminders to your tenants — once or every month."
+        action={<Button icon={Plus} onClick={onCreate}>New reminder</Button>} />
+
+      {reminders.length === 0 ? (
+        <EmptyState icon={CalendarClock} title="No reminders yet"
+          hint="Create a reminder to nudge tenants about rent — pick tenants, write a message, set a date."
+          action={<Button icon={Plus} onClick={onCreate}>New reminder</Button>} />
+      ) : (
+        <div className="space-y-3">
+          {reminders.map((r) => (
+            <Card key={r.id} className="p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs text-slate-500">#{r.reminder_no}</span>
+                    <Badge tone={reminderStatusTone[r.status]}>{reminderStatusLabel[r.status]}</Badge>
+                    <Badge tone={r.recurrence === "monthly" ? "indigo" : "slate"}>
+                      {r.recurrence === "monthly" ? "Monthly" : "One-time"}
+                    </Badge>
+                    <span className="flex items-center gap-1 text-xs text-slate-400">
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      {r.status === "pending" ? "Next: " : ""}{formatDate(r.scheduled_date)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-200">
+                    <Users className="h-4 w-4 text-slate-500" /> {recipients(r)}
+                  </div>
+                  <p className="max-w-2xl whitespace-pre-wrap text-sm text-slate-400">{r.message}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {r.status === "pending" && (
+                    <>
+                      <IconBtnOwner title="Send now" tone="emerald" icon={Send} loading={busy === r.id} onClick={() => act(r.id, "send_now")} />
+                      <IconBtnOwner title="Cancel" tone="amber" icon={X} loading={busy === r.id} onClick={() => act(r.id, "cancel")} />
+                    </>
+                  )}
+                  <IconBtnOwner title="Delete" tone="rose" icon={Trash2} loading={busy === r.id} onClick={() => act(r.id, "delete")} />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Small icon action button (local to the owner page).
+function IconBtnOwner({
+  title, tone, icon: Icon, onClick, loading,
+}: {
+  title: string; tone: "emerald" | "amber" | "rose"; icon: typeof Send; onClick: () => void; loading?: boolean;
+}) {
+  const tones = {
+    emerald: "text-emerald-400 hover:bg-emerald-500/10",
+    amber: "text-amber-400 hover:bg-amber-500/10",
+    rose: "text-rose-400 hover:bg-rose-500/10",
+  };
+  return (
+    <button title={title} onClick={onClick} disabled={loading}
+      className={`rounded-lg p-2 transition disabled:pointer-events-none disabled:opacity-50 ${tones[tone]}`}>
+      {loading ? <Spinner className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+    </button>
+  );
+}
+
+function ReminderModal({
+  open, onClose, tenants, template, onCreated,
+}: {
+  open: boolean; onClose: () => void; tenants: Tenant[]; template: string; onCreated: () => Promise<void>;
+}) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [targetAll, setTargetAll] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [message, setMessage] = useState("");
+  const [scheduledDate, setScheduledDate] = useState(todayIso);
+  const [recurrence, setRecurrence] = useState<ReminderRecurrence>("once");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setTargetAll(false); setSelected([]);
+      setMessage(template || "Hello {tenant}, this is a reminder that your rent of {amount} for {month} is due. Please pay by the {due_date}.");
+      setScheduledDate(new Date().toISOString().slice(0, 10));
+      setRecurrence("once");
+    }
+  }, [open, template]);
+
+  function toggle(id: string) {
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+  function insert(token: string) { setMessage((m) => `${m}${m && !m.endsWith(" ") ? " " : ""}${token} `); }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!message.trim()) { toast.error("Write a message."); return; }
+    if (!targetAll && selected.length === 0) { toast.error("Select at least one tenant (or choose All tenants)."); return; }
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ delivered?: number }>("/api/admin/reminders", {
+        method: "POST", role: "owner",
+        body: JSON.stringify({ targetAll, tenantIds: selected, message: message.trim(), scheduledDate, recurrence }),
+      });
+      const sentNow = scheduledDate <= todayIso;
+      toast.success(sentNow ? `Reminder sent to ${res.delivered ?? 0} tenant(s).` : "Reminder scheduled.");
+      await onCreated();
+      onClose();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} size="lg" title="New rent reminder"
+      subtitle="Pick tenants, write the message, and choose when it goes out.">
+      <form onSubmit={submit} className="space-y-4">
+        {/* Recipients */}
+        <Field label="Recipients" required>
+          <button type="button" onClick={() => setTargetAll((v) => !v)}
+            className={`mb-2 flex w-full items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${
+              targetAll ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-300" : "border-white/[0.08] text-slate-300 hover:bg-white/[0.04]"
+            }`}>
+            {targetAll ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+            All tenants
+          </button>
+          {!targetAll && (
+            <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
+              {tenants.length === 0 && <p className="p-2 text-xs text-slate-500">No tenants yet.</p>}
+              {tenants.map((t) => {
+                const on = selected.includes(t.id);
+                return (
+                  <button type="button" key={t.id} onClick={() => toggle(t.id)}
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
+                      on ? "bg-emerald-500/10 text-emerald-200" : "text-slate-300 hover:bg-white/[0.04]"
+                    }`}>
+                    {on ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <Circle className="h-4 w-4 text-slate-500" />}
+                    <span className="flex-1 text-left">{t.name}</span>
+                    <span className="text-xs text-slate-500">{t.phone}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {!targetAll && selected.length > 0 && (
+            <p className="mt-1.5 text-xs text-slate-500">{selected.length} selected</p>
+          )}
+        </Field>
+
+        {/* Message + placeholders */}
+        <Field label="Message" required>
+          <TextArea required rows={4} value={message} onChange={(e) => setMessage(e.target.value)}
+            placeholder="Write the reminder…" />
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {REMINDER_PLACEHOLDERS.map((p) => (
+              <button type="button" key={p} onClick={() => insert(p)}
+                className="rounded-md bg-white/[0.05] px-2 py-1 font-mono text-[11px] text-slate-300 transition hover:bg-white/[0.1]">
+                {p}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        {/* Schedule */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Date" required>
+            <TextInput type="date" required min={todayIso} value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)} />
+          </Field>
+          <Field label="Repeat" required>
+            <Select value={recurrence} onChange={(e) => setRecurrence(e.target.value as ReminderRecurrence)}>
+              <option value="once">One-time</option>
+              <option value="monthly">Every month on this day</option>
+            </Select>
+          </Field>
+        </div>
+
+        <Button type="submit" loading={saving} icon={Send} className="w-full">
+          {scheduledDate <= todayIso ? "Send reminder" : "Schedule reminder"}
+        </Button>
+      </form>
+    </Modal>
+  );
+}
+
 /* ============================================================ EDIT MODALS */
 function EditPropertyModal({
   property, onClose, onSaved,
@@ -2370,15 +2641,19 @@ function SignatureModal({
 const WA_PLACEHOLDERS = ["{tenant}", "{month}", "{amount}", "{status}", "{property}"];
 
 function SettingsTab({
-  template, onTemplateSaved,
+  template, onTemplateSaved, reminderTemplate, onReminderTemplateSaved,
 }: {
   template: string; onTemplateSaved: (t: string) => void;
+  reminderTemplate: string; onReminderTemplateSaved: (t: string) => void;
 }) {
   const [text, setText] = useState(template);
   const [savingMsg, setSavingMsg] = useState(false);
+  const [reminderText, setReminderText] = useState(reminderTemplate);
+  const [savingReminder, setSavingReminder] = useState(false);
 
-  // Keep the field in sync if the template loads after the tab first mounts.
+  // Keep the fields in sync if templates load after the tab first mounts.
   useEffect(() => { setText(template); }, [template]);
+  useEffect(() => { setReminderText(reminderTemplate); }, [reminderTemplate]);
 
   async function saveTemplate(e: React.FormEvent) {
     e.preventDefault();
@@ -2391,6 +2666,19 @@ function SettingsTab({
       toast.success("Message template saved.");
     } catch (e: any) { toast.error(e.message); }
     finally { setSavingMsg(false); }
+  }
+
+  async function saveReminderTemplate(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setSavingReminder(true);
+      const res = await rentMasterFetch<{ reminderMessageTemplate: string }>("/api/admin/owner/settings", {
+        method: "POST", role: "owner", body: JSON.stringify({ reminderMessageTemplate: reminderText }),
+      });
+      onReminderTemplateSaved(res.reminderMessageTemplate ?? reminderText);
+      toast.success("Reminder template saved.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSavingReminder(false); }
   }
 
   return (
@@ -2422,6 +2710,34 @@ function SettingsTab({
             ))}
           </div>
           <Button type="submit" loading={savingMsg}>Save message</Button>
+        </form>
+      </Card>
+
+      {/* Rent reminder message */}
+      <Card className="p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400"><CalendarClock className="h-4 w-4" /></div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-100">Rent reminder message</h3>
+            <p className="text-xs text-slate-500">The default message pre-filled when you create a new reminder.</p>
+          </div>
+        </div>
+        <form onSubmit={saveReminderTemplate} className="space-y-4">
+          <Field label="Reminder template"
+            hint="Leave blank to use a sensible default. Placeholders are filled in per tenant at send time.">
+            <TextArea rows={4} value={reminderText} onChange={(e) => setReminderText(e.target.value)}
+              placeholder="Hello {tenant}, your rent of {amount} for {month} is due. Please pay by the {due_date}." />
+          </Field>
+          <div className="flex flex-wrap gap-1.5">
+            {REMINDER_PLACEHOLDERS.map((p) => (
+              <button key={p} type="button"
+                onClick={() => setReminderText((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${p}`)}
+                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-slate-300 transition hover:border-indigo-400/40 hover:text-indigo-300">
+                {p}
+              </button>
+            ))}
+          </div>
+          <Button type="submit" loading={savingReminder}>Save reminder message</Button>
         </form>
       </Card>
 
