@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "672044034436",
+    "project_id": "rent-master-pwa-ui",
+    "storage_bucket": "rent-master-pwa-ui.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:672044034436:android:fc19e5d9cf6dec5132d5d1",
+        "android_client_info": {
+          "package_name": "com.rentmaster.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCd6fhhUawNYjr3sfpVR8YG3A9AuV9CNPM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
