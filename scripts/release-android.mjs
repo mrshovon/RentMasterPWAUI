@@ -95,7 +95,10 @@ function run(cmd) {
 }
 run("git add -A");
 run(`git commit -m "Release v${version}"`);
-run(`git tag v${version}`);
+// Annotated (-a), not lightweight: `--follow-tags` below pushes ONLY annotated tags, so a
+// lightweight tag would stay local, the CI build would never trigger, and the release would
+// silently not happen even though the script reported success.
+run(`git tag -a v${version} -m "Release v${version}"`);
 run("git push origin HEAD --follow-tags");
 
 console.log(`\n✅ Pushed v${version}. GitHub Actions is now building the signed APK/AAB and will`);
