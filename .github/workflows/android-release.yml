@@ -29,11 +29,14 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Setup JDK 17
+      - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          # Capacitor 8 generates android/app/capacitor.build.gradle with
+          # source/targetCompatibility VERSION_21, so JDK 17 fails to compile
+          # capacitor-android with "invalid source release: 21".
+          java-version: 21
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
