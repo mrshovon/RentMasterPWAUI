@@ -7,6 +7,7 @@
 // =============================================================================
 
 import { APP_VERSION, LATEST_RELEASE_API, RELEASES_PAGE, LATEST_APK_URL } from "./app-config";
+import { BACKEND_API_BASE } from "./api-service";
 import { isNativeApp } from "./platform";
 
 export interface ReleaseInfo {
@@ -17,10 +18,16 @@ export interface ReleaseInfo {
   htmlUrl: string;   // the release page
 }
 
+/** Where the installed version came from — surfaced by the diagnostic button. */
+export type VersionSource = "native-plugin" | "user-agent" | "web-bundle";
+
 export interface UpdateStatus {
   hasUpdate: boolean;
   current: string;
   latest: ReleaseInfo | null;
+  /** Why there is (or isn't) an update — so a silent "nothing happened" is impossible. */
+  reason: "update" | "up-to-date" | "check-failed";
+  versionSource: VersionSource;
 }
 
 // Strip a leading "v" and any pre-release/build suffix for numeric comparison.
@@ -44,15 +51,48 @@ export function isNewer(latest: string, current: string): boolean {
   return false;
 }
 
-// Fetch the newest published release from GitHub. Returns null on any failure
-// (offline, rate-limited, no releases yet) — callers treat that as "no update".
+/**
+ * Fetch the newest published release.
+ *
+ * Prefers our own backend, which caches the GitHub response server-side. Calling
+ * api.github.com directly from every device runs into its 60-requests/hour-PER-IP limit for
+ * unauthenticated callers — and users behind carrier-grade NAT share one address, so the
+ * check would 403 for everyone on that IP and silently report "no update". GitHub stays as
+ * the fallback for when the backend is unreachable.
+ *
+ * Returns null on total failure; callers must treat that as "check failed", not "no update".
+ */
 export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
+  // 1. Our cached proxy (public route — no session token needed).
+  try {
+    const res = await fetch(`${BACKEND_API_BASE}/api/app/latest-release`, { cache: "no-store" });
+    if (res.ok) {
+      const j = await res.json();
+      if (j?.success && j.version) {
+        return {
+          version: String(j.version).replace(/^v/i, ""),
+          notes: j.notes || "",
+          apkUrl: j.apkUrl || null,
+          apkSize: typeof j.apkSize === "number" ? j.apkSize : null,
+          htmlUrl: j.htmlUrl || RELEASES_PAGE,
+        };
+      }
+    }
+  } catch {
+    /* fall through to GitHub */
+  }
+
+  // 2. Straight from GitHub.
   try {
     const res = await fetch(LATEST_RELEASE_API, {
       headers: { Accept: "application/vnd.github+json" },
       cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn("[updates] GitHub releases API returned", res.status,
+        res.status === 403 ? "(rate limited — 60/hr per IP for anonymous callers)" : "");
+      return null;
+    }
     const json = await res.json();
     const asset = (json.assets || []).find((a: any) => /\.apk$/i.test(a.name));
     return {
@@ -78,23 +118,40 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
  *
  * Falls back to APP_VERSION in the browser, or if the plugin call fails.
  */
-export async function getInstalledVersion(): Promise<string> {
-  if (!isNativeApp()) return APP_VERSION;
+export async function getInstalledVersion(): Promise<{ version: string; source: VersionSource }> {
+  if (!isNativeApp()) return { version: APP_VERSION, source: "web-bundle" };
+
+  // 1. The plugin bridge — authoritative when it works.
   try {
     const { App } = await import("@capacitor/app");
     const info = await App.getInfo();
-    return info?.version || APP_VERSION;
+    if (info?.version) return { version: info.version, source: "native-plugin" };
   } catch (err) {
-    console.warn("[updates] App.getInfo() unavailable, falling back to APP_VERSION:", err);
-    return APP_VERSION;
+    console.warn("[updates] App.getInfo() unavailable:", err);
   }
+
+  // 2. The user-agent token, stamped at build time by capacitor.config.ts
+  //    ("RentMasterApp/1.0.1"). Needs no bridge, so it survives whatever broke step 1.
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const m = ua.match(/RentMasterApp\/(\d+\.\d+\.\d+)/i);
+  if (m) return { version: m[1], source: "user-agent" };
+
+  // 3. Last resort. On native this is nearly useless: APP_VERSION comes from the DEPLOYED
+  //    SITE, which the release script bumps in lockstep with the release tag — so it will
+  //    almost always equal the latest release and report "up to date" forever. Logged loudly
+  //    because reaching here means the two better sources both failed.
+  console.error("[updates] no native version source; falling back to the web bundle's " +
+    "APP_VERSION, which cannot detect updates on a remote-URL shell.");
+  return { version: APP_VERSION, source: "web-bundle" };
 }
 
 // Compare the INSTALLED app version against the latest release.
 export async function checkForUpdate(): Promise<UpdateStatus> {
-  const [latest, current] = await Promise.all([fetchLatestRelease(), getInstalledVersion()]);
-  const hasUpdate = !!latest && isNewer(latest.version, current);
-  return { hasUpdate, current, latest };
+  const [latest, installed] = await Promise.all([fetchLatestRelease(), getInstalledVersion()]);
+  const base = { current: installed.version, versionSource: installed.source, latest };
+  if (!latest) return { ...base, hasUpdate: false, reason: "check-failed" };
+  const hasUpdate = isNewer(latest.version, installed.version);
+  return { ...base, hasUpdate, reason: hasUpdate ? "update" : "up-to-date" };
 }
 
 // Start the upgrade.

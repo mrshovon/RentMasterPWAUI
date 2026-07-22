@@ -7,6 +7,7 @@ import { ensureNativePush } from "../lib/native-push";
 import { isNativeApp } from "../lib/platform";
 import { getSessionToken, rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
+import { UpdateCheckButton } from "./update-gate";
 import { Button } from "./ui";
 
 interface PushTestResult {
@@ -85,10 +86,12 @@ export function PushToggle() {
 
   if (permission === "unsupported") return null;
 
-  // Working: stay out of the way, but keep the self-test reachable.
+  // Working: stay out of the way, but keep the self-tests reachable. UpdateCheckButton
+  // renders nothing outside the native app, so this row is just the push test in a browser.
   if (permission === "granted") {
     return (
-      <div className="mb-5 flex justify-end">
+      <div className="mb-5 flex flex-wrap justify-end gap-1">
+        <UpdateCheckButton />
         <PushTestButton />
       </div>
     );

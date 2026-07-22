@@ -1,4 +1,11 @@
 import type { CapacitorConfig } from "@capacitor/cli";
+import { readFileSync } from "node:fs";
+
+// The APK's own version, stamped into the user-agent below. Read from package.json, which
+// scripts/release-android.mjs bumps immediately before the APK is built.
+const APK_VERSION: string = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+).version;
 
 // =============================================================================
 // Capacitor config — RentMaster Android app.
@@ -26,8 +33,12 @@ const config: CapacitorConfig = {
     // Appended to the default WebView UA.
   },
   android: {
-    // Distinguishes our WebView from a plain browser for lib/platform.ts UA fallback.
-    appendUserAgent: "RentMasterApp",
+    // Distinguishes our WebView from a plain browser for lib/platform.ts, AND carries the
+    // installed APK's version to the web bundle without needing the plugin bridge.
+    // The remotely-loaded site cannot otherwise know which APK is running: its own
+    // APP_VERSION describes the DEPLOYED SITE, which moves with each release, so it can
+    // never detect that the installed app is out of date. See lib/updates.ts.
+    appendUserAgent: `RentMasterApp/${APK_VERSION}`,
   },
   plugins: {
     PushNotifications: {
