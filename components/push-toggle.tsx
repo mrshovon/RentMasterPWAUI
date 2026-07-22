@@ -1,12 +1,55 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, BellOff } from "lucide-react";
+import { Bell, BellOff, Send } from "lucide-react";
 import { ensurePushSubscription, getPushPermission, type PushPermission } from "../lib/push";
 import { ensureNativePush } from "../lib/native-push";
 import { isNativeApp } from "../lib/platform";
-import { getSessionToken } from "../lib/api-service";
+import { getSessionToken, rentMasterFetch } from "../lib/api-service";
+import { toast } from "./toast";
 import { Button } from "./ui";
+
+interface PushTestResult {
+  success: boolean;
+  configured: boolean;
+  tokens: number;
+  delivered: number;
+  hint: string | null;
+}
+
+/**
+ * Sends a test notification to this device and reports the outcome.
+ *
+ * Push failures are invisible on a phone — a missing server key and a misrouted transport
+ * both look like "nothing happened". This turns that into one tap with a real answer.
+ */
+export function PushTestButton({ className }: { className?: string }) {
+  const [busy, setBusy] = useState(false);
+
+  async function run() {
+    setBusy(true);
+    try {
+      const res = await rentMasterFetch<PushTestResult>("/api/notifications/test", {
+        method: "POST",
+      });
+      if (res.success) {
+        toast.success(`Test sent to ${res.delivered} device${res.delivered === 1 ? "" : "s"}. Check your notification shade.`);
+      } else {
+        toast.error(res.hint || "The test notification could not be delivered.");
+      }
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button size="sm" variant="ghost" icon={Send} loading={busy} onClick={run} className={className}>
+      Send test notification
+    </Button>
+  );
+}
 
 /**
  * Keeps this device's push subscription alive. Rendered once inside DashboardShell, so it
@@ -17,7 +60,8 @@ import { Button } from "./ui";
  * failed register call leaves exactly that state), and registering only at login means
  * such a device stays dark forever. Re-checking on every dashboard load heals it.
  *
- * It renders nothing once notifications are working.
+ * Once permission is granted it collapses to a single quiet "send test notification" action,
+ * so a user on a phone can verify the whole chain without a console.
  */
 export function PushToggle() {
   const [permission, setPermission] = useState<PushPermission>("unsupported");
@@ -39,7 +83,16 @@ export function PushToggle() {
     }
   }, []);
 
-  if (permission === "unsupported" || permission === "granted") return null;
+  if (permission === "unsupported") return null;
+
+  // Working: stay out of the way, but keep the self-test reachable.
+  if (permission === "granted") {
+    return (
+      <div className="mb-5 flex justify-end">
+        <PushTestButton />
+      </div>
+    );
+  }
 
   if (permission === "denied") {
     return (

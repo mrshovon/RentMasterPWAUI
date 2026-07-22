@@ -74,8 +74,13 @@ export async function ensurePushSubscription(
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
+        // Always "web": this is a Web Push subscription whatever OS the browser runs on.
+        // This used to send the operating system, so a PWA on Android registered as
+        // "android" — the label the backend reserves for native FCM tokens — and its
+        // notifications were routed to FCM and never delivered. The native app registers
+        // through lib/native-push.ts, which is the only thing that may claim "android".
         subscription,
-        deviceDetails: /Android/i.test(navigator.userAgent) ? "android" : "web",
+        deviceDetails: "web",
       }),
     });
 
