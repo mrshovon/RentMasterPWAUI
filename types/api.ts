@@ -201,6 +201,8 @@ export interface SubscriptionTier {
   max_tenants_allowed: number;
   is_active?: boolean;
   discount_percent?: number;
+  // Whether this tier bundles the Staff module (true on the Whole Building / 'custom' tiers).
+  staff_included?: boolean;
 }
 
 export interface OwnerSubscription {
@@ -233,12 +235,24 @@ export interface PlanUsage {
   tenants: { current: number; limit: number };
 }
 
+// Optional paid modules. `source` says why it's on: bundled with the plan, or granted as
+// an add-on by an admin. See the backend lib/features.ts.
+export interface FeatureState {
+  enabled: boolean;
+  source: "plan" | "addon" | null;
+}
+
+export interface FeatureMap {
+  staff: FeatureState;
+}
+
 export interface SubscriptionResponse {
   success: boolean;
   subscription: PlanState;
   usage: PlanUsage;
   disabled: { propertyIds: string[]; tenantIds: string[] };
   availableTiers: SubscriptionTier[];
+  features: FeatureMap;
 }
 
 export interface AdminOwner {
@@ -257,6 +271,51 @@ export interface AdminOwner {
 export interface AdminOwnerDetail extends AdminOwner {
   propertyCount: number;
   tenantCount: number;
+  // Staff module access. `staff_included_in_plan` wins — when it's true the per-owner
+  // grant is moot and the admin toggle is disabled.
+  staff_addon: boolean;
+  staff_addon_granted_at: string | null;
+  staff_included_in_plan: boolean;
+}
+
+// ---- Staff (owner module; paid add-on) ----
+export type StaffPaymentMethod = "cash" | "bkash" | "nagad" | "bank" | "other";
+
+export interface Staff {
+  id: string;
+  staff_no: number;
+  owner_id: string;
+  name: string;
+  phone: string | null;
+  designation: string | null;
+  // properties.id is TEXT ("UNIT-1234"), not a uuid. Null when unassigned.
+  property_id: string | null;
+  monthly_salary: number;
+  joining_date: string | null;
+  nid_number: string | null;
+  nid_doc_url: string | null;
+  photo_url: string | null;
+  address: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  // Relational join (GET /api/admin/staff) — null when unassigned.
+  properties?: { id: string; name: string; flat_no: string } | null;
+}
+
+export interface StaffPayment {
+  id: string;
+  payment_no: number;
+  staff_id: string;
+  owner_id: string;
+  amount: number;
+  paid_on: string;
+  method: StaffPaymentMethod;
+  note: string | null;
+  created_at: string;
+  // Relational join (GET /api/admin/staff/payments).
+  staff?: { id: string; name: string; designation: string | null } | null;
 }
 
 // ---- Support tickets (owner -> system admin) ----

@@ -6,7 +6,7 @@ import {
   Plus, MapPin, KeyRound, Phone, CircleDollarSign, Home, TriangleAlert,
   CheckCircle2, Send, Circle, Inbox, Pencil, DoorOpen, FileText, Trash2, Upload, Download, X, History,
   Receipt, PenLine, Gem, Crown, Sparkles, ArrowUpCircle, Infinity as InfinityIcon, CalendarClock, Copy, RotateCcw,
-  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle,
+  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle, HardHat,
 } from "lucide-react";
 import { rentMasterFetch, uploadFile, DEMO_OWNER_ID } from "../../lib/api-service";
 import { toast } from "../../components/toast";
@@ -28,6 +28,7 @@ import {
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
+import { StaffTab } from "../../components/staff-tab";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
@@ -88,6 +89,8 @@ export default function OwnerDashboard() {
   const [whatsappTemplate, setWhatsappTemplate] = useState<string>("");
   const [receipt, setReceipt] = useState<{ html: string; phone: string | null; message: string } | null>(null);
   const [revealPasscode, setRevealPasscode] = useState<{ name: string; code: string } | null>(null);
+  // Staff add-on enquiry (opened from the locked Staff tab).
+  const [staffContactOpen, setStaffContactOpen] = useState(false);
 
   // Reset a tenant's login passcode (random; shown once). Passcodes are not derivable
   // from the phone number, so a fresh one must be generated and shared explicitly.
@@ -210,6 +213,8 @@ export default function OwnerDashboard() {
     { key: "maintenance", label: "Requests", icon: Wrench, badge: metrics.openTickets },
     { key: "notices", label: "Notices", icon: Megaphone },
     { key: "reminders", label: "Reminders", icon: CalendarClock, badge: metrics.pendingReminders },
+    // Always listed: when the add-on is off the tab explains the feature rather than hiding it.
+    { key: "staff", label: "Staff", icon: HardHat },
     { key: "plan", label: "Plan", icon: Gem },
     { key: "support", label: "Support", icon: LifeBuoy, badge: metrics.openSupport },
     { key: "settings", label: "Settings", icon: Settings },
@@ -403,6 +408,14 @@ export default function OwnerDashboard() {
         />
       )}
 
+      {tab === "staff" && (
+        <StaffTab
+          enabled={!!plan?.features?.staff?.enabled}
+          properties={properties}
+          onContact={() => setStaffContactOpen(true)}
+        />
+      )}
+
       {tab === "support" && (
         <SupportTab tickets={tickets} onCreate={() => setTicketOpen(true)} />
       )}
@@ -417,6 +430,13 @@ export default function OwnerDashboard() {
       )}
 
       {/* ---------- Modals ---------- */}
+      <ContactModal
+        open={staffContactOpen}
+        subject="Enquiry about the Staff add-on"
+        prefill="I'd like to enable the Staff add-on on my account. Please get in touch."
+        ownerName={session?.name || null}
+        onClose={() => setStaffContactOpen(false)}
+      />
       <RaiseTicketModal
         open={ticketOpen}
         onClose={() => setTicketOpen(false)}
@@ -792,7 +812,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
         <p className="text-xs text-slate-500">Paid plans are activated after our team confirms your bKash payment. The free plan never expires; paid plans renew on their billing interval and get a {`10`}-day grace period after expiry.</p>
       </div>
 
-      <ContactModal tier={contactTier} ownerName={ownerName} onClose={() => setContactTier(null)} />
+      <ContactModal open={!!contactTier} tier={contactTier} ownerName={ownerName} onClose={() => setContactTier(null)} />
       <PaymentModal
         tier={paymentTier}
         onClose={() => setPaymentTier(null)}
@@ -922,10 +942,18 @@ function PaymentModal({
 }
 
 /* ============================================================ CONTACT US */
+// Shared enquiry form. Opened from the Plan tab for a "contact us" tier, and from the
+// Staff tab to ask for the Staff add-on — hence `open` is explicit rather than derived
+// from `tier`, and `subject`/`prefill` cover the tier-less case.
 function ContactModal({
-  tier, ownerName, onClose,
+  open, tier, subject, prefill, ownerName, onClose,
 }: {
-  tier: SubscriptionTier | null; ownerName: string | null; onClose: () => void;
+  open: boolean;
+  tier?: SubscriptionTier | null;
+  subject?: string;
+  prefill?: string;
+  ownerName: string | null;
+  onClose: () => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -933,14 +961,15 @@ function ContactModal({
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
-  // Prefill the sender name and a starter message whenever a tier's modal opens.
+  // Prefill the sender name and a starter message whenever the modal opens.
   useEffect(() => {
-    if (tier) {
-      setName(ownerName || "");
-      setMessage(`I'm interested in the ${tier.name} plan. Please get in touch.`);
-      setEmail(""); setPhone("");
-    }
-  }, [tier, ownerName]);
+    if (!open) return;
+    setName(ownerName || "");
+    setMessage(
+      prefill ?? (tier ? `I'm interested in the ${tier.name} plan. Please get in touch.` : "")
+    );
+    setEmail(""); setPhone("");
+  }, [open, tier, prefill, ownerName]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -961,8 +990,8 @@ function ContactModal({
   }
 
   return (
-    <Modal open={!!tier} onClose={onClose} title="Contact us"
-      subtitle={tier ? `Enquiry about the ${tier.name} plan` : undefined}>
+    <Modal open={open} onClose={onClose} title="Contact us"
+      subtitle={subject ?? (tier ? `Enquiry about the ${tier.name} plan` : undefined)}>
       <form onSubmit={submit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Your name">

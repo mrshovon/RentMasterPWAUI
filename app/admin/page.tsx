@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, CreditCard, Megaphone, Plus, Ban, KeyRound,
   Trash2, Mail, CheckCircle2, ShieldOff, ShieldCheck, Inbox, Building2, Eye,
   RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User,
-  Wallet, Upload, Image as ImageIcon, X, Check,
+  Wallet, Upload, Image as ImageIcon, X, Check, HardHat,
 } from "lucide-react";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
 import { toast } from "../../components/toast";
@@ -1575,6 +1575,33 @@ function OwnerDetailModal({
               <TextInput placeholder="New password" value={newPass} onChange={(e) => setNewPass(e.target.value)} className="flex-1" />
               <Button size="sm" icon={KeyRound} variant="secondary" loading={busy} disabled={!newPass}
                 onClick={() => patch({ password: newPass }, () => setNewPass(""))}>Reset</Button>
+            </div>
+          </Section>
+
+          {/* Paid add-ons */}
+          <Section title="Add-ons">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                  <HardHat className="h-4 w-4 text-slate-500" /> Staff management
+                </div>
+                <div className="mt-0.5 text-xs text-slate-500">
+                  {detail.staff_included_in_plan
+                    ? "Included with this owner's plan — no override needed."
+                    : detail.staff_addon
+                      ? `Granted as an add-on${detail.staff_addon_granted_at ? ` on ${formatDate(detail.staff_addon_granted_at)}` : ""}.`
+                      : "Not enabled. Turn on once the owner has bought the add-on."}
+                </div>
+              </div>
+              {detail.staff_included_in_plan ? (
+                <Badge tone="emerald">Included in plan</Badge>
+              ) : (
+                <Button size="sm" variant={detail.staff_addon ? "secondary" : "success"}
+                  icon={detail.staff_addon ? ShieldOff : ShieldCheck} loading={busy}
+                  onClick={() => patch({ action: detail.staff_addon ? "disable_staff_addon" : "enable_staff_addon" })}>
+                  {detail.staff_addon ? "Disable Staff" : "Enable Staff"}
+                </Button>
+              )}
             </div>
           </Section>
 
