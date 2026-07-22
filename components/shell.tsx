@@ -53,9 +53,8 @@ export function DashboardShell({
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col justify-between border-r border-white/[0.06] bg-slate-950/60 p-5 backdrop-blur-xl md:flex">
         <div className="space-y-8">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 text-sm font-black tracking-tighter text-slate-950 shadow-lg shadow-indigo-500/20">
-              RM
-            </div>
+            <img src="/logo.png" alt="RentMaster"
+              className="h-9 w-9 rounded-xl object-cover shadow-lg shadow-indigo-500/20" />
             <div>
               <div className={cn("bg-gradient-to-r bg-clip-text text-sm font-black tracking-widest text-transparent", accent)}>
                 RENTMASTER
@@ -119,9 +118,7 @@ export function DashboardShell({
         {/* Mobile top bar */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[0.06] bg-slate-950/80 px-4 py-3 backdrop-blur-xl md:hidden">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-500 to-cyan-400 text-xs font-black text-slate-950">
-              RM
-            </div>
+            <img src="/logo.png" alt="RentMaster" className="h-8 w-8 rounded-lg object-cover" />
             <span className="text-sm font-bold text-slate-200">
               {activeTab?.label ?? "RentMaster"}
             </span>

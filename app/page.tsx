@@ -101,9 +101,7 @@ export default function EntryGatewayPage() {
         {/* Brand panel */}
         <div className="hidden flex-col justify-between border-r border-white/[0.06] p-12 lg:flex">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 text-sm font-black text-slate-950">
-              RM
-            </div>
+            <img src="/logo.png" alt="RentMaster" className="h-9 w-9 rounded-xl object-cover" />
             <span className="text-sm font-black uppercase tracking-widest text-slate-200">
               RentMaster
             </span>

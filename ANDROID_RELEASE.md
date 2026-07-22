@@ -73,4 +73,6 @@ Release**. Within a couple of minutes:
 - Backend `lib/fcm-send.ts` + `lib/push-send.ts` — fan notifications out to browser (Web Push) and
   Android (FCM). Notification icon = the logo silhouette (`android/.../ic_stat_notify`).
 
-Regenerate app icons after changing the logo: `npm run gen-android-icons`.
+Regenerate every icon (web favicon/PWA + Android launcher, adaptive and notification) after
+changing the logo: `npm run gen-icons`. The source of truth is
+`public/brandImages/logo-master.jpg`.
