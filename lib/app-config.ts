@@ -7,7 +7,7 @@
 // its built-in version to the latest GitHub Release tag to detect updates.
 // =============================================================================
 
-export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.0.1";
 
 // Frontend GitHub repo that hosts the signed APK as release assets.
 export const GITHUB_OWNER = "mrshovon";
