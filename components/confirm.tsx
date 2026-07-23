@@ -51,7 +51,7 @@ export function ConfirmHost() {
   return (
     <Modal open={!!state} onClose={() => settle(false)} title={opts?.title || ""} size="md">
       <div className="space-y-6">
-        {opts?.message && <p className="text-sm leading-relaxed text-slate-300">{opts.message}</p>}
+        {opts?.message && <p className="text-sm leading-relaxed text-fg">{opts.message}</p>}
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => settle(false)}>
             {opts?.cancelLabel || "Cancel"}

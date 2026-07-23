@@ -44,8 +44,8 @@ export function DownloadAndroid({ variant = "link" }: { variant?: "link" | "side
       download
       className={
         sidebar
-          ? "flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-400 transition hover:bg-emerald-500/10 hover:text-emerald-400"
-          : "inline-flex items-center gap-2 text-xs font-semibold text-slate-400 transition hover:text-emerald-400"
+          ? "flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-muted transition hover:bg-success/10 hover:text-success"
+          : "inline-flex items-center gap-2 text-xs font-semibold text-muted transition hover:text-success"
       }
     >
       <Smartphone className={sidebar ? "h-[18px] w-[18px]" : "h-4 w-4"} />

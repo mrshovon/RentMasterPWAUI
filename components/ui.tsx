@@ -14,11 +14,11 @@ export function Spinner({ className }: { className?: string }) {
 
 export function FullScreenLoader({ label, sub }: { label: string; sub?: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950">
+    <div className="flex min-h-screen items-center justify-center bg-bg">
       <div className="flex flex-col items-center gap-3 text-center animate-fade-in">
-        <Spinner className="h-7 w-7 text-indigo-400" />
-        <div className="text-lg font-semibold text-slate-200">{label}</div>
-        {sub && <div className="text-xs font-mono text-slate-500">{sub}</div>}
+        <Spinner className="h-7 w-7 text-primary" />
+        <div className="text-lg font-semibold text-fg">{label}</div>
+        {sub && <div className="text-xs font-mono text-subtle">{sub}</div>}
       </div>
     </div>
   );
@@ -40,7 +40,7 @@ export function SearchInput({
 }) {
   return (
     <div className={cn("relative w-full sm:max-w-xs", className)}>
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
       <input
         type="search"
         value={value}
@@ -52,7 +52,7 @@ export function SearchInput({
         <button
           type="button"
           onClick={() => onChange("")}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-500 transition hover:text-slate-200"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-subtle transition hover:text-fg"
           aria-label="Clear search"
         >
           <X className="h-3.5 w-3.5" />
@@ -84,14 +84,14 @@ export function Button({
 }: ButtonProps) {
   const variants = {
     primary:
-      "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/20 border border-indigo-500/40",
+      "bg-primary hover:bg-primary/90 text-btn-ink shadow-lg shadow-primary/20 border border-primary/40",
     secondary:
-      "bg-slate-800/80 hover:bg-slate-700/80 text-slate-100 border border-white/[0.08]",
-    ghost: "bg-transparent hover:bg-white/[0.06] text-slate-300",
+      "bg-overlay/[0.06] hover:bg-overlay/[0.1] text-fg border border-line/[0.12]",
+    ghost: "bg-transparent hover:bg-overlay/[0.06] text-muted",
     danger:
-      "bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/20 border border-rose-500/40",
+      "bg-danger hover:bg-danger/90 text-btn-ink shadow-lg shadow-danger/20 border border-danger/40",
     success:
-      "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/20 border border-emerald-500/40",
+      "bg-success hover:bg-success/90 text-btn-ink shadow-lg shadow-success/20 border border-success/40",
   };
   const sizes = {
     sm: "px-3 py-1.5 text-xs rounded-lg gap-1.5",
@@ -130,7 +130,7 @@ export function Card({
     <div
       className={cn(
         "card-surface",
-        hover && "transition-all hover:border-indigo-500/30 hover:bg-slate-900/80",
+        hover && "transition-all hover:border-primary/30 hover:bg-surface-2",
         className
       )}
     >
@@ -143,12 +143,12 @@ export function Card({
 // Stat tile
 // -----------------------------------------------------------------------------
 const accentMap = {
-  indigo: "text-indigo-400",
-  emerald: "text-emerald-400",
-  amber: "text-amber-400",
-  cyan: "text-cyan-400",
-  rose: "text-rose-400",
-  violet: "text-violet-400",
+  indigo: "text-primary",
+  emerald: "text-success",
+  amber: "text-warning",
+  cyan: "text-accent",
+  rose: "text-danger",
+  violet: "text-accent",
 } as const;
 
 export function StatCard({
@@ -167,11 +167,11 @@ export function StatCard({
   return (
     <Card className="p-5">
       <div className="flex items-start justify-between">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-muted">
           {label}
         </div>
         {Icon && (
-          <div className={cn("rounded-lg bg-white/[0.04] p-1.5", accentMap[accent])}>
+          <div className={cn("rounded-lg bg-overlay/[0.04] p-1.5", accentMap[accent])}>
             <Icon className="h-4 w-4" />
           </div>
         )}
@@ -179,7 +179,7 @@ export function StatCard({
       <div className={cn("mt-3 text-2xl font-black tracking-tight sm:text-3xl", accentMap[accent])}>
         {value}
       </div>
-      {sub && <div className="mt-1 text-xs text-slate-500">{sub}</div>}
+      {sub && <div className="mt-1 text-xs text-subtle">{sub}</div>}
     </Card>
   );
 }
@@ -197,12 +197,12 @@ export function Badge({
   className?: string;
 }) {
   const tones = {
-    slate: "bg-slate-700/40 text-slate-300 border-slate-600/30",
-    emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    rose: "bg-rose-500/10 text-rose-400 border-rose-500/20",
-    indigo: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
-    cyan: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+    slate: "bg-overlay/[0.06] text-muted border-line/[0.12]",
+    emerald: "bg-success/10 text-success border-success/20",
+    amber: "bg-warning/10 text-warning border-warning/20",
+    rose: "bg-danger/10 text-danger border-danger/20",
+    indigo: "bg-primary/10 text-primary border-primary/20",
+    cyan: "bg-accent/10 text-accent border-accent/20",
   };
   return (
     <span
@@ -232,8 +232,8 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-white">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-slate-400">{subtitle}</p>}
+        <h1 className="text-2xl font-extrabold tracking-tight text-heading">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
@@ -256,11 +256,11 @@ export function EmptyState({
 }) {
   return (
     <Card className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 text-slate-500">
+      <div className="rounded-2xl border border-line/[0.08] bg-overlay/[0.03] p-4 text-subtle">
         <Icon className="h-7 w-7" />
       </div>
-      <div className="text-sm font-semibold text-slate-300">{title}</div>
-      {hint && <div className="max-w-sm text-xs text-slate-500">{hint}</div>}
+      <div className="text-sm font-semibold text-fg">{title}</div>
+      {hint && <div className="max-w-sm text-xs text-subtle">{hint}</div>}
       {action && <div className="mt-2">{action}</div>}
     </Card>
   );
@@ -271,7 +271,7 @@ export function EmptyState({
 // -----------------------------------------------------------------------------
 export function Alert({ children }: { children: ReactNode }) {
   return (
-    <div className="animate-fade-in rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+    <div className="animate-fade-in rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
       {children}
     </div>
   );
@@ -301,7 +301,7 @@ export function Modal({
   if (!open || typeof document === "undefined") return null;
   return createPortal(
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 overflow-y-auto bg-scrim/80 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
       {/* min-h-full wrapper: centers when short, lets the whole thing scroll from the
@@ -310,18 +310,18 @@ export function Modal({
         <div
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "flex max-h-[100dvh] w-full animate-scale-in flex-col overflow-hidden rounded-t-3xl border border-white/[0.08] bg-slate-900 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl",
+            "flex max-h-[100dvh] w-full animate-scale-in flex-col overflow-hidden rounded-t-3xl border border-line/[0.1] bg-surface shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl",
             size === "lg" ? "sm:max-w-2xl" : "sm:max-w-md"
           )}
         >
-          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/[0.06] p-5">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line/[0.08] p-5">
             <div>
-              <h2 className="text-lg font-bold text-white">{title}</h2>
-              {subtitle && <p className="mt-0.5 text-xs text-slate-400">{subtitle}</p>}
+              <h2 className="text-lg font-bold text-heading">{title}</h2>
+              {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
             </div>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+              className="rounded-lg p-1.5 text-muted transition hover:bg-overlay/[0.06] hover:text-heading"
               aria-label="Close"
             >
               <X className="h-5 w-5" />
@@ -351,11 +351,11 @@ export function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400">
-        {label} {required && <span className="text-rose-400">*</span>}
+      <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">
+        {label} {required && <span className="text-danger">*</span>}
       </span>
       {children}
-      {hint && <span className="block text-[11px] text-slate-500">{hint}</span>}
+      {hint && <span className="block text-[11px] text-subtle">{hint}</span>}
     </label>
   );
 }

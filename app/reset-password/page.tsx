@@ -79,25 +79,25 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
-      <div className="pointer-events-none absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-[130px]" />
-      <div className="pointer-events-none absolute -bottom-40 -right-40 h-[440px] w-[440px] rounded-full bg-cyan-500/10 blur-[120px]" />
+      <div className="pointer-events-none absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-primary/10 blur-[130px]" />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 h-[440px] w-[440px] rounded-full bg-accent/10 blur-[120px]" />
 
       <div className="z-10 w-full max-w-md space-y-8">
         <div className="flex items-center justify-center gap-3">
           <img src="/logo.png" alt="RentMaster" className="h-9 w-9 rounded-xl object-cover" />
-          <span className="text-sm font-black uppercase tracking-widest text-slate-200">RentMaster</span>
+          <span className="text-sm font-black uppercase tracking-widest text-fg">RentMaster</span>
         </div>
 
-        <div className="rounded-2xl border border-white/[0.06] bg-slate-900/40 p-6 backdrop-blur-xl sm:p-8">
+        <div className="rounded-2xl border border-line/[0.06] bg-surface/40 p-6 backdrop-blur-xl sm:p-8">
           {phase === "checking" && (
-            <p className="text-center text-sm text-slate-400">Verifying your reset link…</p>
+            <p className="text-center text-sm text-muted">Verifying your reset link…</p>
           )}
 
           {phase === "invalid" && (
             <div className="space-y-4 text-center">
-              <TriangleAlert className="mx-auto h-8 w-8 text-rose-400" />
-              <h2 className="text-xl font-extrabold text-white">Link expired or invalid</h2>
-              <p className="text-sm text-slate-400">
+              <TriangleAlert className="mx-auto h-8 w-8 text-danger" />
+              <h2 className="text-xl font-extrabold text-heading">Link expired or invalid</h2>
+              <p className="text-sm text-muted">
                 {error || "This password reset link is no longer valid. Request a new one from the sign-in page."}
               </p>
               <Button className="w-full" onClick={() => window.location.replace("/")} icon={ArrowRight}>
@@ -108,9 +108,9 @@ export default function ResetPasswordPage() {
 
           {phase === "done" && (
             <div className="space-y-4 text-center">
-              <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-400" />
-              <h2 className="text-xl font-extrabold text-white">Password updated</h2>
-              <p className="text-sm text-slate-400">You can now sign in with your new password.</p>
+              <CheckCircle2 className="mx-auto h-8 w-8 text-success" />
+              <h2 className="text-xl font-extrabold text-heading">Password updated</h2>
+              <p className="text-sm text-muted">You can now sign in with your new password.</p>
               <Button className="w-full" onClick={() => window.location.replace("/")} icon={ArrowRight}>
                 Go to sign in
               </Button>
@@ -120,26 +120,26 @@ export default function ResetPasswordPage() {
           {(phase === "ready" || phase === "saving") && (
             <form onSubmit={submit} className="space-y-5">
               <div className="space-y-1.5 text-center">
-                <h2 className="text-2xl font-extrabold tracking-tight text-white">Choose a new password</h2>
-                <p className="text-sm text-slate-400">Enter and confirm your new password below.</p>
+                <h2 className="text-2xl font-extrabold tracking-tight text-heading">Choose a new password</h2>
+                <p className="text-sm text-muted">Enter and confirm your new password below.</p>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">New password</label>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted">New password</label>
                 <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
+                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                   <input type="password" placeholder="••••••••" value={password}
                     onChange={(e) => setPassword(e.target.value)} className="field-input pl-10" autoFocus />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Confirm password</label>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted">Confirm password</label>
                 <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
+                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                   <input type="password" placeholder="••••••••" value={confirm}
                     onChange={(e) => setConfirm(e.target.value)} className="field-input pl-10" />
                 </div>
               </div>
-              {error && <p className="text-xs text-rose-400">{error}</p>}
+              {error && <p className="text-xs text-danger">{error}</p>}
               <Button type="submit" loading={phase === "saving"} className="w-full" icon={ArrowRight}>
                 Update password
               </Button>

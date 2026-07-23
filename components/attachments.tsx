@@ -18,9 +18,9 @@ export function AttachmentStrip({ raw }: { raw: string | null | undefined }) {
           target="_blank"
           rel="noreferrer"
           title={`Attachment ${i + 1}`}
-          className="group relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.02]"
+          className="group relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-line/[0.08] bg-overlay/[0.02]"
         >
-          <Paperclip className="absolute h-4 w-4 text-slate-500" />
+          <Paperclip className="absolute h-4 w-4 text-subtle" />
           <img
             src={url}
             alt={`Attachment ${i + 1}`}

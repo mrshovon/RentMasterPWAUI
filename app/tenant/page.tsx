@@ -204,17 +204,17 @@ export default function TenantDashboard() {
           {metrics.dueLedger && (
             <Card className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-sm font-bold text-slate-200">Rent for {formatMonth(metrics.dueLedger.billing_month)}</div>
-                <div className="mt-1 text-xs text-slate-400">
+                <div className="text-sm font-bold text-fg">Rent for {formatMonth(metrics.dueLedger.billing_month)}</div>
+                <div className="mt-1 text-xs text-muted">
                   Rent {formatCurrency(metrics.dueLedger.rent_amount)} · Service {formatCurrency(metrics.dueLedger.service_charge)}
                   {Number(metrics.dueLedger.extra_charge) > 0 && ` · Extra ${formatCurrency(metrics.dueLedger.extra_charge)}`}
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1 text-right">
-                <div className="text-2xl font-black text-emerald-400">{formatCurrency(metrics.dueLedger.total_payable)}</div>
+                <div className="text-2xl font-black text-success">{formatCurrency(metrics.dueLedger.total_payable)}</div>
                 <Badge tone={statusTone[metrics.dueLedger.payment_status]}>{metrics.dueLedger.payment_status}</Badge>
                 <button type="button" onClick={() => setBreakdown(metrics.dueLedger!)}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-400 transition hover:underline">
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary transition hover:underline">
                   <Info className="h-3 w-3" /> Charge breakdown
                 </button>
               </div>
@@ -223,17 +223,17 @@ export default function TenantDashboard() {
 
           <Card className="space-y-3 p-6">
             <div className="flex items-center gap-2">
-              <Megaphone className="h-4 w-4 text-indigo-400" />
-              <h3 className="text-sm font-bold text-slate-200">Latest notice</h3>
+              <Megaphone className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-bold text-fg">Latest notice</h3>
             </div>
             {notices[0] ? (
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
-                <h4 className="font-bold text-indigo-400">{notices[0].title}</h4>
-                <p className="mt-1 text-sm text-slate-300">{notices[0].content}</p>
-                <p className="mt-2 font-mono text-[10px] text-slate-500">{formatDate(notices[0].created_at)}</p>
+              <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.03] p-4">
+                <h4 className="font-bold text-primary">{notices[0].title}</h4>
+                <p className="mt-1 text-sm text-fg">{notices[0].content}</p>
+                <p className="mt-2 font-mono text-[10px] text-subtle">{formatDate(notices[0].created_at)}</p>
               </div>
             ) : (
-              <p className="text-sm text-slate-500">No announcements right now.</p>
+              <p className="text-sm text-subtle">No announcements right now.</p>
             )}
           </Card>
         </div>
@@ -254,24 +254,24 @@ export default function TenantDashboard() {
               <Card className="hidden overflow-hidden md:block">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[560px] text-left text-sm">
-                    <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                    <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                       <tr>
                         <th className="p-4">Month</th><th className="p-4">Rent</th>
                         <th className="p-4">Service + Extra</th><th className="p-4">Total</th><th className="p-4">Status</th>
                         <th className="p-4 text-right">Payment</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/[0.04]">
+                    <tbody className="divide-y divide-line/[0.04]">
                       {ledgers.map((l) => (
-                        <tr key={l.id} className="hover:bg-white/[0.02]">
-                          <td className="p-4 font-semibold text-slate-100">{formatMonth(l.billing_month)}</td>
-                          <td className="p-4 text-slate-300">{formatCurrency(l.rent_amount)}</td>
-                          <td className="p-4 text-slate-300">{formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}</td>
-                          <td className="p-4 font-bold text-emerald-400">
+                        <tr key={l.id} className="hover:bg-overlay/[0.02]">
+                          <td className="p-4 font-semibold text-heading">{formatMonth(l.billing_month)}</td>
+                          <td className="p-4 text-fg">{formatCurrency(l.rent_amount)}</td>
+                          <td className="p-4 text-fg">{formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}</td>
+                          <td className="p-4 font-bold text-success">
                             <button type="button" onClick={() => setBreakdown(l)}
-                              className="inline-flex items-center gap-1.5 transition hover:text-emerald-300" title="View charge breakdown">
+                              className="inline-flex items-center gap-1.5 transition hover:text-success" title="View charge breakdown">
                               {formatCurrency(l.total_payable)}
-                              <Info className="h-3.5 w-3.5 text-slate-500" />
+                              <Info className="h-3.5 w-3.5 text-subtle" />
                             </button>
                           </td>
                           <td className="p-4"><Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge></td>
@@ -279,7 +279,7 @@ export default function TenantDashboard() {
                             <div className="flex items-center justify-end gap-2">
                               {l.payment_status === "paid" && (
                                 <button title="Download receipt" onClick={() => openTenantReceipt(l)}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-slate-800/80 px-2.5 py-1.5 text-xs font-semibold text-slate-100 transition hover:bg-slate-700/80">
+                                  className="inline-flex items-center gap-1 rounded-lg bg-surface-2/80 px-2.5 py-1.5 text-xs font-semibold text-heading transition hover:bg-surface-2/80">
                                   <Receipt className="h-3.5 w-3.5" /> Receipt
                                 </button>
                               )}
@@ -296,23 +296,23 @@ export default function TenantDashboard() {
                 {ledgers.map((l) => (
                   <Card key={l.id} className="p-4">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-100">{formatMonth(l.billing_month)}</span>
+                      <span className="font-semibold text-heading">{formatMonth(l.billing_month)}</span>
                       <Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge>
                     </div>
                     <div className="mt-2 flex items-end justify-between">
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-muted">
                         Rent {formatCurrency(l.rent_amount)} + {formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}
                       </span>
                       <button type="button" onClick={() => setBreakdown(l)}
-                        className="inline-flex items-center gap-1 text-lg font-black text-emerald-400" title="View charge breakdown">
+                        className="inline-flex items-center gap-1 text-lg font-black text-success" title="View charge breakdown">
                         {formatCurrency(l.total_payable)}
-                        <Info className="h-3.5 w-3.5 text-slate-500" />
+                        <Info className="h-3.5 w-3.5 text-subtle" />
                       </button>
                     </div>
                     <div className="mt-3 flex items-center justify-end gap-2">
                       {l.payment_status === "paid" && (
                         <button title="Download receipt" onClick={() => openTenantReceipt(l)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-slate-800/80 px-2.5 py-1.5 text-xs font-semibold text-slate-100">
+                          className="inline-flex items-center gap-1 rounded-lg bg-surface-2/80 px-2.5 py-1.5 text-xs font-semibold text-heading">
                           <Receipt className="h-3.5 w-3.5" /> Receipt
                         </button>
                       )}
@@ -342,19 +342,19 @@ export default function TenantDashboard() {
                 <Card key={m.id} className="space-y-3 p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
-                      <div className="rounded-lg bg-amber-500/10 p-2 text-amber-400"><TriangleAlert className="h-4 w-4" /></div>
-                      <h3 className="font-bold text-slate-100">{m.issue_title}</h3>
+                      <div className="rounded-lg bg-warning/10 p-2 text-warning"><TriangleAlert className="h-4 w-4" /></div>
+                      <h3 className="font-bold text-heading">{m.issue_title}</h3>
                     </div>
                     <Badge tone={priorityTone[m.priority_level]}>{m.priority_level}</Badge>
                   </div>
-                  {m.issue_description && <p className="text-sm leading-relaxed text-slate-400">{m.issue_description}</p>}
+                  {m.issue_description && <p className="text-sm leading-relaxed text-muted">{m.issue_description}</p>}
                   <AttachmentStrip raw={m.attachment_file_url} />
                   {m.resolution_remarks && (
-                    <div className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
-                      <span className="font-semibold text-slate-400">Owner update: </span>{m.resolution_remarks}
+                    <div className="rounded-lg border border-line/[0.06] bg-overlay/[0.03] px-3 py-2 text-xs text-fg">
+                      <span className="font-semibold text-muted">Owner update: </span>{m.resolution_remarks}
                     </div>
                   )}
-                  <div className="flex items-center gap-2 border-t border-white/[0.06] pt-3 text-xs text-slate-500">
+                  <div className="flex items-center gap-2 border-t border-line/[0.06] pt-3 text-xs text-subtle">
                     <span>{formatDate(m.created_at)}</span>
                     <Badge
                       tone={m.resolution_status === "resolved" ? "emerald" : m.resolution_status === "in_progress" ? "cyan" : "amber"}
@@ -379,10 +379,10 @@ export default function TenantDashboard() {
               {notices.map((n) => (
                 <Card key={n.id} className="space-y-2 p-5">
                   <div className="flex items-start justify-between gap-3">
-                    <h3 className="font-bold text-indigo-400">{n.title}</h3>
-                    <span className="shrink-0 font-mono text-[10px] text-slate-500">{formatDate(n.created_at)}</span>
+                    <h3 className="font-bold text-primary">{n.title}</h3>
+                    <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at)}</span>
                   </div>
-                  <p className="text-sm leading-relaxed text-slate-300">{n.content}</p>
+                  <p className="text-sm leading-relaxed text-fg">{n.content}</p>
                 </Card>
               ))}
             </div>
@@ -400,17 +400,17 @@ export default function TenantDashboard() {
             <div className="grid gap-3">
               {documents.map((d) => (
                 <Card key={d.id} className="flex items-center gap-3 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <FileText className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold text-slate-100">{d.title}</div>
-                    <div className="text-[11px] uppercase tracking-wider text-slate-500">
+                    <div className="truncate font-semibold text-heading">{d.title}</div>
+                    <div className="text-[11px] uppercase tracking-wider text-subtle">
                       {d.doc_type ?? "document"} · {formatDate(d.created_at)}
                     </div>
                   </div>
                   <a href={d.file_url} target="_blank" rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800/80 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:bg-slate-700/80">
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-surface-2/80 px-3 py-1.5 text-xs font-semibold text-heading transition hover:bg-surface-2/80">
                     <Download className="h-3.5 w-3.5" /> Download
                   </a>
                 </Card>
@@ -451,23 +451,23 @@ function PropertySidebarCard({ profile }: { profile: TenantProfile }) {
   const p = profile.property;
   if (!p) return null;
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-gradient-to-br from-emerald-500/[0.08] to-cyan-500/[0.04] p-3.5">
+    <div className="rounded-xl border border-line/[0.06] bg-gradient-to-br from-success/[0.08] to-accent/[0.04] p-3.5">
       <div className="flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/15 text-success">
           <Home className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <div className="truncate text-xs font-bold text-slate-100">{p.name}</div>
-          <div className="truncate text-[10px] text-slate-500">Flat {p.flat_no}</div>
+          <div className="truncate text-xs font-bold text-heading">{p.name}</div>
+          <div className="truncate text-[10px] text-subtle">Flat {p.flat_no}</div>
         </div>
       </div>
-      <div className="mt-2.5 flex items-start gap-1.5 text-[10px] leading-relaxed text-slate-400">
+      <div className="mt-2.5 flex items-start gap-1.5 text-[10px] leading-relaxed text-muted">
         <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
         <span className="line-clamp-2">{p.address}</span>
       </div>
-      <div className="mt-2.5 flex items-center justify-between border-t border-white/[0.06] pt-2">
-        <span className="text-[10px] uppercase tracking-wider text-slate-500">Monthly rent</span>
-        <span className="text-xs font-bold text-emerald-400">{formatCurrency(profile.tenant.monthly_rent)}</span>
+      <div className="mt-2.5 flex items-center justify-between border-t border-line/[0.06] pt-2">
+        <span className="text-[10px] uppercase tracking-wider text-subtle">Monthly rent</span>
+        <span className="text-xs font-bold text-success">{formatCurrency(profile.tenant.monthly_rent)}</span>
       </div>
     </div>
   );
@@ -481,14 +481,14 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-2.5">
-      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
-        <div className={cn("text-sm text-slate-200", strong && "font-bold text-emerald-400")}>{value}</div>
+        <div className="text-[10px] uppercase tracking-wider text-subtle">{label}</div>
+        <div className={cn("text-sm text-fg", strong && "font-bold text-success")}>{value}</div>
       </div>
       {action && (
         <button type="button" onClick={action.onClick} title={action.title}
-          className="mt-0.5 rounded-md p-1 text-indigo-400 transition hover:bg-white/[0.06]">
+          className="mt-0.5 rounded-md p-1 text-primary transition hover:bg-overlay/[0.06]">
           <action.icon className="h-3.5 w-3.5" />
         </button>
       )}
@@ -509,18 +509,18 @@ function ResidenceCard({
   return (
     <Card className="p-6">
       <div className="mb-5 flex items-center gap-2">
-        <Building2 className="h-4 w-4 text-emerald-400" />
-        <h3 className="text-sm font-bold text-slate-200">Your residence</h3>
+        <Building2 className="h-4 w-4 text-success" />
+        <h3 className="text-sm font-bold text-fg">Your residence</h3>
       </div>
       <div className="grid gap-6 md:grid-cols-3">
         <div className="space-y-3">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Property</div>
-          <div className="text-sm font-semibold text-slate-100">{property?.name ?? "—"}</div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">Property</div>
+          <div className="text-sm font-semibold text-heading">{property?.name ?? "—"}</div>
           <InfoRow icon={Home} label="Flat / Unit" value={property?.flat_no ?? "—"} />
           <InfoRow icon={MapPin} label="Address" value={property?.address ?? "—"} />
         </div>
         <div className="space-y-3">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Rent terms</div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">Rent terms</div>
           <InfoRow icon={Wallet} label="Monthly rent" value={formatCurrency(tenant.monthly_rent)} strong
             action={{ icon: History, title: "Rent revision history", onClick: onRentHistory }} />
           <InfoRow icon={ReceiptText} label="Service charge" value={formatCurrency(tenant.service_charge)}
@@ -530,14 +530,14 @@ function ResidenceCard({
         </div>
         <div className="space-y-4">
           <div className="space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Your details</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">Your details</div>
             <InfoRow icon={User} label="Name" value={tenant.name} />
             <InfoRow icon={Phone} label="Number" value={tenant.phone} />
             <InfoRow icon={Users} label="Household" value={`${tenant.family_members} member${tenant.family_members === 1 ? "" : "s"}`} />
             {tenant.rented_date && <InfoRow icon={CalendarClock} label="Resident since" value={formatDate(tenant.rented_date)} />}
           </div>
           <div className="space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Owner contact</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">Owner contact</div>
             <InfoRow icon={User} label="Owner" value={ownerName} />
             {owner?.phone && <InfoRow icon={Phone} label="Number" value={owner.phone} />}
           </div>
@@ -550,11 +550,11 @@ function ResidenceCard({
 function BreakRow({ label, value, strong, tone }: { label: string; value: string; strong?: boolean; tone?: "emerald" }) {
   return (
     <div className="flex items-center justify-between py-1.5">
-      <span className={strong ? "text-sm font-bold text-slate-100" : "text-sm text-slate-400"}>{label}</span>
+      <span className={strong ? "text-sm font-bold text-heading" : "text-sm text-muted"}>{label}</span>
       <span className={
-        strong ? "text-base font-black text-emerald-400"
-          : tone === "emerald" ? "text-sm font-semibold text-emerald-400"
-            : "text-sm font-semibold text-slate-200"
+        strong ? "text-base font-black text-success"
+          : tone === "emerald" ? "text-sm font-semibold text-success"
+            : "text-sm font-semibold text-fg"
       }>{value}</span>
     </div>
   );
@@ -577,10 +577,10 @@ function BillBreakdownModal({ ledger, onClose }: { ledger: BillingLedger | null;
           {Number(ledger.discount) > 0 && (
             <BreakRow label="Discount" value={`− ${formatCurrency(ledger.discount)}`} tone="emerald" />
           )}
-          <div className="my-3 border-t border-white/[0.08]" />
+          <div className="my-3 border-t border-line/[0.08]" />
           <BreakRow label="Total payable" value={formatCurrency(ledger.total_payable)} strong />
           <div className="flex items-center justify-between pt-3">
-            <span className="text-xs text-slate-500">Status</span>
+            <span className="text-xs text-subtle">Status</span>
             <Badge tone={statusTone[ledger.payment_status]}>{ledger.payment_status}</Badge>
           </div>
         </div>
@@ -618,7 +618,7 @@ function ServiceChargeBreakdownModal({
     <Modal open={open} onClose={onClose} title="Service charge breakdown"
       subtitle="What your monthly service charge covers.">
       {items.length === 0 ? (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted">
           Your owner hasn&apos;t published a service charge breakdown for your unit yet.
         </p>
       ) : (
@@ -626,10 +626,10 @@ function ServiceChargeBreakdownModal({
           {items.map((it) => (
             <BreakRow key={it.key} label={it.label} value={formatCurrency(it.amount)} />
           ))}
-          <div className="my-3 border-t border-white/[0.08]" />
+          <div className="my-3 border-t border-line/[0.08]" />
           <BreakRow label="Total service charge" value={formatCurrency(total)} strong />
           {typeof serviceCharge === "number" && Math.abs(serviceCharge - total) > 0.01 && (
-            <p className="pt-2 text-[11px] text-slate-500">
+            <p className="pt-2 text-[11px] text-subtle">
               Your billed service charge is {formatCurrency(serviceCharge)}.
             </p>
           )}
@@ -651,24 +651,24 @@ function RentHistoryModal({
     <Modal open={open} onClose={onClose} title="Rent revision history"
       subtitle="Every change to your rent, most recent first.">
       {typeof currentRent === "number" && (
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
-          <span className="text-sm font-semibold text-slate-300">Current rent</span>
-          <span className="text-lg font-black text-emerald-400">{formatCurrency(currentRent)}</span>
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-line/[0.06] bg-overlay/[0.03] px-4 py-3">
+          <span className="text-sm font-semibold text-fg">Current rent</span>
+          <span className="text-lg font-black text-success">{formatCurrency(currentRent)}</span>
         </div>
       )}
       {revisions.length === 0 ? (
-        <p className="text-sm text-slate-400">No rent revisions yet — your rent has stayed the same since you moved in.</p>
+        <p className="text-sm text-muted">No rent revisions yet — your rent has stayed the same since you moved in.</p>
       ) : (
         <div className="space-y-2">
           {revisions.map((r) => {
             const increased = Number(r.new_rent) >= Number(r.old_rent);
             return (
-              <div key={r.id} className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-                <span className="text-xs text-slate-400">{formatDate(r.changed_at)}</span>
+              <div key={r.id} className="flex items-center justify-between rounded-lg border border-line/[0.06] bg-overlay/[0.02] px-3 py-2.5">
+                <span className="text-xs text-muted">{formatDate(r.changed_at)}</span>
                 <span className="text-sm">
-                  <span className="text-slate-400">{formatCurrency(r.old_rent)}</span>
-                  <span className="mx-1.5 text-slate-500">→</span>
-                  <span className={cn("font-bold", increased ? "text-rose-400" : "text-emerald-400")}>
+                  <span className="text-muted">{formatCurrency(r.old_rent)}</span>
+                  <span className="mx-1.5 text-subtle">→</span>
+                  <span className={cn("font-bold", increased ? "text-danger" : "text-success")}>
                     {formatCurrency(r.new_rent)}
                   </span>
                 </span>
@@ -688,13 +688,13 @@ function BillPaymentAction({
 }: { ledger: BillingLedger; onSend: (id: string) => void }) {
   if (ledger.payment_status === "paid") {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400">
+      <span className="inline-flex items-center gap-1 text-xs font-semibold text-success">
         <CheckCircle2 className="h-3.5 w-3.5" /> Confirmed
       </span>
     );
   }
   if (ledger.payment_status === "sent") {
-    return <span className="text-xs text-amber-400">Awaiting owner confirmation</span>;
+    return <span className="text-xs text-warning">Awaiting owner confirmation</span>;
   }
   return (
     <Button variant="secondary" icon={Send} onClick={() => onSend(ledger.id)}>
@@ -783,15 +783,15 @@ function TicketModal({
         <Field label="Photos of the issue" hint="Optional — attach one or more images (max 8MB each).">
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {items.map((it) => (
-              <div key={it.key} className="relative aspect-square overflow-hidden rounded-xl border border-white/[0.08]">
+              <div key={it.key} className="relative aspect-square overflow-hidden rounded-xl border border-line/[0.08]">
                 <img src={it.preview} alt="Attachment preview" className="h-full w-full object-cover" />
                 <button type="button" onClick={() => removeItem(it.key)}
-                  className="absolute right-1 top-1 rounded-lg bg-black/60 p-1 text-white transition hover:bg-black/80">
+                  className="absolute right-1 top-1 rounded-lg bg-black/60 p-1 text-heading transition hover:bg-black/80">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             ))}
-            <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] text-center text-[11px] text-slate-400 transition hover:border-indigo-400/40 hover:text-slate-300">
+            <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] text-center text-[11px] text-muted transition hover:border-primary/40 hover:text-fg">
               <Upload className="h-5 w-5" />
               <span>{items.length ? "Add more" : "Add photo"}</span>
               <input type="file" accept="image/*" multiple className="hidden"

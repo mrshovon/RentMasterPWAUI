@@ -86,42 +86,42 @@ export default function EntryGatewayPage() {
   // While checking for an existing session, show a neutral loader instead of the login form.
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950">
-        <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-white/10 border-t-indigo-500" />
+      <div className="flex min-h-screen items-center justify-center bg-bg">
+        <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-line/10 border-t-primary" />
       </div>
     );
   }
 
   return (
     <div className="relative flex min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-indigo-600/10 blur-[130px]" />
-      <div className="pointer-events-none absolute -bottom-40 -right-40 h-[440px] w-[440px] rounded-full bg-cyan-500/10 blur-[120px]" />
+      <div className="pointer-events-none absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-primary/10 blur-[130px]" />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 h-[440px] w-[440px] rounded-full bg-accent/10 blur-[120px]" />
 
       <div className="z-10 grid min-h-screen w-full lg:grid-cols-2">
         {/* Brand panel */}
-        <div className="hidden flex-col justify-between border-r border-white/[0.06] p-12 lg:flex">
+        <div className="hidden flex-col justify-between border-r border-line/[0.06] p-12 lg:flex">
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="RentMaster" className="h-9 w-9 rounded-xl object-cover" />
-            <span className="text-sm font-black uppercase tracking-widest text-slate-200">
+            <span className="text-sm font-black uppercase tracking-widest text-fg">
               RentMaster
             </span>
           </div>
 
           <div className="max-w-md space-y-5">
-            <span className="inline-block rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-indigo-400">
+            <span className="inline-block rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-primary">
               Property Management, Reimagined
             </span>
-            <h1 className="text-4xl font-black leading-tight tracking-tight text-white">
+            <h1 className="text-4xl font-black leading-tight tracking-tight text-heading">
               Properties, tenants, billing and requests — one calm dashboard.
             </h1>
-            <p className="text-sm leading-relaxed text-slate-400">
+            <p className="text-sm leading-relaxed text-muted">
               Track occupancy, generate rent invoices, resolve maintenance
               tickets and broadcast notices from a single, mobile-ready portal.
             </p>
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="font-mono text-xs text-slate-600">RentMaster · v{APP_VERSION}</span>
+            <span className="font-mono text-xs text-faint">RentMaster · v{APP_VERSION}</span>
             <DownloadAndroid variant="link" />
           </div>
         </div>
@@ -130,16 +130,16 @@ export default function EntryGatewayPage() {
         <div className="flex flex-col items-center justify-center px-4 py-12 sm:px-8">
           <div className="w-full max-w-md space-y-8">
             <div className="space-y-1.5 text-center lg:text-left">
-              <h2 className="text-3xl font-extrabold tracking-tight text-white">
+              <h2 className="text-3xl font-extrabold tracking-tight text-heading">
                 Welcome back
               </h2>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-muted">
                 Choose your access portal to continue.
               </p>
             </div>
 
             {/* Segmented control */}
-            <div className="flex rounded-xl border border-white/[0.06] bg-slate-950/60 p-1">
+            <div className="flex rounded-xl border border-line/[0.06] bg-bg/60 p-1">
               {(["tenant", "owner"] as const).map((t) => (
                 <button
                   key={t}
@@ -147,9 +147,9 @@ export default function EntryGatewayPage() {
                   className={`flex-1 rounded-lg py-2.5 text-xs font-bold uppercase tracking-wider transition-all ${
                     tab === t
                       ? t === "tenant"
-                        ? "bg-slate-900 text-emerald-400 shadow"
-                        : "bg-slate-900 text-indigo-400 shadow"
-                      : "text-slate-500 hover:text-slate-300"
+                        ? "bg-surface text-success shadow"
+                        : "bg-surface text-primary shadow"
+                      : "text-subtle hover:text-fg"
                   }`}
                 >
                   {t === "tenant" ? "Resident" : "Owner / Admin"}
@@ -157,15 +157,15 @@ export default function EntryGatewayPage() {
               ))}
             </div>
 
-            <div className="rounded-2xl border border-white/[0.06] bg-slate-900/40 p-6 backdrop-blur-xl sm:p-8">
+            <div className="rounded-2xl border border-line/[0.06] bg-surface/40 p-6 backdrop-blur-xl sm:p-8">
               {tab === "tenant" ? (
                 <form onSubmit={loginTenant} className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
                       Registered phone
                     </label>
                     <div className="relative">
-                      <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
+                      <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                       <input
                         type="tel"
                         placeholder="01712345678"
@@ -176,11 +176,11 @@ export default function EntryGatewayPage() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
                       Passcode
                     </label>
                     <div className="relative">
-                      <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
+                      <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                       <input
                         type="password"
                         placeholder="••••"
@@ -189,11 +189,11 @@ export default function EntryGatewayPage() {
                         className="field-input pl-10 font-mono"
                       />
                     </div>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-subtle">
                       Tip: your passcode was provided by your landlord.
                     </p>
                   </div>
-                  {error && <p className="text-xs text-rose-400">{error}</p>}
+                  {error && <p className="text-xs text-danger">{error}</p>}
                   <Button type="submit" loading={loading} variant="success" className="w-full" icon={ArrowRight}>
                     Enter resident portal
                   </Button>
@@ -201,33 +201,33 @@ export default function EntryGatewayPage() {
               ) : (
                 <form onSubmit={loginOwner} className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Email</label>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">Email</label>
                     <div className="relative">
-                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
+                      <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                       <input type="email" placeholder="owner@example.com" value={email}
                         onChange={(e) => setEmail(e.target.value)} className="field-input pl-10" />
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Password</label>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">Password</label>
                     <div className="relative">
-                      <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
+                      <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                       <input type="password" placeholder="••••••••" value={ownerPass}
                         onChange={(e) => setOwnerPass(e.target.value)} className="field-input pl-10" />
                     </div>
                   </div>
-                  {error && <p className="text-xs text-rose-400">{error}</p>}
+                  {error && <p className="text-xs text-danger">{error}</p>}
                   <Button type="submit" loading={loading} className="w-full" icon={ArrowRight}>
                     Sign in
                   </Button>
                   <button type="button" onClick={() => setForgotOpen(true)}
-                    className="block w-full text-center text-xs font-medium text-slate-400 transition hover:text-indigo-400">
+                    className="block w-full text-center text-xs font-medium text-muted transition hover:text-primary">
                     Forgot password?
                   </button>
-                  <p className="text-center text-xs text-slate-500">
+                  <p className="text-center text-xs text-subtle">
                     New here?{" "}
                     <button type="button" onClick={() => setSignupOpen(true)}
-                      className="font-semibold text-indigo-400 transition hover:text-indigo-300">
+                      className="font-semibold text-primary transition hover:text-primary">
                       Create an owner account
                     </button>
                   </p>
@@ -338,8 +338,8 @@ function ForgotPasswordModal({
       subtitle="We'll email you a secure link to set a new password.">
       {sent ? (
         <div className="space-y-5">
-          <p className="text-sm text-slate-300">
-            If an account exists for <span className="font-semibold text-white">{email.trim()}</span>, a password
+          <p className="text-sm text-fg">
+            If an account exists for <span className="font-semibold text-heading">{email.trim()}</span>, a password
             reset link is on its way. Check your inbox (and spam folder).
           </p>
           <Button className="w-full" onClick={close}>Done</Button>

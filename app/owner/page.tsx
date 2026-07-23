@@ -6,7 +6,7 @@ import {
   Plus, MapPin, KeyRound, Phone, CircleDollarSign, Home, TriangleAlert,
   CheckCircle2, Send, Circle, Inbox, Pencil, DoorOpen, FileText, Trash2, Upload, Download, X, History,
   Receipt, PenLine, Gem, Crown, Sparkles, ArrowUpCircle, Infinity as InfinityIcon, CalendarClock, Copy, RotateCcw,
-  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle, HardHat,
+  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle, HardHat, Wallet,
 } from "lucide-react";
 import { rentMasterFetch, uploadFile, DEMO_OWNER_ID } from "../../lib/api-service";
 import { toast } from "../../components/toast";
@@ -29,6 +29,7 @@ import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/f
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { StaffTab } from "../../components/staff-tab";
+import { AccountsTab } from "../../components/accounts-tab";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
@@ -91,6 +92,8 @@ export default function OwnerDashboard() {
   const [revealPasscode, setRevealPasscode] = useState<{ name: string; code: string } | null>(null);
   // Staff add-on enquiry (opened from the locked Staff tab).
   const [staffContactOpen, setStaffContactOpen] = useState(false);
+  // Accounts add-on enquiry (opened from the locked Accounts tab).
+  const [accountsContactOpen, setAccountsContactOpen] = useState(false);
 
   // Reset a tenant's login passcode (random; shown once). Passcodes are not derivable
   // from the phone number, so a fresh one must be generated and shared explicitly.
@@ -215,6 +218,7 @@ export default function OwnerDashboard() {
     { key: "reminders", label: "Reminders", icon: CalendarClock, badge: metrics.pendingReminders },
     // Always listed: when the add-on is off the tab explains the feature rather than hiding it.
     { key: "staff", label: "Staff", icon: HardHat },
+    { key: "accounts", label: "Accounts", icon: Wallet },
     { key: "plan", label: "Plan", icon: Gem },
     { key: "support", label: "Support", icon: LifeBuoy, badge: metrics.openSupport },
     { key: "settings", label: "Settings", icon: Settings },
@@ -416,6 +420,14 @@ export default function OwnerDashboard() {
         />
       )}
 
+      {tab === "accounts" && (
+        <AccountsTab
+          enabled={!!plan?.features?.accounts?.enabled}
+          properties={properties}
+          onContact={() => setAccountsContactOpen(true)}
+        />
+      )}
+
       {tab === "support" && (
         <SupportTab tickets={tickets} onCreate={() => setTicketOpen(true)} />
       )}
@@ -436,6 +448,13 @@ export default function OwnerDashboard() {
         prefill="I'd like to enable the Staff add-on on my account. Please get in touch."
         ownerName={session?.name || null}
         onClose={() => setStaffContactOpen(false)}
+      />
+      <ContactModal
+        open={accountsContactOpen}
+        subject="Enquiry about the Accounts add-on"
+        prefill="I'd like to enable the Accounts add-on on my account. Please get in touch."
+        ownerName={session?.name || null}
+        onClose={() => setAccountsContactOpen(false)}
       />
       <RaiseTicketModal
         open={ticketOpen}
@@ -522,12 +541,12 @@ export default function OwnerDashboard() {
 
       <Modal open={!!revealPasscode} onClose={() => setRevealPasscode(null)} title="Tenant login passcode">
         <div className="space-y-5">
-          <p className="text-sm text-slate-300">
-            Share this passcode with <span className="font-semibold text-white">{revealPasscode?.name}</span> so they
+          <p className="text-sm text-fg">
+            Share this passcode with <span className="font-semibold text-heading">{revealPasscode?.name}</span> so they
             can sign in to the resident portal. For security it won&apos;t be shown again — you can reset it anytime.
           </p>
-          <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-4">
-            <span className="flex items-center gap-2 font-mono text-2xl font-black tracking-[0.3em] text-emerald-400">
+          <div className="flex items-center justify-between rounded-xl border border-success/20 bg-success/[0.06] px-4 py-4">
+            <span className="flex items-center gap-2 font-mono text-2xl font-black tracking-[0.3em] text-success">
               <KeyRound className="h-5 w-5" />{revealPasscode?.code}
             </span>
             <Button size="sm" variant="secondary" icon={Copy}
@@ -572,8 +591,8 @@ function PlanBanner({ plan, onRenew }: { plan: SubscriptionResponse; onRenew: ()
   }
   if (!tone) return null;
   const cls = tone === "rose"
-    ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
-    : "border-amber-500/30 bg-amber-500/10 text-amber-200";
+    ? "border-danger/30 bg-danger/10 text-danger"
+    : "border-warning/30 bg-warning/10 text-warning";
   return (
     <div className={`mb-6 flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${cls}`}>
       <div className="flex items-start gap-2 text-sm">
@@ -594,20 +613,20 @@ function UsageMeter({ label, current, limit, icon: Icon }: { label: string; curr
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted">
           <Icon className="h-4 w-4" /> {label}
         </div>
-        <div className="text-sm font-black text-white">
+        <div className="text-sm font-black text-heading">
           {current} / {unlimited ? <InfinityIcon className="inline h-4 w-4 align-middle" /> : limit}
         </div>
       </div>
       {!unlimited && (
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-          <div className={`h-full rounded-full ${atCap ? "bg-rose-500" : "bg-indigo-500"}`} style={{ width: `${pct}%` }} />
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-overlay/[0.06]">
+          <div className={`h-full rounded-full ${atCap ? "bg-danger" : "bg-primary"}`} style={{ width: `${pct}%` }} />
         </div>
       )}
-      {unlimited && <div className="mt-3 text-xs text-emerald-400">Unlimited on your plan</div>}
-      {atCap && <div className="mt-2 text-xs text-rose-400">Limit reached — upgrade to add more.</div>}
+      {unlimited && <div className="mt-3 text-xs text-success">Unlimited on your plan</div>}
+      {atCap && <div className="mt-2 text-xs text-danger">Limit reached — upgrade to add more.</div>}
     </Card>
   );
 }
@@ -675,26 +694,26 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
       <Card className="p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 text-slate-950">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-primary to-accent text-btn-ink">
               {s.isFree ? <Sparkles className="h-5 w-5" /> : <Crown className="h-5 w-5" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-black text-white">{s.tierName}</span>
+                <span className="text-lg font-black text-heading">{s.tierName}</span>
                 <Badge tone={badge.tone}>{badge.label}</Badge>
               </div>
-              <div className="text-xs text-slate-400">
+              <div className="text-xs text-muted">
                 {s.isFree ? "Free · never expires" : `${formatCurrency(s.price)} / ${s.interval}`}
               </div>
             </div>
           </div>
           {!s.isFree && (
-            <div className="flex items-center gap-2 text-sm text-slate-300">
-              <CalendarClock className="h-4 w-4 text-slate-500" />
+            <div className="flex items-center gap-2 text-sm text-fg">
+              <CalendarClock className="h-4 w-4 text-subtle" />
               {s.status === "grace"
-                ? <span className="text-amber-400">Expired · {s.daysLeftInGrace}d grace left</span>
+                ? <span className="text-warning">Expired · {s.daysLeftInGrace}d grace left</span>
                 : s.status === "locked"
-                  ? <span className="text-rose-400">Lapsed on {formatDate(s.expiryDate)}</span>
+                  ? <span className="text-danger">Lapsed on {formatDate(s.expiryDate)}</span>
                   : <span>Renews / expires {formatDate(s.expiryDate)}{s.warnExpiringSoon ? ` · ${s.daysUntilExpiry}d left` : ""}</span>}
             </div>
           )}
@@ -703,11 +722,11 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
 
       {/* Payment awaiting approval */}
       {pendingPayment && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-          <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+        <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+          <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
           <div>
-            <div className="font-bold text-amber-100">Payment awaiting approval</div>
-            <p className="mt-0.5 text-amber-200/90">
+            <div className="font-bold text-warning">Payment awaiting approval</div>
+            <p className="mt-0.5 text-warning/90">
               We&apos;ve received your payment for the <strong>{pendingPayment.tier_name || pendingPayment.tier_id}</strong> plan
               (৳{Number(pendingPayment.amount || 0)}, txn {pendingPayment.txn_id}). Our team will review and activate it shortly.
             </p>
@@ -717,11 +736,11 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
 
       {/* Last payment was rejected */}
       {!pendingPayment && rejectedPayment && (
-        <div className="flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-rose-400" />
+        <div className="flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
           <div>
-            <div className="font-bold text-rose-100">Your last payment could not be approved</div>
-            <p className="mt-0.5 text-rose-200/90">
+            <div className="font-bold text-danger">Your last payment could not be approved</div>
+            <p className="mt-0.5 text-danger/90">
               {rejectedPayment.admin_notes
                 ? <>Reason: {rejectedPayment.admin_notes}</>
                 : "Please review your payment details and try again."}
@@ -739,7 +758,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
 
       {/* Available plans */}
       <div className="space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Available plans</h2>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Available plans</h2>
         <div className="grid gap-4 md:grid-cols-2">
           {[...plan.availableTiers]
             .sort((a, b) => (isContactTier(a) ? 1 : 0) - (isContactTier(b) ? 1 : 0) || Number(a.price) - Number(b.price))
@@ -752,29 +771,29 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
             const tOver = !unlimitedT && plan.usage.tenants.current > tier.max_tenants_allowed;
             const blockedDowngrade = !isCurrent && (pOver || tOver);
             return (
-              <Card key={tier.id} className={`p-6 ${isCurrent ? "border-indigo-500/40" : ""} ${contact ? "border-cyan-500/30" : ""}`}>
+              <Card key={tier.id} className={`p-6 ${isCurrent ? "border-primary/40" : ""} ${contact ? "border-accent/30" : ""}`}>
                 <div className="flex items-center justify-between">
-                  <div className="text-base font-black text-white">{tier.name}</div>
+                  <div className="text-base font-black text-heading">{tier.name}</div>
                   {isCurrent ? <Badge tone="indigo">Current</Badge> : contact ? <Badge tone="cyan">Custom</Badge> : null}
                 </div>
-                <div className="mt-1 text-2xl font-black text-white">
+                <div className="mt-1 text-2xl font-black text-heading">
                   {contact ? "Contact us" : tier.price > 0 ? formatCurrency(tier.price) : "Free"}
-                  {!contact && tier.price > 0 && <span className="text-sm font-medium text-slate-400"> / {tier.billing_interval}</span>}
+                  {!contact && tier.price > 0 && <span className="text-sm font-medium text-muted"> / {tier.billing_interval}</span>}
                 </div>
-                {tier.description && <p className="mt-2 text-xs text-slate-400">{tier.description}</p>}
-                <ul className="mt-4 space-y-1.5 text-sm text-slate-300">
+                {tier.description && <p className="mt-2 text-xs text-muted">{tier.description}</p>}
+                <ul className="mt-4 space-y-1.5 text-sm text-fg">
                   {contact ? (
                     <>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />Custom build for your entire building</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />Unlimited properties &amp; tenants</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />1 year free maintenance included</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />Monthly or yearly contract from year 2</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />Custom build for your entire building</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />Unlimited properties &amp; tenants</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />1 year free maintenance included</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />Monthly or yearly contract from year 2</li>
                     </>
                   ) : (
                     <>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />
                         {unlimitedP ? "Unlimited properties" : `Up to ${tier.max_properties_allowed} properties`}</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />
                         {unlimitedT ? "Unlimited tenants" : `Up to ${tier.max_tenants_allowed} tenants`}</li>
                     </>
                   )}
@@ -789,7 +808,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                   ) : blockedDowngrade ? (
                     <>
                       <Button variant="secondary" className="w-full" disabled>Downgrade blocked</Button>
-                      <p className="mt-2 text-xs text-rose-400">
+                      <p className="mt-2 text-xs text-danger">
                         You use {plan.usage.properties.current} propert{plan.usage.properties.current === 1 ? "y" : "ies"} / {plan.usage.tenants.current} tenant{plan.usage.tenants.current === 1 ? "" : "s"}. Reduce to {unlimitedP ? "∞" : tier.max_properties_allowed} / {unlimitedT ? "∞" : tier.max_tenants_allowed} first.
                       </p>
                     </>
@@ -809,7 +828,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
             );
           })}
         </div>
-        <p className="text-xs text-slate-500">Paid plans are activated after our team confirms your bKash payment. The free plan never expires; paid plans renew on their billing interval and get a {`10`}-day grace period after expiry.</p>
+        <p className="text-xs text-subtle">Paid plans are activated after our team confirms your bKash payment. The free plan never expires; paid plans renew on their billing interval and get a {`10`}-day grace period after expiry.</p>
       </div>
 
       <ContactModal open={!!contactTier} tier={contactTier} ownerName={ownerName} onClose={() => setContactTier(null)} />
@@ -874,24 +893,24 @@ function PaymentModal({
       subtitle={tier ? `${tier.name} · ৳${tier.price} / ${tier.billing_interval}` : undefined}>
       <div className="space-y-5">
         {/* Pay-to details */}
-        <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Pay with {providerName}</div>
+        <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+          <div className="text-xs font-bold uppercase tracking-wider text-muted">Pay with {providerName}</div>
           {config?.qrUrl ? (
             <div className="mt-3 flex flex-col items-center gap-1">
               <button type="button" onClick={() => setZoomed(true)}
-                className="rounded-lg ring-1 ring-white/10 transition hover:ring-indigo-400/50"
+                className="rounded-lg ring-1 ring-line/10 transition hover:ring-primary/50"
                 title="Tap to enlarge and scan">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={config.qrUrl} alt={`${providerName} QR code`} className="h-44 w-44 rounded-lg bg-white object-contain p-2" />
               </button>
-              <span className="text-[11px] text-slate-500">Tap the QR to enlarge and scan</span>
+              <span className="text-[11px] text-subtle">Tap the QR to enlarge and scan</span>
             </div>
           ) : null}
           {config?.walletNumber ? (
-            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2">
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-overlay/[0.03] px-3 py-2">
               <div>
-                <div className="text-[11px] text-slate-500">{providerName} number</div>
-                <div className="font-mono text-base font-bold text-white">{config.walletNumber}</div>
+                <div className="text-[11px] text-subtle">{providerName} number</div>
+                <div className="font-mono text-base font-bold text-heading">{config.walletNumber}</div>
               </div>
               <Button size="sm" variant="secondary" icon={Copy}
                 onClick={() => { navigator.clipboard?.writeText(config.walletNumber); toast.success("Number copied."); }}>
@@ -900,10 +919,10 @@ function PaymentModal({
             </div>
           ) : null}
           {config?.instructions ? (
-            <p className="mt-3 whitespace-pre-wrap text-xs text-slate-400">{config.instructions}</p>
+            <p className="mt-3 whitespace-pre-wrap text-xs text-muted">{config.instructions}</p>
           ) : null}
           {!config?.qrUrl && !config?.walletNumber && (
-            <p className="mt-3 text-xs text-amber-400">Payment details haven&apos;t been set up yet. Please contact us.</p>
+            <p className="mt-3 text-xs text-warning">Payment details haven&apos;t been set up yet. Please contact us.</p>
           )}
         </div>
 
@@ -916,13 +935,13 @@ function PaymentModal({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={config.qrUrl} alt={`${providerName} QR code`}
               className="max-h-[80vh] w-auto max-w-[90vw] rounded-2xl bg-white object-contain p-4 shadow-2xl" />
-            <span className="text-sm text-white/80">Tap anywhere to close</span>
+            <span className="text-sm text-heading/80">Tap anywhere to close</span>
           </div>
         )}
 
         {/* Proof of payment */}
         <form onSubmit={submit} className="space-y-4">
-          <p className="text-xs text-slate-400">After paying, enter your payment details below so we can verify and activate your plan.</p>
+          <p className="text-xs text-muted">After paying, enter your payment details below so we can verify and activate your plan.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Mobile number you paid from" required>
               <TextInput value={senderMsisdn} onChange={(e) => setSenderMsisdn(e.target.value)} placeholder="01712345678" required />
@@ -1050,22 +1069,22 @@ function OverviewTab({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="p-6">
-          <h3 className="mb-4 text-sm font-bold text-slate-200">Occupancy</h3>
+          <h3 className="mb-4 text-sm font-bold text-fg">Occupancy</h3>
           {properties.length === 0 ? (
-            <p className="text-sm text-slate-500">No properties yet.</p>
+            <p className="text-sm text-subtle">No properties yet.</p>
           ) : (
             <>
               <div className="mb-3 flex items-end justify-between">
-                <span className="text-3xl font-black text-white">
+                <span className="text-3xl font-black text-heading">
                   {Math.round((metrics.occupied / properties.length) * 100)}%
                 </span>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-subtle">
                   {metrics.occupied}/{properties.length} units filled
                 </span>
               </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
+              <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all"
+                  className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
                   style={{ width: `${(metrics.occupied / properties.length) * 100}%` }}
                 />
               </div>
@@ -1075,7 +1094,7 @@ function OverviewTab({
 
         <Card className="p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-200">Recent maintenance</h3>
+            <h3 className="text-sm font-bold text-fg">Recent maintenance</h3>
             <Badge tone={metrics.openTickets ? "amber" : "emerald"}>
               {metrics.openTickets} open
             </Badge>
@@ -1083,19 +1102,19 @@ function OverviewTab({
           <div className="space-y-3">
             {maintenance.slice(0, 3).map((m) => (
               <div key={m.id} className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-lg bg-white/[0.04] p-1.5 text-amber-400">
+                <div className="mt-0.5 rounded-lg bg-overlay/[0.04] p-1.5 text-warning">
                   <Wrench className="h-3.5 w-3.5" />
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-200">{m.issue_title}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="truncate text-sm font-semibold text-fg">{m.issue_title}</div>
+                  <div className="text-xs text-subtle">
                     {m.properties?.name ?? "Property"} · {formatDate(m.created_at)}
                   </div>
                 </div>
               </div>
             ))}
             {maintenance.length === 0 && (
-              <p className="text-sm text-slate-500">No maintenance reported. 🎉</p>
+              <p className="text-sm text-subtle">No maintenance reported. 🎉</p>
             )}
           </div>
         </Card>
@@ -1139,7 +1158,7 @@ function PropertiesTab({ properties, disabledIds, onUpgrade, onAdd, onEdit, onVa
             return (
             <Card key={p.id} hover={!disabled} className={`flex flex-col gap-4 p-5 ${disabled ? "opacity-60" : ""}`}>
               <div className="flex items-start justify-between">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Home className="h-5 w-5" />
                 </div>
                 {disabled ? (
@@ -1151,13 +1170,13 @@ function PropertiesTab({ properties, disabledIds, onUpgrade, onAdd, onEdit, onVa
                 )}
               </div>
               <div>
-                <h3 className="font-bold text-slate-100">{p.name}</h3>
-                <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
+                <h3 className="font-bold text-heading">{p.name}</h3>
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
                   <MapPin className="h-3.5 w-3.5" /> {p.address}
                 </p>
               </div>
-              <div className="flex items-center justify-between border-t border-white/[0.06] pt-3 text-xs text-slate-500">
-                <span>Flat <span className="font-semibold text-slate-300">{p.flat_no}</span></span>
+              <div className="flex items-center justify-between border-t border-line/[0.06] pt-3 text-xs text-subtle">
+                <span>Flat <span className="font-semibold text-fg">{p.flat_no}</span></span>
                 <span className="font-mono">{p.id.slice(0, 8)}…</span>
               </div>
               {disabled ? (
@@ -1207,8 +1226,8 @@ function LoginAccessToggle({ tenant, onToggle }: { tenant: Tenant; onToggle: (t:
         : "Blocked from signing in. Click to allow it anyway."}
       className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold transition ${
         allowed
-          ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-          : "bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
+          ? "bg-success/10 text-success hover:bg-success/20"
+          : "bg-danger/10 text-danger hover:bg-danger/20"
       }`}
     >
       {allowed
@@ -1226,7 +1245,7 @@ function ResetPasscodeButton({
       onClick={() => onReset(tenant)}
       disabled={pending}
       title="Generate a new login passcode"
-      className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.04] px-2 py-1 text-xs text-slate-300 transition hover:bg-white/[0.08] hover:text-white disabled:pointer-events-none disabled:opacity-50"
+      className="inline-flex items-center gap-1.5 rounded-lg bg-overlay/[0.04] px-2 py-1 text-xs text-fg transition hover:bg-overlay/[0.08] hover:text-heading disabled:pointer-events-none disabled:opacity-50"
     >
       {pending ? <Spinner className="h-3 w-3" /> : <RotateCcw className="h-3 w-3" />} {label}
     </button>
@@ -1273,7 +1292,7 @@ function TenantsTab({
           <Card className="hidden overflow-hidden md:block">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                   <tr>
                     <th className="p-4">Resident</th>
                     <th className="p-4">Property</th>
@@ -1283,20 +1302,20 @@ function TenantsTab({
                     <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/[0.04]">
+                <tbody className="divide-y divide-line/[0.04]">
                   {filtered.map((t) => {
                     const disabled = isDisabled(t.id);
                     return (
-                    <tr key={t.id} className={`hover:bg-white/[0.02] ${disabled ? "opacity-60" : ""}`}>
+                    <tr key={t.id} className={`hover:bg-overlay/[0.02] ${disabled ? "opacity-60" : ""}`}>
                       <td className="p-4">
-                        <div className="flex items-center gap-2 font-semibold text-slate-100">
+                        <div className="flex items-center gap-2 font-semibold text-heading">
                           {t.name}{disabled && <Badge tone="rose">Disabled</Badge>}
                         </div>
-                        <div className="flex items-center gap-1 text-xs text-slate-500">
+                        <div className="flex items-center gap-1 text-xs text-subtle">
                           <Phone className="h-3 w-3" /> {t.phone}
                         </div>
                       </td>
-                      <td className="p-4 text-slate-300">
+                      <td className="p-4 text-fg">
                         {t.properties?.name ?? propName(t.property_id) ?? (
                           // No property = no portal access by default. Offer the override here,
                           // where the owner can see *why* it applies.
@@ -1306,8 +1325,8 @@ function TenantsTab({
                           </div>
                         )}
                       </td>
-                      <td className="p-4 font-semibold text-emerald-400">{formatCurrency(t.monthly_rent)}</td>
-                      <td className="p-4 text-slate-300">{ordinalDay(t.due_date)}</td>
+                      <td className="p-4 font-semibold text-success">{formatCurrency(t.monthly_rent)}</td>
+                      <td className="p-4 text-fg">{ordinalDay(t.due_date)}</td>
                       <td className="p-4">
                         <ResetPasscodeButton
                           tenant={t}
@@ -1342,7 +1361,7 @@ function TenantsTab({
               return (
               <Card key={t.id} className={`p-4 ${disabled ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 font-semibold text-slate-100">
+                  <div className="flex items-center gap-2 font-semibold text-heading">
                     {t.name}{disabled && <Badge tone="rose">Disabled</Badge>}
                   </div>
                   <ResetPasscodeButton
@@ -1352,13 +1371,13 @@ function TenantsTab({
                     label="Reset passcode"
                   />
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-400">
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted">
                   <span>
                     {t.properties?.name ?? propName(t.property_id) ?? (
                       <Badge tone="amber">Unassigned</Badge>
                     )}
                   </span>
-                  <span className="text-right font-semibold text-emerald-400">{formatCurrency(t.monthly_rent)}</span>
+                  <span className="text-right font-semibold text-success">{formatCurrency(t.monthly_rent)}</span>
                   <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{t.phone}</span>
                   <span className="text-right">Due {ordinalDay(t.due_date)}</span>
                 </div>
@@ -1440,7 +1459,7 @@ function BillingTab({
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+              <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                 <tr>
                   <th className="p-4">Tenant / Month</th>
                   <th className="p-4">Rent</th>
@@ -1450,26 +1469,26 @@ function BillingTab({
                   <th className="p-4 text-right">Mark as</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.04]">
+              <tbody className="divide-y divide-line/[0.04]">
                 {filtered.map((l) => (
-                  <tr key={l.id} className="hover:bg-white/[0.02]">
+                  <tr key={l.id} className="hover:bg-overlay/[0.02]">
                     <td className="p-4">
-                      <div className="font-semibold text-slate-100">{l.tenants?.name ?? "Tenant"}</div>
-                      <div className="text-xs text-slate-500">{formatMonth(l.billing_month)}</div>
+                      <div className="font-semibold text-heading">{l.tenants?.name ?? "Tenant"}</div>
+                      <div className="text-xs text-subtle">{formatMonth(l.billing_month)}</div>
                     </td>
-                    <td className="p-4 text-slate-300">{formatCurrency(l.rent_amount)}</td>
-                    <td className="p-4 text-slate-300">
+                    <td className="p-4 text-fg">{formatCurrency(l.rent_amount)}</td>
+                    <td className="p-4 text-fg">
                       {formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}
                       {Number(l.discount) > 0 && (
-                        <span className="ml-1 text-xs text-emerald-400">−{formatCurrency(l.discount)}</span>
+                        <span className="ml-1 text-xs text-success">−{formatCurrency(l.discount)}</span>
                       )}
                     </td>
-                    <td className="p-4 font-bold text-white">{formatCurrency(l.total_payable)}</td>
+                    <td className="p-4 font-bold text-heading">{formatCurrency(l.total_payable)}</td>
                     <td className="p-4"><Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge></td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-1">
                         <button title="Receipt & share" onClick={() => onReceipt(l)}
-                          className="rounded-lg p-1.5 text-indigo-400 transition hover:bg-indigo-500/10">
+                          className="rounded-lg p-1.5 text-primary transition hover:bg-primary/10">
                           <Receipt className="h-4 w-4" />
                         </button>
                         <StatusButton active={l.payment_status === "unpaid"} tone="rose" icon={Circle}
@@ -1500,15 +1519,15 @@ function StatusButton({
   icon: typeof Circle; onClick: () => void; title: string;
 }) {
   const tones = {
-    rose: "text-rose-400 hover:bg-rose-500/10",
-    amber: "text-amber-400 hover:bg-amber-500/10",
-    emerald: "text-emerald-400 hover:bg-emerald-500/10",
+    rose: "text-danger hover:bg-danger/10",
+    amber: "text-warning hover:bg-warning/10",
+    emerald: "text-success hover:bg-success/10",
   };
   return (
     <button
       title={title}
       onClick={onClick}
-      className={`rounded-lg p-1.5 transition ${tones[tone]} ${active ? "bg-white/[0.06] ring-1 ring-white/10" : "text-slate-600"}`}
+      className={`rounded-lg p-1.5 transition ${tones[tone]} ${active ? "bg-overlay/[0.06] ring-1 ring-line/10" : "text-faint"}`}
     >
       <Icon className="h-4 w-4" />
     </button>
@@ -1528,19 +1547,19 @@ function MaintenanceTab({ logs, onUpdate }: { logs: MaintenanceLog[]; onUpdate: 
             <Card key={m.id} className="flex flex-col gap-3 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="rounded-lg bg-amber-500/10 p-2 text-amber-400"><TriangleAlert className="h-4 w-4" /></div>
-                  <h3 className="font-bold text-slate-100">{m.issue_title}</h3>
+                  <div className="rounded-lg bg-warning/10 p-2 text-warning"><TriangleAlert className="h-4 w-4" /></div>
+                  <h3 className="font-bold text-heading">{m.issue_title}</h3>
                 </div>
                 <Badge tone={priorityTone[m.priority_level]}>{m.priority_level}</Badge>
               </div>
-              {m.issue_description && <p className="text-sm leading-relaxed text-slate-400">{m.issue_description}</p>}
+              {m.issue_description && <p className="text-sm leading-relaxed text-muted">{m.issue_description}</p>}
               <AttachmentStrip raw={m.attachment_file_url} />
               {m.resolution_remarks && (
-                <div className="rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs text-slate-300">
-                  <span className="font-semibold text-slate-400">Owner note: </span>{m.resolution_remarks}
+                <div className="rounded-lg border border-line/[0.06] bg-overlay/[0.03] px-3 py-2 text-xs text-fg">
+                  <span className="font-semibold text-muted">Owner note: </span>{m.resolution_remarks}
                 </div>
               )}
-              <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3 text-xs text-slate-500">
+              <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line/[0.06] pt-3 text-xs text-subtle">
                 <span>{m.properties?.name ?? "Property"}</span>
                 {m.tenants?.name && <span>· {m.tenants.name}</span>}
                 <span>· {formatDate(m.created_at)}</span>
@@ -1581,25 +1600,25 @@ function SupportTab({ tickets, onCreate }: { tickets: SupportTicket[]; onCreate:
             <Card key={t.id} className="flex flex-col gap-3 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400"><LifeBuoy className="h-4 w-4" /></div>
+                  <div className="rounded-lg bg-primary/10 p-2 text-primary"><LifeBuoy className="h-4 w-4" /></div>
                   <div>
-                    <h3 className="font-bold text-slate-100">{t.subject}</h3>
-                    <span className="text-[11px] font-semibold text-slate-500">#{t.ticket_no}</span>
+                    <h3 className="font-bold text-heading">{t.subject}</h3>
+                    <span className="text-[11px] font-semibold text-subtle">#{t.ticket_no}</span>
                   </div>
                 </div>
                 <Badge tone={priorityTone[t.priority]}>{t.priority}</Badge>
               </div>
-              <p className="text-sm leading-relaxed text-slate-400">{t.description}</p>
+              <p className="text-sm leading-relaxed text-muted">{t.description}</p>
               <AttachmentStrip raw={t.attachment_file_url} />
               {t.admin_remarks && (
-                <div className="rounded-lg border border-indigo-400/20 bg-indigo-500/[0.06] px-3 py-2 text-xs text-slate-300">
-                  <span className="flex items-center gap-1.5 font-semibold text-indigo-300">
+                <div className="rounded-lg border border-primary/20 bg-primary/[0.06] px-3 py-2 text-xs text-fg">
+                  <span className="flex items-center gap-1.5 font-semibold text-primary">
                     <MessageSquare className="h-3.5 w-3.5" /> Admin response
                   </span>
                   <p className="mt-1 leading-relaxed">{t.admin_remarks}</p>
                 </div>
               )}
-              <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3 text-xs text-slate-500">
+              <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line/[0.06] pt-3 text-xs text-subtle">
                 <span>{ticketCategoryLabel[t.category]}</span>
                 <span>· Raised {formatDate(t.created_at)}</span>
                 {t.finished_at && <span>· Closed {formatDate(t.finished_at)}</span>}
@@ -1699,15 +1718,15 @@ function RaiseTicketModal({
         <Field label="Screenshots" hint="Optional — attach one or more images (max 8MB each).">
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {items.map((it) => (
-              <div key={it.key} className="relative aspect-square overflow-hidden rounded-xl border border-white/[0.08]">
+              <div key={it.key} className="relative aspect-square overflow-hidden rounded-xl border border-line/[0.08]">
                 <img src={it.preview} alt="Attachment preview" className="h-full w-full object-cover" />
                 <button type="button" onClick={() => removeItem(it.key)}
-                  className="absolute right-1 top-1 rounded-lg bg-black/60 p-1 text-white transition hover:bg-black/80">
+                  className="absolute right-1 top-1 rounded-lg bg-black/60 p-1 text-heading transition hover:bg-black/80">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             ))}
-            <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] text-center text-[11px] text-slate-400 transition hover:border-indigo-400/40 hover:text-slate-300">
+            <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] text-center text-[11px] text-muted transition hover:border-primary/40 hover:text-fg">
               <Upload className="h-5 w-5" />
               <span>{items.length ? "Add more" : "Add image"}</span>
               <input type="file" accept="image/*" multiple className="hidden"
@@ -1743,10 +1762,10 @@ function NoticesTab({ notices, onCreate }: { notices: Notice[]; onCreate: () => 
           {notices.map((n) => (
             <Card key={n.id} className="space-y-2 p-5">
               <div className="flex items-start justify-between gap-3">
-                <h3 className="font-bold text-indigo-400">{n.title}</h3>
-                <span className="shrink-0 font-mono text-[10px] text-slate-500">{formatDate(n.created_at)}</span>
+                <h3 className="font-bold text-primary">{n.title}</h3>
+                <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at)}</span>
               </div>
-              <p className="text-sm leading-relaxed text-slate-300">{n.content}</p>
+              <p className="text-sm leading-relaxed text-fg">{n.content}</p>
               <div className="flex items-center gap-2 pt-1">
                 <Badge tone="indigo">{scopeLabel[n.target_scope] ?? n.target_scope}</Badge>
                 <Badge tone="slate">{senderLabel(n.sender_type)}</Badge>
@@ -1956,7 +1975,7 @@ function InvoiceModal({
     <Modal open={open} onClose={onClose} size="lg" title="Create invoice"
       subtitle="Generate a monthly rent invoice for a tenant.">
       {billable.length === 0 ? (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted">
           {tenants.length === 0
             ? "Onboard a tenant first to create invoices."
             : "None of your tenants are assigned to a property. Assign one from the Tenants tab to invoice them."}
@@ -2000,9 +2019,9 @@ function InvoiceModal({
               value={form.extraChargeRemarks}
               onChange={(e) => setForm({ ...form, extraChargeRemarks: e.target.value })} />
           </Field>
-          <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
-            <span className="text-sm font-semibold text-slate-300">Total payable</span>
-            <span className="text-xl font-black text-emerald-400">{formatCurrency(total)}</span>
+          <div className="flex items-center justify-between rounded-xl border border-line/[0.06] bg-overlay/[0.03] px-4 py-3">
+            <span className="text-sm font-semibold text-fg">Total payable</span>
+            <span className="text-xl font-black text-success">{formatCurrency(total)}</span>
           </div>
           <Button type="submit" loading={saving} className="w-full">Generate invoice</Button>
         </form>
@@ -2131,20 +2150,20 @@ function RemindersTab({
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-slate-500">#{r.reminder_no}</span>
+                    <span className="font-mono text-xs text-subtle">#{r.reminder_no}</span>
                     <Badge tone={reminderStatusTone[r.status]}>{reminderStatusLabel[r.status]}</Badge>
                     <Badge tone={r.recurrence === "monthly" ? "indigo" : "slate"}>
                       {r.recurrence === "monthly" ? "Monthly" : "One-time"}
                     </Badge>
-                    <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <span className="flex items-center gap-1 text-xs text-muted">
                       <CalendarClock className="h-3.5 w-3.5" />
                       {r.status === "pending" ? "Next: " : ""}{formatDate(r.scheduled_date)}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-200">
-                    <Users className="h-4 w-4 text-slate-500" /> {recipients(r)}
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-fg">
+                    <Users className="h-4 w-4 text-subtle" /> {recipients(r)}
                   </div>
-                  <p className="max-w-2xl whitespace-pre-wrap text-sm text-slate-400">{r.message}</p>
+                  <p className="max-w-2xl whitespace-pre-wrap text-sm text-muted">{r.message}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {r.status === "pending" && (
@@ -2171,9 +2190,9 @@ function IconBtnOwner({
   title: string; tone: "emerald" | "amber" | "rose"; icon: typeof Send; onClick: () => void; loading?: boolean;
 }) {
   const tones = {
-    emerald: "text-emerald-400 hover:bg-emerald-500/10",
-    amber: "text-amber-400 hover:bg-amber-500/10",
-    rose: "text-rose-400 hover:bg-rose-500/10",
+    emerald: "text-success hover:bg-success/10",
+    amber: "text-warning hover:bg-warning/10",
+    rose: "text-danger hover:bg-danger/10",
   };
   return (
     <button title={title} onClick={onClick} disabled={loading}
@@ -2236,31 +2255,31 @@ function ReminderModal({
         <Field label="Recipients" required>
           <button type="button" onClick={() => setTargetAll((v) => !v)}
             className={`mb-2 flex w-full items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition ${
-              targetAll ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-300" : "border-white/[0.08] text-slate-300 hover:bg-white/[0.04]"
+              targetAll ? "border-primary/40 bg-primary/10 text-primary" : "border-line/[0.08] text-fg hover:bg-overlay/[0.04]"
             }`}>
             {targetAll ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
             All tenants
           </button>
           {!targetAll && (
-            <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-white/[0.06] bg-white/[0.02] p-2">
-              {tenants.length === 0 && <p className="p-2 text-xs text-slate-500">No tenants yet.</p>}
+            <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-2">
+              {tenants.length === 0 && <p className="p-2 text-xs text-subtle">No tenants yet.</p>}
               {tenants.map((t) => {
                 const on = selected.includes(t.id);
                 return (
                   <button type="button" key={t.id} onClick={() => toggle(t.id)}
                     className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
-                      on ? "bg-emerald-500/10 text-emerald-200" : "text-slate-300 hover:bg-white/[0.04]"
+                      on ? "bg-success/10 text-success" : "text-fg hover:bg-overlay/[0.04]"
                     }`}>
-                    {on ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <Circle className="h-4 w-4 text-slate-500" />}
+                    {on ? <CheckCircle2 className="h-4 w-4 text-success" /> : <Circle className="h-4 w-4 text-subtle" />}
                     <span className="flex-1 text-left">{t.name}</span>
-                    <span className="text-xs text-slate-500">{t.phone}</span>
+                    <span className="text-xs text-subtle">{t.phone}</span>
                   </button>
                 );
               })}
             </div>
           )}
           {!targetAll && selected.length > 0 && (
-            <p className="mt-1.5 text-xs text-slate-500">{selected.length} selected</p>
+            <p className="mt-1.5 text-xs text-subtle">{selected.length} selected</p>
           )}
         </Field>
 
@@ -2271,7 +2290,7 @@ function ReminderModal({
           <div className="mt-2 flex flex-wrap gap-1.5">
             {REMINDER_PLACEHOLDERS.map((p) => (
               <button type="button" key={p} onClick={() => insert(p)}
-                className="rounded-md bg-white/[0.05] px-2 py-1 font-mono text-[11px] text-slate-300 transition hover:bg-white/[0.1]">
+                className="rounded-md bg-overlay/[0.05] px-2 py-1 font-mono text-[11px] text-fg transition hover:bg-overlay/[0.1]">
                 {p}
               </button>
             ))}
@@ -2402,7 +2421,7 @@ function ServiceChargeModal({ property, onClose }: { property: Property | null; 
       title="Service charge breakdown"
       subtitle={property ? `${property.name} · Flat ${property.flat_no}` : undefined}>
       {loading ? (
-        <div className="py-8 text-center text-sm text-slate-400">Loading breakdown…</div>
+        <div className="py-8 text-center text-sm text-muted">Loading breakdown…</div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -2413,9 +2432,9 @@ function ServiceChargeModal({ property, onClose }: { property: Property | null; 
               </Field>
             ))}
           </div>
-          <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
-            <span className="text-sm font-semibold text-slate-300">Total service charge</span>
-            <span className="text-xl font-black text-emerald-400">{formatCurrency(total)}</span>
+          <div className="flex items-center justify-between rounded-xl border border-line/[0.06] bg-overlay/[0.03] px-4 py-3">
+            <span className="text-sm font-semibold text-fg">Total service charge</span>
+            <span className="text-xl font-black text-success">{formatCurrency(total)}</span>
           </div>
           <Button type="submit" loading={saving} className="w-full">Save breakdown</Button>
         </form>
@@ -2494,7 +2513,7 @@ function EditTenantModal({
           </Select>
         </Field>
         {moved && (
-          <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2.5 text-xs text-cyan-300">
+          <div className="rounded-xl border border-accent/20 bg-accent/10 px-4 py-2.5 text-xs text-accent">
             {form.propertyId
               ? "The tenant's current unit will be marked vacant and the new one occupied."
               : tenant?.allow_login_unassigned
@@ -2535,7 +2554,7 @@ function EditTenantModal({
             onChange={(e) => setForm({ ...form, familyMembers: e.target.value })} />
         </Field>
         {rentChanged && (
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300">
+          <div className="rounded-xl border border-warning/20 bg-warning/10 px-4 py-2.5 text-xs text-warning">
             Rent will change to {formatCurrency(Number(form.monthlyRent) || 0)} — the previous rent is archived for history.
           </div>
         )}
@@ -2544,13 +2563,13 @@ function EditTenantModal({
 
       {revisions.length > 0 && (
         <div className="mt-6 space-y-2">
-          <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Rent revision history</h4>
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-subtle">Rent revision history</h4>
           {revisions.map((r) => (
-            <div key={r.id} className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-xs">
-              <span className="text-slate-400">{formatDate(r.changed_at)}</span>
-              <span className="text-slate-200">
-                {formatCurrency(r.old_rent)} <span className="text-slate-500">→</span>{" "}
-                <span className="font-semibold text-emerald-400">{formatCurrency(r.new_rent)}</span>
+            <div key={r.id} className="flex items-center justify-between rounded-lg border border-line/[0.06] bg-overlay/[0.02] px-3 py-2 text-xs">
+              <span className="text-muted">{formatDate(r.changed_at)}</span>
+              <span className="text-fg">
+                {formatCurrency(r.old_rent)} <span className="text-subtle">→</span>{" "}
+                <span className="font-semibold text-success">{formatCurrency(r.new_rent)}</span>
               </span>
             </div>
           ))}
@@ -2581,23 +2600,23 @@ function PropertyHistoryModal({ property, onClose }: { property: Property | null
     <Modal open={!!property} onClose={onClose} size="lg" title="Occupancy history"
       subtitle={property ? `${property.name} · past residents` : undefined}>
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-subtle">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted">
           No past tenants archived yet. When you vacate this unit, the outgoing resident is recorded here.
         </p>
       ) : (
         <div className="space-y-3">
           {rows.map((o) => (
-            <div key={o.id} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+            <div key={o.id} className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="font-semibold text-slate-100">{o.tenant_name}</div>
-                <span className="text-xs text-slate-500">{o.tenant_phone}</span>
+                <div className="font-semibold text-heading">{o.tenant_name}</div>
+                <span className="text-xs text-subtle">{o.tenant_phone}</span>
               </div>
-              <div className="mt-2 grid grid-cols-1 gap-1.5 text-xs text-slate-400 sm:grid-cols-3">
+              <div className="mt-2 grid grid-cols-1 gap-1.5 text-xs text-muted sm:grid-cols-3">
                 <span>From: {o.lease_start ? formatDate(o.lease_start) : "—"}</span>
                 <span>To: {o.lease_end ? formatDate(o.lease_end) : "—"}</span>
-                <span className="font-semibold text-emerald-400">Rent paid: {formatCurrency(o.total_rent_paid ?? 0)}</span>
+                <span className="font-semibold text-success">Rent paid: {formatCurrency(o.total_rent_paid ?? 0)}</span>
               </div>
             </div>
           ))}
@@ -2650,14 +2669,14 @@ function SignatureModal({
       subtitle="Attached to every rent receipt you issue.">
       <form onSubmit={submit} className="space-y-4">
         {(preview || current) && (
-          <div className="rounded-xl border border-white/[0.08] bg-white p-4 text-center">
+          <div className="rounded-xl border border-line/[0.08] bg-white p-4 text-center">
             <img src={preview || current || ""} alt="Signature" className="mx-auto max-h-24 object-contain" />
           </div>
         )}
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] px-4 py-6 text-center text-sm text-slate-400 transition hover:border-indigo-400/40 hover:text-slate-300">
+        <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] px-4 py-6 text-center text-sm text-muted transition hover:border-primary/40 hover:text-fg">
           <Upload className="h-5 w-5" />
           <span>{current ? "Replace signature image" : "Upload signature image"}</span>
-          <span className="text-[11px] text-slate-500">Transparent PNG recommended</span>
+          <span className="text-[11px] text-subtle">Transparent PNG recommended</span>
           <input type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
         </label>
         <Button type="submit" loading={saving} disabled={!file} className="w-full">Save signature</Button>
@@ -2717,10 +2736,10 @@ function SettingsTab({
       {/* WhatsApp receipt message */}
       <Card className="p-6">
         <div className="mb-4 flex items-center gap-2">
-          <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400"><MessageCircle className="h-4 w-4" /></div>
+          <div className="rounded-lg bg-success/10 p-2 text-success"><MessageCircle className="h-4 w-4" /></div>
           <div>
-            <h3 className="text-sm font-bold text-slate-100">WhatsApp receipt message</h3>
-            <p className="text-xs text-slate-500">Sent alongside a rent receipt when you share it to WhatsApp.</p>
+            <h3 className="text-sm font-bold text-heading">WhatsApp receipt message</h3>
+            <p className="text-xs text-subtle">Sent alongside a rent receipt when you share it to WhatsApp.</p>
           </div>
         </div>
         <form onSubmit={saveTemplate} className="space-y-4">
@@ -2733,7 +2752,7 @@ function SettingsTab({
             {WA_PLACEHOLDERS.map((p) => (
               <button key={p} type="button"
                 onClick={() => setText((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${p}`)}
-                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-slate-300 transition hover:border-emerald-400/40 hover:text-emerald-300">
+                className="rounded-lg border border-line/[0.08] bg-overlay/[0.03] px-2 py-1 font-mono text-[11px] text-fg transition hover:border-success/40 hover:text-success">
                 {p}
               </button>
             ))}
@@ -2745,10 +2764,10 @@ function SettingsTab({
       {/* Rent reminder message */}
       <Card className="p-6">
         <div className="mb-4 flex items-center gap-2">
-          <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400"><CalendarClock className="h-4 w-4" /></div>
+          <div className="rounded-lg bg-primary/10 p-2 text-primary"><CalendarClock className="h-4 w-4" /></div>
           <div>
-            <h3 className="text-sm font-bold text-slate-100">Rent reminder message</h3>
-            <p className="text-xs text-slate-500">The default message pre-filled when you create a new reminder.</p>
+            <h3 className="text-sm font-bold text-heading">Rent reminder message</h3>
+            <p className="text-xs text-subtle">The default message pre-filled when you create a new reminder.</p>
           </div>
         </div>
         <form onSubmit={saveReminderTemplate} className="space-y-4">
@@ -2761,7 +2780,7 @@ function SettingsTab({
             {REMINDER_PLACEHOLDERS.map((p) => (
               <button key={p} type="button"
                 onClick={() => setReminderText((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${p}`)}
-                className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-mono text-[11px] text-slate-300 transition hover:border-indigo-400/40 hover:text-indigo-300">
+                className="rounded-lg border border-line/[0.08] bg-overlay/[0.03] px-2 py-1 font-mono text-[11px] text-fg transition hover:border-primary/40 hover:text-primary">
                 {p}
               </button>
             ))}
@@ -2801,10 +2820,10 @@ function ChangePasswordCard() {
   return (
     <Card className="p-6">
       <div className="mb-4 flex items-center gap-2">
-        <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400"><Lock className="h-4 w-4" /></div>
+        <div className="rounded-lg bg-primary/10 p-2 text-primary"><Lock className="h-4 w-4" /></div>
         <div>
-          <h3 className="text-sm font-bold text-slate-100">Change password</h3>
-          <p className="text-xs text-slate-500">Update the password you use to sign in.</p>
+          <h3 className="text-sm font-bold text-heading">Change password</h3>
+          <p className="text-xs text-subtle">Update the password you use to sign in.</p>
         </div>
       </div>
       <form onSubmit={submit} className="max-w-md space-y-4">
@@ -2940,12 +2959,12 @@ function OwnerDocumentsModal({ tenant, onClose }: { tenant: Tenant | null; onClo
         </div>
         <Field label="File" required hint="PDF or image, up to 8MB.">
           {file ? (
-            <div className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-sm text-slate-200">
+            <div className="flex items-center justify-between rounded-xl border border-line/[0.08] bg-overlay/[0.02] px-3 py-2 text-sm text-fg">
               <span className="truncate">{file.name}</span>
-              <button type="button" onClick={() => setFile(null)} className="ml-2 text-slate-400 transition hover:text-rose-400"><X className="h-4 w-4" /></button>
+              <button type="button" onClick={() => setFile(null)} className="ml-2 text-muted transition hover:text-danger"><X className="h-4 w-4" /></button>
             </div>
           ) : (
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] px-4 py-4 text-sm text-slate-400 transition hover:border-indigo-400/40 hover:text-slate-300">
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] px-4 py-4 text-sm text-muted transition hover:border-primary/40 hover:text-fg">
               <Upload className="h-4 w-4" /> Choose a file
               <input type="file" accept="image/*,application/pdf" className="hidden"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
@@ -2958,23 +2977,23 @@ function OwnerDocumentsModal({ tenant, onClose }: { tenant: Tenant | null; onClo
       </form>
 
       <div className="mt-6 space-y-2">
-        <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Existing documents</h4>
+        <h4 className="text-[11px] font-bold uppercase tracking-wider text-subtle">Existing documents</h4>
         {loading ? (
-          <p className="text-sm text-slate-500">Loading…</p>
+          <p className="text-sm text-subtle">Loading…</p>
         ) : docs.length === 0 ? (
-          <p className="text-sm text-slate-500">No documents yet for this tenant.</p>
+          <p className="text-sm text-subtle">No documents yet for this tenant.</p>
         ) : (
           docs.map((d) => (
-            <div key={d.id} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
-              <FileText className="h-4 w-4 shrink-0 text-indigo-400" />
+            <div key={d.id} className="flex items-center gap-3 rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-3 py-2.5">
+              <FileText className="h-4 w-4 shrink-0 text-primary" />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-slate-200">{d.title}</div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500">{d.doc_type ?? "document"} · {formatDate(d.created_at)}</div>
+                <div className="truncate text-sm font-semibold text-fg">{d.title}</div>
+                <div className="text-[10px] uppercase tracking-wider text-subtle">{d.doc_type ?? "document"} · {formatDate(d.created_at)}</div>
               </div>
               <a href={d.file_url} target="_blank" rel="noreferrer" title="Open"
-                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/[0.06] hover:text-indigo-400"><Download className="h-4 w-4" /></a>
+                className="rounded-lg p-1.5 text-muted transition hover:bg-overlay/[0.06] hover:text-primary"><Download className="h-4 w-4" /></a>
               <button type="button" onClick={() => remove(d.id)} title="Delete"
-                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-500/10 hover:text-rose-400"><Trash2 className="h-4 w-4" /></button>
+                className="rounded-lg p-1.5 text-muted transition hover:bg-danger/10 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))
         )}

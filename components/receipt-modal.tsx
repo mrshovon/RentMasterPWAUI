@@ -126,7 +126,7 @@ export function ReceiptModal({
     <Modal open={open} onClose={onClose} size="lg" title="Rent receipt"
       subtitle="Share to WhatsApp, send as an image, or download / print.">
       <div className="space-y-4">
-        <div className="overflow-hidden rounded-xl border border-white/[0.08] bg-white">
+        <div className="overflow-hidden rounded-xl border border-line/[0.08] bg-white">
           <iframe ref={iframeRef} srcDoc={html} title="Rent receipt" className="h-[52vh] w-full" />
         </div>
         <div className="grid grid-cols-2 gap-2">
@@ -140,11 +140,11 @@ export function ReceiptModal({
           <Button icon={Printer} variant="secondary" onClick={printReceipt}>Print</Button>
         </div>
         <button onClick={shareReceipt}
-          className="w-full text-center text-xs font-medium text-slate-500 transition hover:text-slate-300">
+          className="w-full text-center text-xs font-medium text-subtle transition hover:text-fg">
           Share as HTML file instead
         </button>
         {!waPhone && phone !== undefined && (
-          <p className="text-center text-[11px] text-slate-500">
+          <p className="text-center text-[11px] text-subtle">
             No valid WhatsApp number on file for this tenant.
           </p>
         )}

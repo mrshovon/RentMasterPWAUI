@@ -225,18 +225,18 @@ export default function AdminDashboard() {
             <StatCard label="On a plan" accent="indigo" icon={CreditCard} value={metrics.subscribed} />
           </div>
           <Card className="p-6">
-            <h3 className="mb-4 text-sm font-bold text-slate-200">Recently added owners</h3>
+            <h3 className="mb-4 text-sm font-bold text-fg">Recently added owners</h3>
             <div className="space-y-3">
               {owners.slice(0, 5).map((o) => (
                 <div key={o.id} className="flex items-center justify-between">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-100">{o.name || "—"}</div>
-                    <div className="truncate text-xs text-slate-500">{o.email}</div>
+                    <div className="truncate text-sm font-semibold text-heading">{o.name || "—"}</div>
+                    <div className="truncate text-xs text-subtle">{o.email}</div>
                   </div>
                   <Badge tone={o.suspended ? "rose" : "emerald"}>{o.suspended ? "Suspended" : "Active"}</Badge>
                 </div>
               ))}
-              {owners.length === 0 && <p className="text-sm text-slate-500">No owner accounts yet.</p>}
+              {owners.length === 0 && <p className="text-sm text-subtle">No owner accounts yet.</p>}
             </div>
           </Card>
         </div>
@@ -336,7 +336,7 @@ function OwnersTab({
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+              <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                 <tr>
                   <th className="p-4">Owner</th>
                   <th className="p-4">Role</th>
@@ -345,12 +345,12 @@ function OwnersTab({
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.04]">
+              <tbody className="divide-y divide-line/[0.04]">
                 {filtered.map((o) => (
-                  <tr key={o.id} className="hover:bg-white/[0.02]">
+                  <tr key={o.id} className="hover:bg-overlay/[0.02]">
                     <td className="p-4">
-                      <div className="font-semibold text-slate-100">{o.name || "—"}</div>
-                      <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" /> {o.email}</div>
+                      <div className="font-semibold text-heading">{o.name || "—"}</div>
+                      <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {o.email}</div>
                     </td>
                     <td className="p-4"><Badge tone={o.role === "admin" ? "amber" : "slate"}>{o.role}</Badge></td>
                     <td className="p-4">
@@ -359,10 +359,10 @@ function OwnersTab({
                         {o.permissions_revoked && <Badge tone="amber">No perms</Badge>}
                       </div>
                     </td>
-                    <td className="p-4 text-slate-300">
+                    <td className="p-4 text-fg">
                       {o.subscription?.status === "active" ? (
                         <Badge tone="indigo">{o.subscription.tier_id}</Badge>
-                      ) : <span className="text-xs text-slate-500">—</span>}
+                      ) : <span className="text-xs text-subtle">—</span>}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-1">
@@ -394,10 +394,10 @@ function IconBtn({
   loading?: boolean;
 }) {
   const tones = {
-    indigo: "text-indigo-400 hover:bg-indigo-500/10",
-    amber: "text-amber-400 hover:bg-amber-500/10",
-    emerald: "text-emerald-400 hover:bg-emerald-500/10",
-    rose: "text-rose-400 hover:bg-rose-500/10",
+    indigo: "text-primary hover:bg-primary/10",
+    amber: "text-warning hover:bg-warning/10",
+    emerald: "text-success hover:bg-success/10",
+    rose: "text-danger hover:bg-danger/10",
   };
   return (
     <button
@@ -462,8 +462,8 @@ function TicketsTab({
                     onClick={() => setFilter(f.key)}
                     className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                       isActive
-                        ? "bg-amber-500/15 text-amber-300"
-                        : "text-slate-500 hover:bg-white/[0.05] hover:text-slate-300"
+                        ? "bg-warning/15 text-warning"
+                        : "text-subtle hover:bg-overlay/[0.05] hover:text-fg"
                     }`}
                   >
                     {f.label} <span className="opacity-60">{count}</span>
@@ -479,7 +479,7 @@ function TicketsTab({
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[860px] text-left text-sm">
-                  <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                  <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                     <tr>
                       <th className="p-4">#</th>
                       <th className="p-4">Owner</th>
@@ -491,21 +491,21 @@ function TicketsTab({
                       <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.04]">
+                  <tbody className="divide-y divide-line/[0.04]">
                     {filtered.map((t) => (
-                      <tr key={t.id} className="hover:bg-white/[0.02]">
-                        <td className="p-4 font-mono text-xs text-slate-500">#{t.ticket_no}</td>
+                      <tr key={t.id} className="hover:bg-overlay/[0.02]">
+                        <td className="p-4 font-mono text-xs text-subtle">#{t.ticket_no}</td>
                         <td className="p-4">
-                          <div className="font-semibold text-slate-100">{t.owner?.name || "—"}</div>
-                          <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" /> {t.owner?.email || "unknown"}</div>
+                          <div className="font-semibold text-heading">{t.owner?.name || "—"}</div>
+                          <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {t.owner?.email || "unknown"}</div>
                         </td>
                         <td className="p-4">
-                          <div className="max-w-[260px] truncate font-medium text-slate-200">{t.subject}</div>
+                          <div className="max-w-[260px] truncate font-medium text-fg">{t.subject}</div>
                         </td>
                         <td className="p-4"><Badge tone="slate">{ticketCategoryLabel[t.category]}</Badge></td>
                         <td className="p-4"><Badge tone={ticketPriorityTone[t.priority]}>{t.priority}</Badge></td>
                         <td className="p-4"><Badge tone={ticketStatusTone[t.status]}>{ticketStatusLabel[t.status]}</Badge></td>
-                        <td className="p-4 text-xs text-slate-500">{ticketAge(t.created_at)}</td>
+                        <td className="p-4 text-xs text-subtle">{ticketAge(t.created_at)}</td>
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-1">
                             <IconBtn title="Open / update" tone="indigo" icon={Eye} onClick={() => onOpen(t)} />
@@ -574,19 +574,19 @@ function TicketStatusModal({
             <Badge tone={ticketPriorityTone[ticket.priority]}>{ticket.priority}</Badge>
             <Badge tone="slate">{ticketCategoryLabel[ticket.category]}</Badge>
             <Badge tone={ticketStatusTone[ticket.status]}>{ticketStatusLabel[ticket.status]}</Badge>
-            <span className="ml-auto text-xs text-slate-500">Raised {formatDate(ticket.created_at)}</span>
+            <span className="ml-auto text-xs text-subtle">Raised {formatDate(ticket.created_at)}</span>
           </div>
 
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-subtle">
               From {ticket.owner?.name || "owner"}{ticket.owner?.email ? ` · ${ticket.owner.email}` : ""}
             </div>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{ticket.description}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg">{ticket.description}</p>
           </div>
 
           <AttachmentStrip raw={ticket.attachment_file_url} />
 
-          <form onSubmit={submit} className="space-y-4 border-t border-white/[0.06] pt-5">
+          <form onSubmit={submit} className="space-y-4 border-t border-line/[0.06] pt-5">
             <Field label="Status" required>
               <Select value={status} onChange={(e) => setStatus(e.target.value as TicketStatus)}>
                 <option value="submitted">Submitted</option>
@@ -657,7 +657,7 @@ function MessagesTab({
                     key={f.key}
                     onClick={() => setFilter(f.key)}
                     className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                      isActive ? "bg-amber-500/15 text-amber-300" : "text-slate-500 hover:bg-white/[0.05] hover:text-slate-300"
+                      isActive ? "bg-warning/15 text-warning" : "text-subtle hover:bg-overlay/[0.05] hover:text-fg"
                     }`}
                   >
                     {f.label} <span className="opacity-60">{count}</span>
@@ -673,7 +673,7 @@ function MessagesTab({
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[820px] text-left text-sm">
-                  <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                  <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                     <tr>
                       <th className="p-4">#</th>
                       <th className="p-4">From</th>
@@ -683,17 +683,17 @@ function MessagesTab({
                       <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.04]">
+                  <tbody className="divide-y divide-line/[0.04]">
                     {filtered.map((m) => (
-                      <tr key={m.id} className="hover:bg-white/[0.02]">
-                        <td className="p-4 font-mono text-xs text-slate-500">#{m.message_no}</td>
+                      <tr key={m.id} className="hover:bg-overlay/[0.02]">
+                        <td className="p-4 font-mono text-xs text-subtle">#{m.message_no}</td>
                         <td className="p-4">
-                          <div className="font-semibold text-slate-100">{m.name || m.owner?.name || "—"}</div>
-                          <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" /> {m.email || m.owner?.email || "unknown"}</div>
+                          <div className="font-semibold text-heading">{m.name || m.owner?.name || "—"}</div>
+                          <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {m.email || m.owner?.email || "unknown"}</div>
                         </td>
-                        <td className="p-4"><div className="max-w-[280px] truncate text-slate-300">{m.message}</div></td>
+                        <td className="p-4"><div className="max-w-[280px] truncate text-fg">{m.message}</div></td>
                         <td className="p-4"><Badge tone={CONTACT_STATUS_TONE[m.status]}>{CONTACT_STATUS_LABEL[m.status]}</Badge></td>
-                        <td className="p-4 text-xs text-slate-500">{formatDate(m.created_at)}</td>
+                        <td className="p-4 text-xs text-subtle">{formatDate(m.created_at)}</td>
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-1">
                             <IconBtn title="Open / update" tone="indigo" icon={Eye} onClick={() => onOpen(m)} />
@@ -747,21 +747,21 @@ function ContactMessageModal({
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={CONTACT_STATUS_TONE[message.status]}>{CONTACT_STATUS_LABEL[message.status]}</Badge>
-            <span className="ml-auto text-xs text-slate-500">Received {formatDate(message.created_at)}</span>
+            <span className="ml-auto text-xs text-subtle">Received {formatDate(message.created_at)}</span>
           </div>
 
-          <div className="grid gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm sm:grid-cols-3">
-            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Name</div><div className="text-slate-200">{message.name || "—"}</div></div>
-            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Email</div><div className="text-slate-200">{message.email || message.owner?.email || "—"}</div></div>
-            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Phone</div><div className="text-slate-200">{message.phone || "—"}</div></div>
+          <div className="grid gap-2 rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm sm:grid-cols-3">
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Name</div><div className="text-fg">{message.name || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Email</div><div className="text-fg">{message.email || message.owner?.email || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Phone</div><div className="text-fg">{message.phone || "—"}</div></div>
           </div>
 
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Message</div>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{message.message}</p>
+          <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-subtle">Message</div>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg">{message.message}</p>
           </div>
 
-          <form onSubmit={submit} className="space-y-4 border-t border-white/[0.06] pt-5">
+          <form onSubmit={submit} className="space-y-4 border-t border-line/[0.06] pt-5">
             <Field label="Status" required>
               <Select value={status} onChange={(e) => setStatus(e.target.value as ContactStatus)}>
                 <option value="new">New</option>
@@ -831,7 +831,7 @@ function PaymentsTab({
                     key={f.key}
                     onClick={() => setFilter(f.key)}
                     className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                      isActive ? "bg-amber-500/15 text-amber-300" : "text-slate-500 hover:bg-white/[0.05] hover:text-slate-300"
+                      isActive ? "bg-warning/15 text-warning" : "text-subtle hover:bg-overlay/[0.05] hover:text-fg"
                     }`}
                   >
                     {f.label} <span className="opacity-60">{count}</span>
@@ -847,7 +847,7 @@ function PaymentsTab({
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] text-left text-sm">
-                  <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                  <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                     <tr>
                       <th className="p-4">#</th>
                       <th className="p-4">Owner</th>
@@ -859,22 +859,22 @@ function PaymentsTab({
                       <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.04]">
+                  <tbody className="divide-y divide-line/[0.04]">
                     {filtered.map((p) => (
-                      <tr key={p.id} className="hover:bg-white/[0.02]">
-                        <td className="p-4 font-mono text-xs text-slate-500">#{p.payment_no}</td>
+                      <tr key={p.id} className="hover:bg-overlay/[0.02]">
+                        <td className="p-4 font-mono text-xs text-subtle">#{p.payment_no}</td>
                         <td className="p-4">
-                          <div className="font-semibold text-slate-100">{p.owner?.name || "—"}</div>
-                          <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" /> {p.owner?.email || p.owner_email || "unknown"}</div>
+                          <div className="font-semibold text-heading">{p.owner?.name || "—"}</div>
+                          <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {p.owner?.email || p.owner_email || "unknown"}</div>
                         </td>
-                        <td className="p-4"><div className="max-w-[180px] truncate font-medium text-slate-200">{p.tier_name || p.tier_id}</div></td>
-                        <td className="p-4 font-semibold text-slate-100">{formatCurrency(Number(p.amount || 0))}</td>
+                        <td className="p-4"><div className="max-w-[180px] truncate font-medium text-fg">{p.tier_name || p.tier_id}</div></td>
+                        <td className="p-4 font-semibold text-heading">{formatCurrency(Number(p.amount || 0))}</td>
                         <td className="p-4">
-                          <div className="text-slate-300">{p.sender_msisdn || "—"}</div>
-                          <div className="font-mono text-xs text-slate-500">{p.txn_id || "—"}</div>
+                          <div className="text-fg">{p.sender_msisdn || "—"}</div>
+                          <div className="font-mono text-xs text-subtle">{p.txn_id || "—"}</div>
                         </td>
                         <td className="p-4"><Badge tone={PAYMENT_STATUS_TONE[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</Badge></td>
-                        <td className="p-4 text-xs text-slate-500">{formatDate(p.created_at)}</td>
+                        <td className="p-4 text-xs text-subtle">{formatDate(p.created_at)}</td>
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-1">
                             <IconBtn title="Review" tone="indigo" icon={Eye} onClick={() => onOpen(p)} />
@@ -931,25 +931,25 @@ function PaymentDecisionModal({
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={PAYMENT_STATUS_TONE[payment.status]}>{PAYMENT_STATUS_LABEL[payment.status]}</Badge>
-            <span className="ml-auto text-xs text-slate-500">Submitted {formatDate(payment.created_at)}</span>
+            <span className="ml-auto text-xs text-subtle">Submitted {formatDate(payment.created_at)}</span>
           </div>
 
-          <div className="grid gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm sm:grid-cols-2">
-            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Owner</div><div className="text-slate-200">{payment.owner?.name || "—"}</div></div>
-            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Email</div><div className="text-slate-200">{payment.owner?.email || payment.owner_email || "—"}</div></div>
-            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Plan</div><div className="text-slate-200">{payment.tier_name || payment.tier_id}</div></div>
-            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Amount</div><div className="font-semibold text-slate-100">{formatCurrency(Number(payment.amount || 0))}</div></div>
-            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Paid from</div><div className="font-mono text-slate-200">{payment.sender_msisdn || "—"}</div></div>
-            <div><div className="text-[11px] uppercase tracking-wider text-slate-500">Transaction id</div><div className="font-mono text-slate-200">{payment.txn_id || "—"}</div></div>
+          <div className="grid gap-2 rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm sm:grid-cols-2">
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Owner</div><div className="text-fg">{payment.owner?.name || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Email</div><div className="text-fg">{payment.owner?.email || payment.owner_email || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Plan</div><div className="text-fg">{payment.tier_name || payment.tier_id}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Amount</div><div className="font-semibold text-heading">{formatCurrency(Number(payment.amount || 0))}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Paid from</div><div className="font-mono text-fg">{payment.sender_msisdn || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Transaction id</div><div className="font-mono text-fg">{payment.txn_id || "—"}</div></div>
           </div>
 
           {decided ? (
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-slate-300">
+            <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm text-fg">
               This payment was already <strong>{PAYMENT_STATUS_LABEL[payment.status].toLowerCase()}</strong>
               {payment.admin_notes ? <> — {payment.admin_notes}</> : null}.
             </div>
           ) : (
-            <div className="space-y-4 border-t border-white/[0.06] pt-5">
+            <div className="space-y-4 border-t border-line/[0.06] pt-5">
               <Field label="Remarks" hint="Required to reject — shown to the owner as the reason.">
                 <TextArea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)}
                   placeholder="e.g. Transaction id not found, amount mismatch…" />
@@ -1043,13 +1043,13 @@ function PaymentSetupTab() {
         </Card>
 
         <Card className="space-y-4 p-6">
-          <div className="text-sm font-bold text-slate-200">{config.provider || "MFS"} QR code</div>
-          <div className="flex items-center justify-center rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] p-6">
+          <div className="text-sm font-bold text-fg">{config.provider || "MFS"} QR code</div>
+          <div className="flex items-center justify-center rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] p-6">
             {config.qrUrl ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={config.qrUrl} alt="bKash QR" className="h-52 w-52 rounded-lg bg-white object-contain p-2" />
             ) : (
-              <div className="flex flex-col items-center gap-2 text-slate-500">
+              <div className="flex flex-col items-center gap-2 text-subtle">
                 <ImageIcon className="h-10 w-10" />
                 <span className="text-xs">No QR uploaded yet</span>
               </div>
@@ -1057,7 +1057,7 @@ function PaymentSetupTab() {
           </div>
           <label className="block">
             <input type="file" accept="image/*" className="hidden" onChange={onPickQr} />
-            <span className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.06]">
+            <span className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line/[0.1] bg-overlay/[0.03] px-4 py-2.5 text-sm font-semibold text-fg transition hover:bg-overlay/[0.06]">
               {uploading ? <Spinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
               {config.qrUrl ? "Replace QR image" : "Upload QR image"}
             </span>
@@ -1067,7 +1067,7 @@ function PaymentSetupTab() {
               Remove QR
             </Button>
           )}
-          <p className="text-xs text-slate-500">Upload then click <strong>Save payment setup</strong> to publish. Owners see this QR on their payment screen.</p>
+          <p className="text-xs text-subtle">Upload then click <strong>Save payment setup</strong> to publish. Owners see this QR on their payment screen.</p>
         </Card>
       </div>
     </div>
@@ -1106,7 +1106,7 @@ function ResetLogTab({ resets }: { resets: PasswordResetRecord[] }) {
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="border-b border-white/[0.06] bg-white/[0.02] text-[11px] uppercase tracking-wider text-slate-400">
+                  <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                     <tr>
                       <th className="p-4">#</th>
                       <th className="p-4">Owner</th>
@@ -1115,21 +1115,21 @@ function ResetLogTab({ resets }: { resets: PasswordResetRecord[] }) {
                       <th className="p-4">When</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.04]">
+                  <tbody className="divide-y divide-line/[0.04]">
                     {filtered.map((r) => (
-                      <tr key={r.id} className="hover:bg-white/[0.02]">
-                        <td className="p-4 font-mono text-xs text-slate-500">#{r.reset_no}</td>
+                      <tr key={r.id} className="hover:bg-overlay/[0.02]">
+                        <td className="p-4 font-mono text-xs text-subtle">#{r.reset_no}</td>
                         <td className="p-4">
-                          <div className="font-semibold text-slate-100">{r.owner?.name || "—"}</div>
-                          <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" /> {r.owner?.email || r.owner_email || "unknown"}</div>
+                          <div className="font-semibold text-heading">{r.owner?.name || "—"}</div>
+                          <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {r.owner?.email || r.owner_email || "unknown"}</div>
                         </td>
                         <td className="p-4"><Badge tone={RESET_METHOD_TONE[r.reset_method]}>{RESET_METHOD_LABEL[r.reset_method]}</Badge></td>
                         <td className="p-4">
                           {r.reset_method === "admin_reset"
-                            ? <span className="flex items-center gap-1 text-slate-300"><ShieldCheck className="h-3.5 w-3.5 text-amber-400" />{r.actor?.name || r.actor?.email || "Admin"}</span>
-                            : <span className="flex items-center gap-1 text-slate-400"><User className="h-3.5 w-3.5" />Owner (self-service)</span>}
+                            ? <span className="flex items-center gap-1 text-fg"><ShieldCheck className="h-3.5 w-3.5 text-warning" />{r.actor?.name || r.actor?.email || "Admin"}</span>
+                            : <span className="flex items-center gap-1 text-muted"><User className="h-3.5 w-3.5" />Owner (self-service)</span>}
                         </td>
-                        <td className="p-4 text-xs text-slate-500">{formatDate(r.created_at)}</td>
+                        <td className="p-4 text-xs text-subtle">{formatDate(r.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1179,10 +1179,10 @@ function DefaultSignupPlanCard({ tiers }: { tiers: SubscriptionTier[] }) {
   return (
     <Card className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400"><User className="h-5 w-5" /></div>
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><User className="h-5 w-5" /></div>
         <div>
-          <div className="text-sm font-bold text-slate-100">Default plan for new signups</div>
-          <p className="mt-0.5 text-xs text-slate-400">The plan a newly self-registered owner starts on. Leave as Free unless you&apos;re running a promotion.</p>
+          <div className="text-sm font-bold text-heading">Default plan for new signups</div>
+          <p className="mt-0.5 text-xs text-muted">The plan a newly self-registered owner starts on. Leave as Free unless you&apos;re running a promotion.</p>
         </div>
       </div>
       <div className="sm:w-56">
@@ -1224,35 +1224,35 @@ function PlansTab({
             return (
               <Card key={t.id} className={`flex flex-col gap-3 p-5 ${inactive ? "opacity-60" : ""}`}>
                 <div className="flex items-start justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400"><CreditCard className="h-5 w-5" /></div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/10 text-warning"><CreditCard className="h-5 w-5" /></div>
                   <div className="flex gap-1">
                     {disc > 0 && <Badge tone="emerald"><Percent className="mr-0.5 inline h-3 w-3" />{disc}% off</Badge>}
                     <Badge tone={inactive ? "rose" : "slate"}>{inactive ? "Inactive" : "Active"}</Badge>
                   </div>
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-100">{t.name}</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-400">{t.description}</p>
+                  <h3 className="font-bold text-heading">{t.name}</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">{t.description}</p>
                 </div>
-                <div className="flex items-end justify-between border-t border-white/[0.06] pt-3">
-                  <div className="text-xs text-slate-500">
+                <div className="flex items-end justify-between border-t border-line/[0.06] pt-3">
+                  <div className="text-xs text-subtle">
                     <div>Properties: {t.max_properties_allowed < 0 ? "Unlimited" : t.max_properties_allowed}</div>
                     <div>Tenants: {t.max_tenants_allowed < 0 ? "Unlimited" : t.max_tenants_allowed}</div>
                   </div>
                   <div className="text-right">
                     {isContact ? (
-                      <span className="text-lg font-black text-cyan-400">Contact us</span>
+                      <span className="text-lg font-black text-accent">Contact us</span>
                     ) : (
                       <>
                         {disc > 0 ? (
                           <div>
-                            <span className="mr-1 text-xs text-slate-500 line-through">{formatCurrency(t.price)}</span>
-                            <span className="text-lg font-black text-amber-400">{formatCurrency(discountedPrice(t))}</span>
+                            <span className="mr-1 text-xs text-subtle line-through">{formatCurrency(t.price)}</span>
+                            <span className="text-lg font-black text-warning">{formatCurrency(discountedPrice(t))}</span>
                           </div>
                         ) : (
-                          <span className="text-lg font-black text-amber-400">{formatCurrency(t.price)}</span>
+                          <span className="text-lg font-black text-warning">{formatCurrency(t.price)}</span>
                         )}
-                        <span className="text-xs text-slate-500">/{t.billing_interval}</span>
+                        <span className="text-xs text-subtle">/{t.billing_interval}</span>
                       </>
                     )}
                   </div>
@@ -1521,7 +1521,7 @@ function OwnerDetailModal({
     <Modal open={!!ownerId} onClose={onClose} size="lg" title="Manage owner"
       subtitle={detail?.email || undefined}>
       {loading || !detail ? (
-        <p className="py-8 text-center text-sm text-slate-400">Loading…</p>
+        <p className="py-8 text-center text-sm text-muted">Loading…</p>
       ) : (
         <div className="space-y-6">
           {/* Status + stats */}
@@ -1529,7 +1529,7 @@ function OwnerDetailModal({
             <Badge tone={detail.suspended ? "rose" : "emerald"}>{detail.suspended ? "Suspended" : "Active"}</Badge>
             {detail.permissions_revoked && <Badge tone="amber">Permissions revoked</Badge>}
             <Badge tone={detail.role === "admin" ? "amber" : "slate"}>{detail.role}</Badge>
-            <span className="ml-auto text-xs text-slate-500">Joined {formatDate(detail.created_at)}</span>
+            <span className="ml-auto text-xs text-subtle">Joined {formatDate(detail.created_at)}</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <MiniStat icon={Building2} label="Properties" value={detail.propertyCount} />
@@ -1548,15 +1548,15 @@ function OwnerDetailModal({
           {/* Subscription */}
           <Section title="Subscription">
             {detail.subscription?.status === "active" ? (
-              <div className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-sm">
-                <span className="text-slate-200">
+              <div className="flex items-center justify-between rounded-lg border border-line/[0.06] bg-overlay/[0.02] px-3 py-2 text-sm">
+                <span className="text-fg">
                   {detail.subscription.subscription_tiers?.name || detail.subscription.tier_id}
-                  <span className="ml-2 text-xs text-slate-500">exp {detail.subscription.expiry_date ? formatDate(detail.subscription.expiry_date) : "—"}</span>
+                  <span className="ml-2 text-xs text-subtle">exp {detail.subscription.expiry_date ? formatDate(detail.subscription.expiry_date) : "—"}</span>
                 </span>
                 <Button size="sm" variant="danger" loading={busy} onClick={() => patch({ action: "cancel_subscription" })}>Cancel</Button>
               </div>
             ) : (
-              <p className="text-xs text-slate-500">No active plan.</p>
+              <p className="text-xs text-subtle">No active plan.</p>
             )}
             <div className="flex gap-2">
               <Select value={tierId} onChange={(e) => setTierId(e.target.value)} className="flex-1">
@@ -1580,28 +1580,54 @@ function OwnerDetailModal({
 
           {/* Paid add-ons */}
           <Section title="Add-ons">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
-                  <HardHat className="h-4 w-4 text-slate-500" /> Staff management
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-fg">
+                    <HardHat className="h-4 w-4 text-subtle" /> Staff management
+                  </div>
+                  <div className="mt-0.5 text-xs text-subtle">
+                    {detail.staff_included_in_plan
+                      ? "Included with this owner's plan — no override needed."
+                      : detail.staff_addon
+                        ? `Granted as an add-on${detail.staff_addon_granted_at ? ` on ${formatDate(detail.staff_addon_granted_at)}` : ""}.`
+                        : "Not enabled. Turn on once the owner has bought the add-on."}
+                  </div>
                 </div>
-                <div className="mt-0.5 text-xs text-slate-500">
-                  {detail.staff_included_in_plan
-                    ? "Included with this owner's plan — no override needed."
-                    : detail.staff_addon
-                      ? `Granted as an add-on${detail.staff_addon_granted_at ? ` on ${formatDate(detail.staff_addon_granted_at)}` : ""}.`
-                      : "Not enabled. Turn on once the owner has bought the add-on."}
-                </div>
+                {detail.staff_included_in_plan ? (
+                  <Badge tone="emerald">Included in plan</Badge>
+                ) : (
+                  <Button size="sm" variant={detail.staff_addon ? "secondary" : "success"}
+                    icon={detail.staff_addon ? ShieldOff : ShieldCheck} loading={busy}
+                    onClick={() => patch({ action: detail.staff_addon ? "disable_staff_addon" : "enable_staff_addon" })}>
+                    {detail.staff_addon ? "Disable Staff" : "Enable Staff"}
+                  </Button>
+                )}
               </div>
-              {detail.staff_included_in_plan ? (
-                <Badge tone="emerald">Included in plan</Badge>
-              ) : (
-                <Button size="sm" variant={detail.staff_addon ? "secondary" : "success"}
-                  icon={detail.staff_addon ? ShieldOff : ShieldCheck} loading={busy}
-                  onClick={() => patch({ action: detail.staff_addon ? "disable_staff_addon" : "enable_staff_addon" })}>
-                  {detail.staff_addon ? "Disable Staff" : "Enable Staff"}
-                </Button>
-              )}
+
+              <div className="flex flex-wrap items-center gap-3 border-t border-line/[0.06] pt-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-fg">
+                    <Wallet className="h-4 w-4 text-subtle" /> Accounts &amp; bookkeeping
+                  </div>
+                  <div className="mt-0.5 text-xs text-subtle">
+                    {detail.accounts_included_in_plan
+                      ? "Included with this owner's plan — no override needed."
+                      : detail.accounts_addon
+                        ? `Granted as an add-on${detail.accounts_addon_granted_at ? ` on ${formatDate(detail.accounts_addon_granted_at)}` : ""}.`
+                        : "Not enabled. Turn on once the owner has bought the add-on."}
+                  </div>
+                </div>
+                {detail.accounts_included_in_plan ? (
+                  <Badge tone="emerald">Included in plan</Badge>
+                ) : (
+                  <Button size="sm" variant={detail.accounts_addon ? "secondary" : "success"}
+                    icon={detail.accounts_addon ? ShieldOff : ShieldCheck} loading={busy}
+                    onClick={() => patch({ action: detail.accounts_addon ? "disable_accounts_addon" : "enable_accounts_addon" })}>
+                    {detail.accounts_addon ? "Disable Accounts" : "Enable Accounts"}
+                  </Button>
+                )}
+              </div>
             </div>
           </Section>
 
@@ -1642,8 +1668,8 @@ function OwnerDetailModal({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-2 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{title}</div>
+    <div className="space-y-2 rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4">
+      <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">{title}</div>
       {children}
     </div>
   );
@@ -1651,11 +1677,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function MiniStat({ icon: Icon, label, value }: { icon: typeof Building2; label: string; value: number }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-      <div className="rounded-lg bg-white/[0.04] p-2 text-amber-400"><Icon className="h-4 w-4" /></div>
+    <div className="flex items-center gap-3 rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-3">
+      <div className="rounded-lg bg-overlay/[0.04] p-2 text-warning"><Icon className="h-4 w-4" /></div>
       <div>
-        <div className="text-lg font-black text-slate-100">{value}</div>
-        <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
+        <div className="text-lg font-black text-heading">{value}</div>
+        <div className="text-[10px] uppercase tracking-wider text-subtle">{label}</div>
       </div>
     </div>
   );

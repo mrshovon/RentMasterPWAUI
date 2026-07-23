@@ -135,7 +135,7 @@ export function StaffTab({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center gap-3 py-20 text-sm text-slate-400">
+      <div className="flex items-center justify-center gap-3 py-20 text-sm text-muted">
         <Spinner /> Loading your staff…
       </div>
     );
@@ -220,12 +220,12 @@ function StaffLocked({ onContact }: { onContact: () => void }) {
     <div className="space-y-6">
       <PageHeader title="Staff" subtitle="Manage the people who work on your properties." />
       <Card className="overflow-hidden">
-        <div className="border-b border-white/[0.06] bg-gradient-to-r from-indigo-500/10 to-cyan-400/5 px-6 py-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-indigo-400">
+        <div className="border-b border-line/[0.06] bg-gradient-to-r from-primary/10 to-accent/5 px-6 py-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-line/[0.08] bg-overlay/[0.03] text-primary">
             <Lock className="h-6 w-6" />
           </div>
-          <h2 className="text-xl font-extrabold tracking-tight text-white">Staff is an add-on</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
+          <h2 className="text-xl font-extrabold tracking-tight text-heading">Staff is an add-on</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted">
             Keep a record of every caretaker, guard and cleaner you employ — their salary, the
             property they cover, and every payment you make them.
           </p>
@@ -238,14 +238,14 @@ function StaffLocked({ onContact }: { onContact: () => void }) {
               "Record the agreed monthly salary",
               "Log salary payments and keep a running history",
             ].map((line) => (
-              <li key={line} className="flex items-start gap-2 text-sm text-slate-300">
-                <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+              <li key={line} className="flex items-start gap-2 text-sm text-fg">
+                <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                 {line}
               </li>
             ))}
           </ul>
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm text-slate-400">
-            Included with the <span className="font-semibold text-slate-200">Whole Building</span> plan,
+          <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm text-muted">
+            Included with the <span className="font-semibold text-fg">Whole Building</span> plan,
             or available as a paid add-on to your current plan.
           </div>
           <Button icon={Sparkles} className="w-full" onClick={onContact}>
@@ -278,12 +278,12 @@ function StaffCard({
           <StaffAvatar staff={s} />
           <div className="min-w-0 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-xs text-slate-500">#{s.staff_no}</span>
-              <span className="truncate text-sm font-bold text-white">{s.name}</span>
+              <span className="font-mono text-xs text-subtle">#{s.staff_no}</span>
+              <span className="truncate text-sm font-bold text-heading">{s.name}</span>
               {s.designation && <Badge tone="indigo">{s.designation}</Badge>}
               <Badge tone={s.is_active ? "emerald" : "slate"}>{s.is_active ? "Active" : "Inactive"}</Badge>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
               {s.phone && (
                 <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{s.phone}</span>
               )}
@@ -298,11 +298,11 @@ function StaffCard({
               )}
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-              <span className="text-slate-400">
-                Salary <span className="font-semibold text-slate-200">{formatCurrency(s.monthly_salary)}</span>/mo
+              <span className="text-muted">
+                Salary <span className="font-semibold text-fg">{formatCurrency(s.monthly_salary)}</span>/mo
               </span>
-              <span className="text-slate-400">
-                Paid to date <span className="font-semibold text-emerald-400">{formatCurrency(paidTotal)}</span>
+              <span className="text-muted">
+                Paid to date <span className="font-semibold text-success">{formatCurrency(paidTotal)}</span>
               </span>
             </div>
           </div>
@@ -327,7 +327,7 @@ function StaffCard({
 function StaffAvatar({ staff: s }: { staff: Staff }) {
   const initials = s.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   return (
-    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03]">
+    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-line/[0.08] bg-overlay/[0.03]">
       {s.photo_url ? (
         <img
           src={s.photo_url}
@@ -337,7 +337,7 @@ function StaffAvatar({ staff: s }: { staff: Staff }) {
           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-sm font-black text-slate-500">
+        <div className="flex h-full w-full items-center justify-center text-sm font-black text-subtle">
           {initials || "?"}
         </div>
       )}
@@ -363,8 +363,8 @@ function IconBtn({
       className={
         "rounded-lg p-2 transition disabled:opacity-50 " +
         (tone === "rose"
-          ? "text-rose-400 hover:bg-rose-500/10"
-          : "text-slate-400 hover:bg-white/[0.06] hover:text-white")
+          ? "text-danger hover:bg-danger/10"
+          : "text-muted hover:bg-overlay/[0.06] hover:text-heading")
       }
     >
       {loading ? <Spinner /> : <Icon className="h-4 w-4" />}
@@ -547,7 +547,7 @@ function ImageField({
         <div className="flex items-center gap-3">
           <a
             href={value} target="_blank" rel="noreferrer"
-            className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.02]"
+            className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-line/[0.08] bg-overlay/[0.02]"
           >
             <img src={value} alt={label} className="h-full w-full object-cover" />
           </a>
@@ -556,7 +556,7 @@ function ImageField({
           </Button>
         </div>
       ) : (
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/[0.12] bg-white/[0.02] px-4 py-5 text-xs font-semibold text-slate-400 transition hover:border-white/20 hover:text-slate-200">
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] px-4 py-5 text-xs font-semibold text-muted transition hover:border-line/20 hover:text-fg">
           {uploading ? <Spinner /> : <Upload className="h-4 w-4" />}
           {uploading ? "Uploading…" : `Upload ${label.toLowerCase()}`}
           <input type="file" accept="image/*" className="hidden" onChange={pick} disabled={uploading} />
@@ -675,20 +675,20 @@ function PaymentHistoryModal({
           hint="Payments you log for this person will appear here." />
       ) : (
         <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total paid</span>
-            <span className="text-lg font-extrabold text-emerald-400">{formatCurrency(total)}</span>
+          <div className="flex items-center justify-between rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-4 py-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted">Total paid</span>
+            <span className="text-lg font-extrabold text-success">{formatCurrency(total)}</span>
           </div>
           {payments.map((p) => (
             <div key={p.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+              className="flex items-center justify-between gap-3 rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-4 py-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs text-slate-500">#{p.payment_no}</span>
-                  <span className="text-sm font-bold text-white">{formatCurrency(p.amount)}</span>
+                  <span className="font-mono text-xs text-subtle">#{p.payment_no}</span>
+                  <span className="text-sm font-bold text-heading">{formatCurrency(p.amount)}</span>
                   <Badge tone="slate">{METHOD_LABEL[p.method] ?? p.method}</Badge>
                 </div>
-                <div className="mt-0.5 text-xs text-slate-400">
+                <div className="mt-0.5 text-xs text-muted">
                   {formatDate(p.paid_on)}{p.note ? ` · ${p.note}` : ""}
                 </div>
               </div>

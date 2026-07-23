@@ -33,10 +33,10 @@ export const toast = {
 };
 
 const TONE: Record<ToastType, { icon: typeof CheckCircle2; ring: string; text: string; iconColor: string }> = {
-  success: { icon: CheckCircle2, ring: "border-emerald-500/30", text: "text-emerald-100", iconColor: "text-emerald-400" },
-  error: { icon: XCircle, ring: "border-rose-500/30", text: "text-rose-100", iconColor: "text-rose-400" },
-  warning: { icon: TriangleAlert, ring: "border-amber-500/30", text: "text-amber-100", iconColor: "text-amber-400" },
-  info: { icon: Info, ring: "border-indigo-500/30", text: "text-indigo-100", iconColor: "text-indigo-400" },
+  success: { icon: CheckCircle2, ring: "border-success/30", text: "text-success", iconColor: "text-success" },
+  error: { icon: XCircle, ring: "border-danger/30", text: "text-danger", iconColor: "text-danger" },
+  warning: { icon: TriangleAlert, ring: "border-warning/30", text: "text-warning", iconColor: "text-warning" },
+  info: { icon: Info, ring: "border-primary/30", text: "text-primary", iconColor: "text-primary" },
 };
 
 const AUTO_DISMISS_MS = 4500;
@@ -70,13 +70,13 @@ export function Toaster() {
           <div
             key={t.id}
             role="status"
-            className={`pointer-events-auto flex w-full max-w-sm animate-toast-in items-start gap-3 rounded-xl border ${tone.ring} bg-slate-900/95 px-4 py-3 shadow-2xl shadow-black/40 backdrop-blur-xl`}
+            className={`pointer-events-auto flex w-full max-w-sm animate-toast-in items-start gap-3 rounded-xl border ${tone.ring} bg-surface/95 px-4 py-3 shadow-2xl shadow-black/40 backdrop-blur-xl`}
           >
             <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${tone.iconColor}`} />
             <p className={`flex-1 text-sm leading-snug ${tone.text}`}>{t.message}</p>
             <button
               onClick={() => dismiss(t.id)}
-              className="shrink-0 rounded-md p-0.5 text-slate-500 transition hover:text-slate-200"
+              className="shrink-0 rounded-md p-0.5 text-subtle transition hover:text-fg"
               aria-label="Dismiss"
             >
               <X className="h-4 w-4" />

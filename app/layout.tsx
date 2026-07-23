@@ -26,12 +26,16 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#030712",
+  // The app defaults to the light theme; the toggle updates this meta live at runtime.
+  themeColor: "#f6f8fb",
   width: "device-width",
   initialScale: 1,
   // Draw under the Android status/nav bars so safe-area insets can be applied.
   viewportFit: "cover",
 };
+
+// Runs before paint so the saved theme is applied with no flash of the wrong palette.
+const THEME_INIT = `(function(){try{var t=localStorage.getItem('rentmaster-theme');document.documentElement.dataset.theme=(t==='dark')?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}})();`;
 
 export default function RootLayout({
   children,
@@ -40,7 +44,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-950 text-slate-100 antialiased font-sans selection:bg-indigo-500/30 selection:text-indigo-100">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+      </head>
+      <body className="min-h-screen bg-bg text-fg antialiased font-sans selection:bg-primary/30 selection:text-heading">
         {children}
         <Toaster />
         <ConfirmHost />

@@ -203,6 +203,8 @@ export interface SubscriptionTier {
   discount_percent?: number;
   // Whether this tier bundles the Staff module (true on the Whole Building / 'custom' tiers).
   staff_included?: boolean;
+  // Whether this tier bundles the Accounts module (true on the Whole Building / 'custom' tiers).
+  accounts_included?: boolean;
 }
 
 export interface OwnerSubscription {
@@ -244,6 +246,7 @@ export interface FeatureState {
 
 export interface FeatureMap {
   staff: FeatureState;
+  accounts: FeatureState;
 }
 
 export interface SubscriptionResponse {
@@ -276,6 +279,10 @@ export interface AdminOwnerDetail extends AdminOwner {
   staff_addon: boolean;
   staff_addon_granted_at: string | null;
   staff_included_in_plan: boolean;
+  // Accounts module access — same shape as staff.
+  accounts_addon: boolean;
+  accounts_addon_granted_at: string | null;
+  accounts_included_in_plan: boolean;
 }
 
 // ---- Staff (owner module; paid add-on) ----
@@ -316,6 +323,61 @@ export interface StaffPayment {
   created_at: string;
   // Relational join (GET /api/admin/staff/payments).
   staff?: { id: string; name: string; designation: string | null } | null;
+}
+
+// ---- Accounts (owner module; paid add-on) ----
+export type AccountType = "cash" | "bank" | "mfs" | "other";
+export type TxnDirection = "income" | "expense";
+// How an income/expense row was created: by hand, or auto-booked by an automation.
+export type TxnSource = "manual" | "billing" | "staff_salary";
+
+export interface Account {
+  id: string;
+  account_no: number;
+  owner_id: string;
+  name: string;
+  type: AccountType;
+  opening_balance: number;
+  is_default: boolean;
+  is_active: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountTransaction {
+  id: string;
+  txn_no: number;
+  owner_id: string;
+  account_id: string;
+  // properties.id is TEXT ("UNIT-1234"). Null when not tied to a property.
+  property_id: string | null;
+  direction: TxnDirection;
+  amount: number;
+  category: string | null;
+  txn_date: string;
+  note: string | null;
+  source: TxnSource;
+  source_ref: string | null;
+  created_at: string;
+  // Relational joins (GET /api/admin/accounts/transactions).
+  properties?: { id: string; name: string; flat_no: string } | null;
+  accounts?: { id: string; name: string; type: AccountType } | null;
+}
+
+export interface AccountTransfer {
+  id: string;
+  transfer_no: number;
+  owner_id: string;
+  from_account_id: string;
+  to_account_id: string;
+  amount: number;
+  txn_date: string;
+  note: string | null;
+  created_at: string;
+  // Relational joins (GET /api/admin/accounts/transfers).
+  from_account?: { id: string; name: string; type: AccountType } | null;
+  to_account?: { id: string; name: string; type: AccountType } | null;
 }
 
 // ---- Support tickets (owner -> system admin) ----

@@ -5,6 +5,8 @@ module.exports = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./lib/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  // The toggle sets data-theme="dark" on <html>; light is the default (:root).
+  darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
       fontFamily: {
@@ -15,15 +17,34 @@ module.exports = {
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       colors: {
-        // Semantic accents mapped to the brand.
+        // Semantic theme tokens — resolve to CSS vars in globals.css (light default / dark override).
+        // The `<alpha-value>` placeholder lets Tailwind opacity modifiers work (e.g. bg-overlay/[0.04]).
+        bg: "rgb(var(--bg) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        "surface-2": "rgb(var(--surface-2) / <alpha-value>)",
+        overlay: "rgb(var(--overlay) / <alpha-value>)",
+        line: "rgb(var(--line) / <alpha-value>)",
+        scrim: "rgb(var(--scrim) / <alpha-value>)",
+        heading: "rgb(var(--heading) / <alpha-value>)",
+        fg: "rgb(var(--fg) / <alpha-value>)",
+        muted: "rgb(var(--muted) / <alpha-value>)",
+        subtle: "rgb(var(--subtle) / <alpha-value>)",
+        faint: "rgb(var(--faint) / <alpha-value>)",
+        primary: "rgb(var(--primary) / <alpha-value>)",
+        accent: "rgb(var(--accent) / <alpha-value>)",
+        success: "rgb(var(--success) / <alpha-value>)",
+        warning: "rgb(var(--warning) / <alpha-value>)",
+        danger: "rgb(var(--danger) / <alpha-value>)",
+        "btn-ink": "rgb(var(--btn-ink) / <alpha-value>)",
+        // Back-compat alias — the brand accent now points at the primary token.
         brand: {
-          DEFAULT: "#6366f1",
-          soft: "#818cf8",
+          DEFAULT: "rgb(var(--primary) / <alpha-value>)",
+          soft: "rgb(var(--accent) / <alpha-value>)",
         },
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(99,102,241,0.15), 0 12px 40px -12px rgba(99,102,241,0.35)",
-        card: "0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5)",
+        glow: "0 0 0 1px rgb(var(--primary) / 0.15), 0 12px 40px -12px rgb(var(--primary) / 0.35)",
+        card: "var(--shadow-card)",
       },
       keyframes: {
         "fade-in": {

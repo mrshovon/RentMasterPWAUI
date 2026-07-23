@@ -104,18 +104,18 @@ export function UpdateGate() {
     <Modal open={open} onClose={cancel} title="Update available"
       subtitle={`Version ${release.version} is ready to install`}>
       <div className="space-y-5">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
-          <Sparkles className="h-4 w-4 text-indigo-400" />
+        <div className="flex items-center gap-2 text-sm font-semibold text-fg">
+          <Sparkles className="h-4 w-4 text-primary" />
           What&apos;s new in v{release.version}
         </div>
 
-        <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 text-sm leading-relaxed text-slate-300">
+        <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm leading-relaxed text-fg">
           {paragraphs.map((p, i) => <p key={`p${i}`}>{p}</p>)}
           {bullets.length > 0 && (
             <ul className="space-y-2">
               {bullets.map((b, i) => (
                 <li key={`b${i}`} className="flex items-start gap-2">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                   <span>{b}</span>
                 </li>
               ))}
@@ -126,11 +126,11 @@ export function UpdateGate() {
 
         {busy && (
           <div className="space-y-2">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
-              <div className="h-full rounded-full bg-indigo-500 transition-all duration-200"
+            <div className="h-2 w-full overflow-hidden rounded-full bg-overlay/[0.06]">
+              <div className="h-full rounded-full bg-primary transition-all duration-200"
                 style={{ width: `${percent}%` }} />
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted">
               {percent < 100
                 ? `Downloading… ${percent}%`
                 : "Starting the installer — confirm the install when Android asks."}

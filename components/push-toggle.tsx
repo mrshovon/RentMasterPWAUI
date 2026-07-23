@@ -99,8 +99,8 @@ export function PushToggle() {
 
   if (permission === "denied") {
     return (
-      <div className="mb-5 flex items-center gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-2.5 text-xs text-slate-400">
-        <BellOff className="h-4 w-4 shrink-0 text-slate-500" />
+      <div className="mb-5 flex items-center gap-2.5 rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-4 py-2.5 text-xs text-muted">
+        <BellOff className="h-4 w-4 shrink-0 text-subtle" />
         Notifications are blocked for this app. Re-enable them in your browser or system settings to
         get rent, invoice and maintenance alerts.
       </div>
@@ -108,8 +108,8 @@ export function PushToggle() {
   }
 
   return (
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-500/20 bg-indigo-500/10 px-4 py-3">
-      <p className="text-xs text-slate-300">
+    <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3">
+      <p className="text-xs text-fg">
         Turn on notifications for invoices, payments and maintenance updates.
       </p>
       <Button
