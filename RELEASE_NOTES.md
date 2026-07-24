@@ -1,7 +1,9 @@
+- Downloading and printing a rent receipt now works inside the Android app. Tapping Download or Print saves the receipt as an image and opens it, and the viewer's own menu lets you share or print it.
+- The app is now available in Bangla. Use the language button next to the light/dark switch — on the sign-in screen too — and your choice is remembered on that device.
+- The sign-in page now opens on the Owner portal by default.
 - New Settings tab for everyone: edit your name and phone, see which account you are signed in with, and manage notifications for the device you are on.
 - Owners and admins now get a welcome line on the overview showing who is signed in.
 - Admins can send an announcement to owners and tenants, to all owners, to all tenants, or to one specific owner.
 - Admins can put the system into maintenance mode, and everyone else sees a notice with the time window when they open the app.
 - Tenants no longer see an incorrect "you may only view your own billing history" message after signing in.
 - Pop-ups and forms no longer sit behind the phone's gesture bar, so the buttons at the bottom are always tappable.
-- App updates are published automatically now, so new versions reach you sooner.

@@ -1,47 +1,98 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Download, Printer, Share2, MessageCircle, ImageDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Download, Printer, MessageCircle, ImageDown } from "lucide-react";
 import html2canvas from "html2canvas";
 import { Modal, Button } from "./ui";
 import { toast } from "./toast";
 import { normalizeWhatsappPhone, openWhatsapp } from "../lib/whatsapp";
+import { isNativeApp } from "../lib/platform";
+import { blobToBase64, saveAndOpen } from "../lib/native-file";
+import { useT } from "../lib/i18n";
 
 // Renders a prebuilt receipt HTML string in an isolated iframe, with download, print, a WhatsApp
 // text deep-link, and an image (PNG) share/download. wa.me links can only carry text, so the
 // "snapshot" is shared as a PNG via the Web Share API (share sheet -> WhatsApp attaches the image).
 // NOTE: WhatsApp's share target silently drops the accompanying text/caption whenever a file is
 // attached, so on the image path we copy the message to the clipboard instead (paste as caption).
+//
+// ⚠️ EVERY export here is browser-only and DEAD inside the Android app: the WebView ignores
+// <a download>, blocks blob: navigation, has no window.print(), and does not expose
+// navigator.share — none of which throw, so the buttons silently did nothing. Anything that
+// hands the user a file therefore branches on isNativeApp() and goes through lib/native-file.ts
+// (Filesystem + FileOpener) instead. Keep that branch when adding a new export.
 export function ReceiptModal({
-  open, onClose, html, phone, message,
+  open, onClose, html, phone, message, fileName,
 }: {
   open: boolean;
   onClose: () => void;
   html: string;
   phone?: string | null;     // tenant phone for the WhatsApp target (raw; normalized here)
   message?: string;          // resolved WhatsApp message body (from the owner's template)
+  fileName?: string;         // base name for saved files, e.g. "rent-receipt-2026-07"
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [rasterizing, setRasterizing] = useState(false);
+  const t = useT();
+  // Resolved after mount: isNativeApp() reads window/navigator, so calling it during render
+  // would disagree with the server-rendered HTML and trip hydration.
+  const [native, setNative] = useState(false);
+  useEffect(() => { setNative(isNativeApp()); }, []);
 
   const waPhone = normalizeWhatsappPhone(phone);
   const waText = message || "Please find your rent receipt attached.";
+  const baseName = fileName?.trim()
+    || `rent-receipt-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}`;
+
+  /** Save the receipt as a PNG through the native plugins, then let the system open it. */
+  async function saveImageNatively() {
+    setRasterizing(true);
+    try {
+      const blob = await renderPng();
+      if (!blob) return; // renderPng already explained why
+      const where = await saveAndOpen({
+        base64: await blobToBase64(blob),
+        fileName: `${baseName}.png`,
+        mimeType: "image/png",
+      });
+      toast.success(`Receipt saved to ${where} as ${baseName}.png`);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not save the receipt to this device.");
+    } finally {
+      setRasterizing(false);
+    }
+  }
 
   function printReceipt() {
+    // The WebView has no print support at all, so in the app this saves the image instead —
+    // the system image viewer's own menu carries Print.
+    if (native) { void saveImageNatively(); return; }
     const win = iframeRef.current?.contentWindow;
-    if (win) { win.focus(); win.print(); }
+    if (!win || typeof win.print !== "function") {
+      toast.error("Printing isn't available here — use Download instead.");
+      return;
+    }
+    win.focus();
+    win.print();
   }
 
   function downloadReceipt() {
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "rent-receipt.html";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    // Native: an .html file usually has no handler on Android, so FileOpener would throw
+    // "no app found" — one dead button traded for another. A PNG always opens.
+    if (native) { void saveImageNatively(); return; }
+    try {
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${baseName}.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not download the receipt.");
+    }
   }
 
   async function shareReceipt() {
@@ -50,7 +101,7 @@ export function ReceiptModal({
       canShare?: (d: unknown) => boolean;
     };
     try {
-      const file = new File([new Blob([html], { type: "text/html" })], "rent-receipt.html", { type: "text/html" });
+      const file = new File([new Blob([html], { type: "text/html" })], `${baseName}.html`, { type: "text/html" });
       if (nav.canShare && nav.canShare({ files: [file] })) {
         await nav.share!({ files: [file], title: "Rent Receipt" });
       } else if (nav.share) {
@@ -58,7 +109,13 @@ export function ReceiptModal({
       } else {
         toast.info("Sharing isn't supported on this device — use Download or Print instead.");
       }
-    } catch { /* user cancelled or share unavailable */ }
+    } catch (e: any) {
+      // AbortError is the user dismissing the share sheet — everything else is a real failure
+      // and used to vanish here, which is how this whole modal ended up looking broken.
+      if (e?.name !== "AbortError") {
+        toast.error(e?.message || "Could not share the receipt.");
+      }
+    }
   }
 
   // Rasterize the receipt (inside the iframe) to a PNG blob for image sharing / download.
@@ -70,17 +127,22 @@ export function ReceiptModal({
       return null;
     }
     const canvas = await html2canvas(target, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
-    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) toast.error("Could not turn the receipt into an image on this device.");
+    return blob;
   }
 
   // Share the PNG snapshot. WhatsApp drops the caption when a file is attached, so the message is
   // copied to the clipboard for the owner to paste. Falls back to a download on desktop/unsupported.
   async function shareImage() {
+    // In the app there is no Web Share and no <a download>; save the PNG and open it — the
+    // image viewer provides its own Share and Print.
+    if (native) { void saveImageNatively(); return; }
     try {
       setRasterizing(true);
       const blob = await renderPng();
       if (!blob) return;
-      const file = new File([blob], "rent-receipt.png", { type: "image/png" });
+      const file = new File([blob], `${baseName}.png`, { type: "image/png" });
       const nav = navigator as unknown as {
         share?: (d: unknown) => Promise<void>;
         canShare?: (d: unknown) => boolean;
@@ -100,7 +162,7 @@ export function ReceiptModal({
         // Desktop / unsupported: download the image so the owner can attach it manually.
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url; a.download = "rent-receipt.png";
+        a.href = url; a.download = `${baseName}.png`;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         toast.info(copied
@@ -108,7 +170,9 @@ export function ReceiptModal({
           : "Image downloaded — attach it in WhatsApp, or use the WhatsApp button for the message.");
       }
     } catch (e: any) {
-      if (e?.name !== "AbortError") toast.error("Could not generate the receipt image.");
+      if (e?.name !== "AbortError") {
+        toast.error(e?.message || "Could not generate the receipt image.");
+      }
     } finally {
       setRasterizing(false);
     }
@@ -124,28 +188,40 @@ export function ReceiptModal({
 
   return (
     <Modal open={open} onClose={onClose} size="lg" title="Rent receipt"
-      subtitle="Share to WhatsApp, send as an image, or download / print.">
+      subtitle={native
+        ? "Share to WhatsApp, or save the receipt as an image."
+        : "Share to WhatsApp, send as an image, or download / print."}>
       <div className="space-y-4">
         <div className="overflow-hidden rounded-xl border border-line/[0.08] bg-white">
           <iframe ref={iframeRef} srcDoc={html} title="Rent receipt" className="h-[52vh] w-full" />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Button icon={MessageCircle} variant="success" onClick={sendWhatsapp} disabled={!waPhone}>
-            WhatsApp
+            {t("WhatsApp")}
           </Button>
           <Button icon={ImageDown} onClick={shareImage} loading={rasterizing}>
-            Share image
+            {native ? t("Save image") : t("Share image")}
           </Button>
-          <Button icon={Download} variant="secondary" onClick={downloadReceipt}>Download</Button>
-          <Button icon={Printer} variant="secondary" onClick={printReceipt}>Print</Button>
+          <Button icon={Download} variant="secondary" onClick={downloadReceipt} loading={native && rasterizing}>
+            {t("Download")}
+          </Button>
+          {/* The WebView cannot print, so in the app this button saves the image instead —
+              the system viewer that opens it has Print in its own menu. */}
+          <Button icon={Printer} variant="secondary" onClick={printReceipt} loading={native && rasterizing}>
+            {native ? t("Save & print") : t("Print")}
+          </Button>
         </div>
-        <button onClick={shareReceipt}
-          className="w-full text-center text-xs font-medium text-subtle transition hover:text-fg">
-          Share as HTML file instead
-        </button>
+        {/* Browser only: Android has no default handler for a .html file, so offering it in the
+            app would just produce a "no app can open this" error. */}
+        {!native && (
+          <button onClick={shareReceipt}
+            className="w-full text-center text-xs font-medium text-subtle transition hover:text-fg">
+            {t("Share as HTML file instead")}
+          </button>
+        )}
         {!waPhone && phone !== undefined && (
           <p className="text-center text-[11px] text-subtle">
-            No valid WhatsApp number on file for this tenant.
+            {t("No valid WhatsApp number on file for this tenant.")}
           </p>
         )}
       </div>
