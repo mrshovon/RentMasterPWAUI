@@ -10,7 +10,10 @@ name: Android Release
 #   * a pre-flight step fails fast with a readable message when a secret is missing, instead of
 #     dying somewhere deep inside Gradle.
 #
-# Skip a release for a commit by putting [skip apk] in its message.
+# Skip a release for a commit by starting its SUBJECT LINE marker: put [skip apk] on the first
+# line of the commit message. Only the subject is checked — scanning the whole message means a
+# commit that merely *mentions* the token in its body silently skips its own release, which is
+# exactly what happened the first time this ran.
 
 on:
   push:
@@ -31,8 +34,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Tiny gate job: `if:` expressions can't split a string, and the skip marker must be read from
+  # the SUBJECT LINE only. Costs a few seconds and keeps the decision visible in the run log.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - name: Should this commit be released?
+        id: check
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          SUBJECT=$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)
+          if printf '%s' "$SUBJECT" | grep -qF '[skip apk]'; then
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "Subject carries [skip apk] — no release for this commit."
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            echo "Releasing: $SUBJECT"
+          fi
+
   build:
-    if: "!contains(github.event.head_commit.message, '[skip apk]')"
+    needs: gate
+    if: needs.gate.outputs.build == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

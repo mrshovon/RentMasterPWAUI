@@ -74,7 +74,8 @@ run number — so `1.1.23`, `1.1.24`, … with nothing to bump by hand. To start
 `version` in `package.json` to e.g. `1.2.0` and push; releases become `1.2.<run>`.
 
 **Skip a release** for a commit that can't affect the app (docs, CI tweaks) by putting
-`[skip apk]` anywhere in the commit message.
+`[skip apk]` on the **first line** of the commit message. Only the subject is checked, so a commit
+that merely mentions the marker in its body still gets released.
 
 **Play Store bundle (.aab):** not built by default. Actions tab → *Android Release* → **Run
 workflow** → tick *Also build the Play Store bundle* — the `.aab` is attached to that run's release.
