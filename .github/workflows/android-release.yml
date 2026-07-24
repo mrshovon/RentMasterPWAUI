@@ -1,19 +1,24 @@
 name: Android Release
 
-# Every push to `main` builds a SIGNED APK and publishes it as a GitHub Release. The app reads
-# /releases/latest to power the in-app update popup, so shipping is just: merge to main.
+# Builds a SIGNED APK and publishes it as a GitHub Release when a push to `main` changes the
+# NATIVE SHELL. The app reads /releases/latest to power the in-app update popup.
 #
-# Why it works this way (the previous tag-driven flow kept failing):
+# It does NOT release for web changes, and that is the point: capacitor.config.js sets
+# server.url, so the APK is a thin shell whose WebView loads the live site over the network.
+# Web and backend changes reach users through Vercel on their next app open. Publishing an APK
+# for those would prompt everyone to download 5MB of shell identical to what they already have.
+# See "When do I need a new APK?" in ANDROID_RELEASE.md.
+#
+# Why the rest works this way (the previous tag-driven flow kept failing):
 #   * the version is computed HERE, so nothing has to be bumped, committed or tagged by hand;
 #   * the tag + Release are created by the LAST step, only after a green build — a failed build
 #     can no longer leave a published-but-empty tag that has to be deleted by hand;
 #   * a pre-flight step fails fast with a readable message when a secret is missing, instead of
 #     dying somewhere deep inside Gradle.
 #
-# Skip a release for a commit by starting its SUBJECT LINE marker: put [skip apk] on the first
-# line of the commit message. Only the subject is checked — scanning the whole message means a
-# commit that merely *mentions* the token in its body silently skips its own release, which is
-# exactly what happened the first time this ran.
+# Overrides, both read from the SUBJECT LINE only ([skip apk] wins): [skip apk] suppresses a
+# release, [force apk] forces one. Scanning the whole message would let a commit that merely
+# *mentions* a token trigger it — which is exactly what happened the first time this ran.
 
 on:
   push:
@@ -34,26 +39,67 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Tiny gate job: `if:` expressions can't split a string, and the skip marker must be read from
-  # the SUBJECT LINE only. Costs a few seconds and keeps the decision visible in the run log.
+  # Tiny gate job. It exists because an `if:` expression can't split a string (the skip marker is
+  # read from the SUBJECT LINE only) and can't diff a commit range. Costs a few seconds and keeps
+  # the reasoning visible on the run page.
   gate:
     runs-on: ubuntu-latest
     outputs:
       build: ${{ steps.check.outputs.build }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # a shallow clone can't diff the pushed range
+
       - name: Should this commit be released?
         id: check
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          SUBJECT=$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)
-          if printf '%s' "$SUBJECT" | grep -qF '[skip apk]'; then
-            echo "build=false" >> "$GITHUB_OUTPUT"
-            echo "Subject carries [skip apk] — no release for this commit."
-          else
-            echo "build=true" >> "$GITHUB_OUTPUT"
-            echo "Releasing: $SUBJECT"
+          decide() { echo "build=$1" >> "$GITHUB_OUTPUT"; echo "$2"; exit 0; }
+
+          # 1. Manual run — always build.
+          if [ "${{ github.event_name }}" != "push" ]; then
+            decide true "Manual run — building."
           fi
+
+          SUBJECT=$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)
+
+          # 2/3. Explicit overrides in the subject. [skip apk] wins over everything.
+          if printf '%s' "$SUBJECT" | grep -qF '[skip apk]'; then
+            decide false "Subject carries [skip apk] — no release."
+          fi
+          if printf '%s' "$SUBJECT" | grep -qF '[force apk]'; then
+            decide true "Subject carries [force apk] — releasing even though nothing native changed."
+          fi
+
+          # 4. Otherwise release only when the NATIVE SHELL changed. The APK loads the live site
+          #    over the network (capacitor.config.js server.url), so web changes reach users
+          #    through Vercel on their next app open — publishing an APK for those only prompts
+          #    people to download 5MB of identical shell.
+          #    package.json counts: Capacitor plugin versions and the MAJOR.MINOR the release
+          #    number is built from both live there. package-lock.json does NOT — it churns on
+          #    every web-only dependency bump.
+          BEFORE="${{ github.event.before }}"
+          if [ -z "$BEFORE" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            # New branch or force push: no comparable range. Fail safe by building — a spurious
+            # release is recoverable, a silently missed native fix is not.
+            decide true "No comparable previous commit — building to be safe."
+          fi
+
+          CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}")
+          echo "Files changed in this push:"
+          printf '%s\n' "$CHANGED" | sed 's/^/  /'
+
+          NATIVE='^(android/|capacitor\.config\.js$|package\.json$|\.github/workflows/android-release\.yml$)'
+          if printf '%s\n' "$CHANGED" | grep -qE "$NATIVE"; then
+            echo "Native shell files changed:"
+            printf '%s\n' "$CHANGED" | grep -E "$NATIVE" | sed 's/^/  /'
+            decide true "Releasing."
+          fi
+
+          decide false "No native shell files changed — this ships via Vercel and needs no APK. (Use [force apk] in the subject, or Run workflow, to release anyway.)"
 
   build:
     needs: gate
