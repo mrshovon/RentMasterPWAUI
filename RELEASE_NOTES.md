@@ -1,5 +1,7 @@
-RentMaster v1.1.0
-
-- New **Accounts** module for owners: track cash, bank and mobile-money balances, record income and expenses, transfer between accounts, and have rent payments and staff salaries booked automatically.
-- A refreshed, easier-on-the-eyes look with a new **light theme** and a light/dark toggle.
-- Smoother navigation: a tidier sidebar and a cleaner mobile bottom menu.
+- New Settings tab for everyone: edit your name and phone, see which account you are signed in with, and manage notifications for the device you are on.
+- Owners and admins now get a welcome line on the overview showing who is signed in.
+- Admins can send an announcement to owners and tenants, to all owners, to all tenants, or to one specific owner.
+- Admins can put the system into maintenance mode, and everyone else sees a notice with the time window when they open the app.
+- Tenants no longer see an incorrect "you may only view your own billing history" message after signing in.
+- Pop-ups and forms no longer sit behind the phone's gesture bar, so the buttons at the bottom are always tappable.
+- App updates are published automatically now, so new versions reach you sooner.

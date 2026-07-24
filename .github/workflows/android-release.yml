@@ -62,6 +62,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history: the release-notes check below diffs the pushed range, which a
+          # shallow clone cannot do.
+          fetch-depth: 0
 
       - name: Pre-flight — signing secrets
         env:
@@ -202,13 +206,34 @@ jobs:
             echo 'ASSETS_EOF'
           } >> "$GITHUB_OUTPUT"
 
+      # RELEASE_NOTES.md is the release body AND the "What's new" text users read in the in-app
+      # update popup, so a push that forgets it republishes the PREVIOUS release's bullets.
+      # Warning only — it must never block a release.
+      - name: Check the release notes were updated
+        if: github.event_name == 'push'
+        run: |
+          BEFORE="${{ github.event.before }}"
+          if [ -z "$BEFORE" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "No comparable previous commit — skipping the check."
+            exit 0
+          fi
+          if git diff --name-only "$BEFORE" "${{ github.sha }}" | grep -qx 'RELEASE_NOTES.md'; then
+            echo "RELEASE_NOTES.md was updated in this push."
+          else
+            echo "::warning::RELEASE_NOTES.md was not updated — this release republishes the previous release's notes, so users will see changes they already have."
+          fi
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           # The action creates the tag itself, pointing at this commit — AFTER a green build.
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
-          generate_release_notes: true
+          # RELEASE_NOTES.md, NOT generate_release_notes. GitHub builds generated notes from
+          # merged pull requests; this repo pushes straight to main, so there are none and the
+          # body collapses to a bare "Full Changelog" link — which is exactly what the update
+          # popup then showed instead of bullets. Keep this as body_path.
+          body_path: RELEASE_NOTES.md
           # Keep the app-release.apk filename: lib/app-config.ts builds the permanent
           # /releases/latest/download/app-release.apk URL from it.
           files: ${{ steps.assets.outputs.list }}

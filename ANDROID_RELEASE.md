@@ -62,14 +62,28 @@ Enable **Actions** on the repo if it isn't already.
 
 ## Shipping a release
 
+**1. Edit `RELEASE_NOTES.md`. Every time — before you commit.**
+
+That file *is* the GitHub Release body **and** the "What's new" list users read in the in-app
+update popup. Write it for them, not for yourself:
+
+- One `- ` bullet per user-visible change; the popup renders each as a ticked line.
+- **Plain text only — no `**bold**`.** The popup renders notes as plain text, so markdown emphasis
+  shows up as literal asterisks on the phone.
+- **No version heading.** The popup already titles itself "What's new in v1.1.x" and the release is
+  named after the tag, so a hand-written version line only goes stale.
+
+If you push without touching it, the build still succeeds but logs a warning — and the new release
+republishes the *previous* release's bullets, so users are shown changes they already have.
+
+**2. Push.**
+
 ```bash
 git push origin main
 ```
 
-That's it. Every push to `main`:
-1. builds a **signed APK**,
-2. and only then creates the tag `v<version>` and a **GitHub Release** with auto-generated notes
-   from the commits since the last release.
+Every push to `main` builds a **signed APK**, and only then creates the tag `v<version>` and a
+**GitHub Release** whose body is `RELEASE_NOTES.md`.
 
 Within a couple of minutes the APK is downloadable from the Releases page (and from the in-app
 "Download / Upgrade" links), and installed apps see the **update popup** on their next launch or
