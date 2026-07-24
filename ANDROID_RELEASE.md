@@ -45,12 +45,18 @@ keytool -genkeypair -v \
 | `ANDROID_KEYSTORE_PASSWORD` | the keystore password |
 | `ANDROID_KEY_ALIAS` | `rentmaster` (the `-alias` above) |
 | `ANDROID_KEY_PASSWORD` | the key password (often same as keystore password) |
-| `NEXT_PUBLIC_APP_URL` | your production web URL |
+| `NEXT_PUBLIC_APP_URL` | your production web URL — *optional*, see below |
 | `FIREBASE_GOOGLE_SERVICES` | contents of `google-services.json` (skip if you committed the file) |
 
-Enable **Actions** on the repo if it isn't already. The workflow's first step checks every secret
-above and stops with a plain-English error if one is missing — so a misconfigured repo fails in
-ten seconds instead of five minutes into a Gradle build.
+The four `ANDROID_*` secrets are **required** — without them the APK cannot be signed, and the
+workflow's pre-flight step says exactly which one is missing within ten seconds instead of dying
+five minutes into a Gradle build.
+
+`NEXT_PUBLIC_APP_URL` is **optional**: `capacitor.config.js` falls back to
+`https://rent-master-pwa-ui.vercel.app`. Set the secret only if your production domain differs —
+the pre-flight logs which URL is being baked into the shell either way.
+
+Enable **Actions** on the repo if it isn't already.
 
 ---
 

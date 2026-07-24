@@ -63,23 +63,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Pre-flight — required secrets
+      - name: Pre-flight — signing secrets
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # NOT required: capacitor.config.js falls back to the production Vercel URL, so a
+          # missing secret here changes nothing about the APK. Only report which URL is used.
           NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
         run: |
           missing=""
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD NEXT_PUBLIC_APP_URL; do
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then
-            echo "::error::Missing repository secret(s):$missing — add them under Settings → Secrets and variables → Actions (see ANDROID_RELEASE.md)."
+            echo "::error::Missing repository secret(s):$missing — add them under Settings → Secrets and variables → Actions (see ANDROID_RELEASE.md). Without them the APK cannot be signed."
             exit 1
           fi
-          echo "All required secrets are present."
+          echo "Signing secrets are present."
+          if [ -z "$NEXT_PUBLIC_APP_URL" ]; then
+            echo "::warning::NEXT_PUBLIC_APP_URL is not set — the shell will load the fallback URL in capacitor.config.js. Set the secret if your production domain differs."
+          else
+            echo "Shell will load: $NEXT_PUBLIC_APP_URL"
+          fi
 
       - name: Compute version
         id: version
