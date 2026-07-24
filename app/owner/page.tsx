@@ -23,7 +23,7 @@ import {
   PlanState, PlanUsage, SubscriptionResponse, SubscriptionTier,
   SupportTicket, TicketStatus, TicketCategory,
   PaymentSubmission, PaymentConfig,
-  Reminder, ReminderRecurrence,
+  Reminder, ReminderRecurrence, AccountProfile,
 } from "../../types/api";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
@@ -31,6 +31,7 @@ import { AttachmentStrip } from "../../components/attachments";
 import { StaffTab } from "../../components/staff-tab";
 import { AccountsTab } from "../../components/accounts-tab";
 import { AppSettingsCard } from "../../components/app-settings-card";
+import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
@@ -70,6 +71,7 @@ export default function OwnerDashboard() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [plan, setPlan] = useState<SubscriptionResponse | null>(null);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [account, setAccount] = useState<AccountProfile | null>(null);
 
   // Modals
   const [ticketOpen, setTicketOpen] = useState(false);
@@ -252,6 +254,17 @@ export default function OwnerDashboard() {
     })();
   }, []);
 
+  // The signed-in account, for the "Signed in as …" line on the overview. The session in
+  // localStorage carries a name but no email, so this is the only source for it.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: AccountProfile }>("/api/admin/owner/profile", { role: "owner" });
+        setAccount(res.data);
+      } catch { /* non-fatal — the overview falls back to its static header */ }
+    })();
+  }, []);
+
   // Load the owner's message templates (WhatsApp receipt + rent reminder) from Settings/auth metadata.
   const loadWhatsappTemplate = async () => {
     try {
@@ -349,6 +362,8 @@ export default function OwnerDashboard() {
           tenants={tenants}
           metrics={metrics}
           maintenance={maintenance}
+          sessionName={session?.name}
+          accountEmail={account?.email ?? null}
           onQuickInvoice={() => setInvoiceOpen(true)}
           onQuickProperty={() => guardedOpen("property", () => setPropOpen(true))}
         />
@@ -1037,17 +1052,24 @@ function ContactModal({
 /* ============================================================ OVERVIEW */
 function OverviewTab({
   properties, tenants, metrics, maintenance, onQuickInvoice, onQuickProperty,
+  sessionName, accountEmail,
 }: {
   properties: Property[]; tenants: Tenant[];
   metrics: { occupied: number; monthlyRevenue: number; outstanding: number; unpaidCount: number; openTickets: number };
   maintenance: MaintenanceLog[];
   onQuickInvoice: () => void; onQuickProperty: () => void;
+  sessionName?: string; accountEmail?: string | null;
 }) {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Portfolio overview"
-        subtitle="A live snapshot of your properties, income and open work."
+        // Greet by name like the tenant dashboard does, and name the account actually signed in —
+        // useful when someone manages more than one owner login. Both fall back to the original
+        // static header while the profile is still loading.
+        title={sessionName ? `Welcome back, ${sessionName}` : "Portfolio overview"}
+        subtitle={accountEmail
+          ? `Signed in as ${accountEmail} · Owner`
+          : "A live snapshot of your properties, income and open work."}
         action={
           <div className="flex gap-2">
             <Button variant="secondary" icon={Plus} onClick={onQuickProperty}>Property</Button>
@@ -2733,6 +2755,9 @@ function SettingsTab({
   return (
     <div className="space-y-8">
       <PageHeader title="Settings" subtitle="System preferences for your account." />
+
+      {/* Who you are */}
+      <OwnerProfileCard />
 
       {/* WhatsApp receipt message */}
       <Card className="p-6">

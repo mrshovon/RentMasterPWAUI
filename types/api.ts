@@ -93,6 +93,14 @@ export interface Notice {
   created_at: string;
 }
 
+// ---- Signed-in owner/admin account (Supabase auth user; email is read-only) ----
+export interface AccountProfile {
+  email: string | null;
+  name: string | null;
+  phone: string | null;
+  role: string;
+}
+
 // ---- Platform maintenance window (admin-declared, app_settings.maintenance_mode) ----
 export interface MaintenanceMode {
   enabled: boolean;

@@ -43,13 +43,20 @@ export function MaintenanceGate() {
   const run = useCallback(async (force = false) => {
     if (!force && Date.now() - lastCheck < RECHECK_THROTTLE_MS) return;
     setLastCheck(Date.now());
+    const url = `${BACKEND_API_BASE}/api/app/maintenance`;
     try {
-      const res = await fetch(`${BACKEND_API_BASE}/api/app/maintenance`, { cache: "no-store" });
-      if (!res.ok) return; // fail open — never lock people out over a failed check
+      const res = await fetch(url, { cache: "no-store" });
+      // Fail open — never lock people out over a failed check — but never fail SILENTLY either.
+      // A blocked/failed read renders exactly like "no maintenance window", which is how a
+      // missing CORS header on this route hid the whole feature once already.
+      if (!res.ok) {
+        console.warn(`[maintenance] check returned ${res.status} from ${url} — assuming no window.`);
+        return;
+      }
       const json = await res.json();
       setMode(json?.data ?? null);
-    } catch {
-      /* fail open */
+    } catch (err) {
+      console.warn(`[maintenance] could not reach ${url} (CORS or network?) — assuming no window.`, err);
     }
   }, [lastCheck]);
 

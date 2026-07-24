@@ -18,12 +18,13 @@ import {
   SupportTicket, TicketStatus, TicketCategory, PriorityLevel,
   PasswordResetRecord, ResetMethod, ContactMessage, ContactStatus,
   PaymentSubmission, PaymentSubmissionStatus, PaymentConfig,
-  MaintenanceMode, NoticeScope,
+  MaintenanceMode, NoticeScope, AccountProfile,
 } from "../../types/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { AppSettingsCard } from "../../components/app-settings-card";
+import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
@@ -56,6 +57,7 @@ export default function AdminDashboard() {
   const [resets, setResets] = useState<PasswordResetRecord[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [payments, setPayments] = useState<PaymentSubmission[]>([]);
+  const [account, setAccount] = useState<AccountProfile | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -96,6 +98,17 @@ export default function AdminDashboard() {
       } finally {
         setLoading(false);
       }
+    })();
+  }, []);
+
+  // The signed-in account, for the "Signed in as …" line on the overview. The stored session
+  // carries a name but no email, so this is the only source for it.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: AccountProfile }>("/api/admin/owner/profile", { role: "admin" });
+        setAccount(res.data);
+      } catch { /* non-fatal — the overview falls back to its static header */ }
     })();
   }, []);
 
@@ -220,7 +233,14 @@ export default function AdminDashboard() {
 
       {tab === "overview" && (
         <div className="space-y-8">
-          <PageHeader title="Admin overview" subtitle="Platform-wide owners and subscriptions." />
+          {/* Greets by name like the tenant dashboard, and names the account signed in. Both
+              fall back to the static header while the profile request is still in flight. */}
+          <PageHeader
+            title={session?.name ? `Welcome back, ${session.name}` : "Admin overview"}
+            subtitle={account?.email
+              ? `Signed in as ${account.email} · Super Admin`
+              : "Platform-wide owners and subscriptions."}
+          />
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <StatCard label="Owner accounts" accent="amber" icon={Users} value={metrics.total} />
             <StatCard label="Active" accent="emerald" icon={CheckCircle2} value={metrics.active} />
@@ -1375,6 +1395,7 @@ function AdminSettingsTab() {
   return (
     <div className="space-y-8">
       <PageHeader title="Settings" subtitle="Platform controls and this device's preferences." />
+      <OwnerProfileCard />
       <MaintenanceCard />
       <AppSettingsCard />
     </div>

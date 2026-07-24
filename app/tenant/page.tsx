@@ -19,6 +19,7 @@ import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/f
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { AppSettingsCard } from "../../components/app-settings-card";
+import { TenantProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader,
@@ -430,7 +431,8 @@ export default function TenantDashboard() {
 
       {tab === "settings" && (
         <div className="space-y-6">
-          <PageHeader title="Settings" subtitle="Preferences for this device." />
+          <PageHeader title="Settings" subtitle="Your profile and this device's preferences." />
+          <TenantProfileCard />
           <AppSettingsCard />
         </div>
       )}
