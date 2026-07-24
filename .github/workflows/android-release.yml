@@ -19,6 +19,9 @@ name: Android Release
 # Overrides, both read from the SUBJECT LINE only ([skip apk] wins): [skip apk] suppresses a
 # release, [force apk] forces one. Scanning the whole message would let a commit that merely
 # *mentions* a token trigger it — which is exactly what happened the first time this ran.
+#
+# Editing THIS FILE builds but does not publish: a broken CI change should surface immediately,
+# without shipping an APK nobody needs.
 
 on:
   push:
@@ -46,60 +49,76 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       build: ${{ steps.check.outputs.build }}
+      publish: ${{ steps.check.outputs.publish }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # a shallow clone can't diff the pushed range
 
-      - name: Should this commit be released?
+      - name: Should this commit be built and/or released?
         id: check
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          decide() { echo "build=$1" >> "$GITHUB_OUTPUT"; echo "$2"; exit 0; }
+          # Two separate answers. "build" compiles and signs the APK; "publish" tags it and puts
+          # it in front of users. Editing this workflow needs the first without the second —
+          # otherwise a CI tweak prompts everyone to download an identical shell.
+          decide() {
+            echo "build=$1"   >> "$GITHUB_OUTPUT"
+            echo "publish=$2" >> "$GITHUB_OUTPUT"
+            echo "$3"
+            exit 0
+          }
 
-          # 1. Manual run — always build.
+          # 1. Manual run — build and publish.
           if [ "${{ github.event_name }}" != "push" ]; then
-            decide true "Manual run — building."
+            decide true true "Manual run — building and publishing."
           fi
 
           SUBJECT=$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)
 
           # 2/3. Explicit overrides in the subject. [skip apk] wins over everything.
           if printf '%s' "$SUBJECT" | grep -qF '[skip apk]'; then
-            decide false "Subject carries [skip apk] — no release."
+            decide false false "Subject carries [skip apk] — nothing to do."
           fi
           if printf '%s' "$SUBJECT" | grep -qF '[force apk]'; then
-            decide true "Subject carries [force apk] — releasing even though nothing native changed."
+            decide true true "Subject carries [force apk] — releasing even though nothing native changed."
           fi
 
-          # 4. Otherwise release only when the NATIVE SHELL changed. The APK loads the live site
-          #    over the network (capacitor.config.js server.url), so web changes reach users
-          #    through Vercel on their next app open — publishing an APK for those only prompts
-          #    people to download 5MB of identical shell.
-          #    package.json counts: Capacitor plugin versions and the MAJOR.MINOR the release
-          #    number is built from both live there. package-lock.json does NOT — it churns on
-          #    every web-only dependency bump.
           BEFORE="${{ github.event.before }}"
           if [ -z "$BEFORE" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            # New branch or force push: no comparable range. Fail safe by building — a spurious
-            # release is recoverable, a silently missed native fix is not.
-            decide true "No comparable previous commit — building to be safe."
+            # New branch or force push: no comparable range. Fail safe — a spurious release is
+            # recoverable, a silently missed native fix is not.
+            decide true true "No comparable previous commit — releasing to be safe."
           fi
 
           CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}")
           echo "Files changed in this push:"
           printf '%s\n' "$CHANGED" | sed 's/^/  /'
 
-          NATIVE='^(android/|capacitor\.config\.js$|package\.json$|\.github/workflows/android-release\.yml$)'
-          if printf '%s\n' "$CHANGED" | grep -qE "$NATIVE"; then
+          # 4. Ship only when the NATIVE SHELL changed. The APK loads the live site over the
+          #    network (capacitor.config.js server.url), so web changes reach users through Vercel
+          #    on their next app open — publishing an APK for those only prompts people to
+          #    download 5MB of identical shell.
+          #    package.json counts: Capacitor plugin versions and the MAJOR.MINOR the release
+          #    number is built from both live there. package-lock.json does NOT — it churns on
+          #    every web-only dependency bump.
+          SHIP='^(android/|capacitor\.config\.js$|package\.json$)'
+          if printf '%s\n' "$CHANGED" | grep -qE "$SHIP"; then
             echo "Native shell files changed:"
-            printf '%s\n' "$CHANGED" | grep -E "$NATIVE" | sed 's/^/  /'
-            decide true "Releasing."
+            printf '%s\n' "$CHANGED" | grep -E "$SHIP" | sed 's/^/  /'
+            decide true true "Releasing."
           fi
 
-          decide false "No native shell files changed — this ships via Vercel and needs no APK. (Use [force apk] in the subject, or Run workflow, to release anyway.)"
+          # 5. This workflow changed but nothing native did: build to prove the pipeline still
+          #    works, but publish nothing. A broken CI edit should surface now, not months later
+          #    when a native fix is urgent.
+          if printf '%s\n' "$CHANGED" | grep -qE '^\.github/workflows/android-release\.yml$'; then
+            decide true false "Only the release workflow changed — building to validate it, publishing nothing."
+          fi
+
+          decide false false "No native shell files changed — this ships via Vercel and needs no APK. (Use [force apk] in the subject, or Run workflow, to release anyway.)"
 
   build:
     needs: gate
@@ -256,7 +275,7 @@ jobs:
       # update popup, so a push that forgets it republishes the PREVIOUS release's bullets.
       # Warning only — it must never block a release.
       - name: Check the release notes were updated
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && needs.gate.outputs.publish == 'true'
         run: |
           BEFORE="${{ github.event.before }}"
           if [ -z "$BEFORE" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
@@ -270,6 +289,8 @@ jobs:
           fi
 
       - name: Publish GitHub Release
+        # Skipped when the build ran only to validate a workflow edit (gate step 5).
+        if: needs.gate.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           # The action creates the tag itself, pointing at this commit — AFTER a green build.

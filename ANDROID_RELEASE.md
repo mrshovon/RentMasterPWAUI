@@ -38,6 +38,8 @@ the next launch instead of waiting for tabs to close. Occasionally a user needs 
 
 CI decides this for you: it diffs the pushed range and only releases when one of those paths
 changed. A web-only push finishes in seconds with the build skipped, and the run log says why.
+Editing the release workflow itself is the one in-between case — CI builds to prove the pipeline
+still works, but publishes nothing.
 
 **Overrides**, both read from the **first line** of the commit message:
 
