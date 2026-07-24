@@ -2,11 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { Modal, Button } from "./ui";
+import { useT } from "../lib/i18n";
 
 // =============================================================================
 // Promise-based confirm dialog — a styled replacement for window.confirm().
 // Call `await confirmDialog({ title, message, danger })` anywhere; it resolves
 // true/false. Render <ConfirmHost /> once at the app root (see app/layout.tsx).
+//
+// Like the toaster, translation happens HERE rather than at every call site, so callers keep
+// passing plain English. Anything absent from the dictionary — including every string from the
+// untranslated admin console — falls through to English, which is exactly what we want.
 // =============================================================================
 
 export interface ConfirmOptions {
@@ -35,6 +40,7 @@ export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
 
 export function ConfirmHost() {
   const [state, setState] = useState<{ opts: ConfirmOptions; resolve: Resolver } | null>(null);
+  const t = useT();
 
   useEffect(() => {
     request = (opts, resolve) => setState({ opts, resolve });
@@ -49,15 +55,15 @@ export function ConfirmHost() {
   const opts = state?.opts;
 
   return (
-    <Modal open={!!state} onClose={() => settle(false)} title={opts?.title || ""} size="md">
+    <Modal open={!!state} onClose={() => settle(false)} title={t(opts?.title || "")} size="md">
       <div className="space-y-6">
-        {opts?.message && <p className="text-sm leading-relaxed text-fg">{opts.message}</p>}
+        {opts?.message && <p className="text-sm leading-relaxed text-fg">{t(opts.message)}</p>}
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={() => settle(false)}>
-            {opts?.cancelLabel || "Cancel"}
+            {t(opts?.cancelLabel || "Cancel")}
           </Button>
           <Button variant={opts?.danger ? "danger" : "primary"} onClick={() => settle(true)}>
-            {opts?.confirmLabel || "Confirm"}
+            {t(opts?.confirmLabel || "Confirm")}
           </Button>
         </div>
       </div>

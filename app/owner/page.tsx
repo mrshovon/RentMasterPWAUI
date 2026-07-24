@@ -31,6 +31,7 @@ import { AttachmentStrip } from "../../components/attachments";
 import { StaffTab } from "../../components/staff-tab";
 import { AccountsTab } from "../../components/accounts-tab";
 import { AppSettingsCard } from "../../components/app-settings-card";
+import { useT, useLang } from "../../lib/i18n";
 import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
@@ -58,6 +59,8 @@ const ticketCategoryLabel: Record<TicketCategory, string> = {
 };
 
 export default function OwnerDashboard() {
+  const t = useT();
+  const lang = useLang();
   const { session, checkingSession, logout } = useSessionGuard("owner");
   const { isPending, run } = usePendingAction();
   const [tab, setTab] = useTabState("overview");
@@ -91,7 +94,7 @@ export default function OwnerDashboard() {
   const [ownerSignature, setOwnerSignature] = useState<string | null>(null);
   const [sigOpen, setSigOpen] = useState(false);
   const [whatsappTemplate, setWhatsappTemplate] = useState<string>("");
-  const [receipt, setReceipt] = useState<{ html: string; phone: string | null; message: string } | null>(null);
+  const [receipt, setReceipt] = useState<{ html: string; phone: string | null; message: string; fileName: string } | null>(null);
   const [revealPasscode, setRevealPasscode] = useState<{ name: string; code: string } | null>(null);
   // Staff add-on enquiry (opened from the locked Staff tab).
   const [staffContactOpen, setStaffContactOpen] = useState(false);
@@ -212,19 +215,19 @@ export default function OwnerDashboard() {
   }, [properties, tenants, ledgers, maintenance, tickets, reminders]);
 
   const nav: NavItem[] = [
-    { key: "overview", label: "Overview", icon: LayoutDashboard },
-    { key: "properties", label: "Properties", icon: Building2, badge: properties.length },
-    { key: "tenants", label: "Tenants", icon: Users, badge: tenants.length },
-    { key: "billing", label: "Billing", icon: ReceiptText, badge: metrics.unpaidCount },
-    { key: "maintenance", label: "Requests", icon: Wrench, badge: metrics.openTickets },
-    { key: "notices", label: "Notices", icon: Megaphone },
-    { key: "reminders", label: "Reminders", icon: CalendarClock, badge: metrics.pendingReminders },
+    { key: "overview", label: t("Overview"), icon: LayoutDashboard },
+    { key: "properties", label: t("Properties"), icon: Building2, badge: properties.length },
+    { key: "tenants", label: t("Tenants"), icon: Users, badge: tenants.length },
+    { key: "billing", label: t("Billing"), icon: ReceiptText, badge: metrics.unpaidCount },
+    { key: "maintenance", label: t("Requests"), icon: Wrench, badge: metrics.openTickets },
+    { key: "notices", label: t("Notices"), icon: Megaphone },
+    { key: "reminders", label: t("Reminders"), icon: CalendarClock, badge: metrics.pendingReminders },
     // Always listed: when the add-on is off the tab explains the feature rather than hiding it.
-    { key: "staff", label: "Staff", icon: HardHat },
-    { key: "accounts", label: "Accounts", icon: Wallet },
-    { key: "plan", label: "Plan", icon: Gem },
-    { key: "support", label: "Support", icon: LifeBuoy, badge: metrics.openSupport },
-    { key: "settings", label: "Settings", icon: Settings },
+    { key: "staff", label: t("Staff"), icon: HardHat },
+    { key: "accounts", label: t("Accounts"), icon: Wallet },
+    { key: "plan", label: t("Plan"), icon: Gem },
+    { key: "support", label: t("Support"), icon: LifeBuoy, badge: metrics.openSupport },
+    { key: "settings", label: t("Settings"), icon: Settings },
   ];
 
   // ---- Status mutation (PATCH) ----
@@ -314,7 +317,7 @@ export default function OwnerDashboard() {
       status: l.payment_status,
       property: prop?.name || "",
     });
-    setReceipt({ html, phone: l.tenants?.phone || t?.phone || null, message });
+    setReceipt({ html, phone: l.tenants?.phone || t?.phone || null, message, fileName: `rent-receipt-${l.billing_month}` });
   }
 
   // ---- Vacate a property (archives occupancy on the backend) ----
@@ -344,7 +347,7 @@ export default function OwnerDashboard() {
   return (
     <DashboardShell
       brand="owner"
-      roleLabel="HQ Admin Panel"
+      roleLabel={t("Owner Console")}
       sessionName={session?.name}
       sessionId={session?.userId}
       nav={nav}
@@ -553,7 +556,8 @@ export default function OwnerDashboard() {
       <PropertyHistoryModal property={historyProp} onClose={() => setHistoryProp(null)} />
       <SignatureModal open={sigOpen} onClose={() => setSigOpen(false)} current={ownerSignature} onSaved={setOwnerSignature} />
       <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)}
-        html={receipt?.html || ""} phone={receipt?.phone} message={receipt?.message} />
+        html={receipt?.html || ""} phone={receipt?.phone} message={receipt?.message}
+        fileName={receipt?.fileName} />
 
       <Modal open={!!revealPasscode} onClose={() => setRevealPasscode(null)} title="Tenant login passcode">
         <div className="space-y-5">

@@ -6,6 +6,7 @@ import { Card, Button, Field, TextInput } from "./ui";
 import { toast } from "./toast";
 import { rentMasterFetch, getStoredSession, setStoredSession } from "../lib/api-service";
 import type { AccountProfile, TenantProfile } from "../types/api";
+import { useT } from "../lib/i18n";
 
 // =============================================================================
 // Profile editing, rendered from the Settings tab of each dashboard.
@@ -29,14 +30,15 @@ function syncSessionName(name: string) {
 function ReadOnlyField({
   label, value, hint, icon: Icon,
 }: { label: string; value: string; hint: string; icon: typeof Mail }) {
+  const t = useT();
   return (
     <div className="space-y-1.5">
-      <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">{label}</span>
+      <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">{t(label)}</span>
       <div className="flex items-center gap-2 rounded-xl border border-line/[0.08] bg-overlay/[0.03] px-3 py-2.5 text-sm text-fg">
         <Icon className="h-4 w-4 shrink-0 text-subtle" />
         <span className="truncate">{value || "—"}</span>
       </div>
-      <span className="block text-[11px] text-subtle">{hint}</span>
+      <span className="block text-[11px] text-subtle">{t(hint)}</span>
     </div>
   );
 }
@@ -50,6 +52,7 @@ export function OwnerProfileCard() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
 
+  const t = useT();
   const role = getStoredSession()?.role;
   const apiRole = role === "admin" ? "admin" : "owner";
 
@@ -91,13 +94,13 @@ export function OwnerProfileCard() {
       <div className="mb-4 flex items-center gap-2">
         <div className="rounded-lg bg-primary/10 p-2 text-primary"><UserRound className="h-4 w-4" /></div>
         <div>
-          <h3 className="text-sm font-bold text-heading">Your profile</h3>
-          <p className="text-xs text-subtle">The name and number shown to your tenants.</p>
+          <h3 className="text-sm font-bold text-heading">{t("Your profile")}</h3>
+          <p className="text-xs text-subtle">{t("The name and number shown to your tenants.")}</p>
         </div>
       </div>
 
       {loading ? (
-        <p className="text-sm text-subtle">Loading…</p>
+        <p className="text-sm text-subtle">{t("Loading…")}</p>
       ) : (
         <form onSubmit={submit} className="max-w-md space-y-4">
           <ReadOnlyField
@@ -110,7 +113,7 @@ export function OwnerProfileCard() {
           <Field label="Phone" hint="Used on receipts and for tenants to reach you.">
             <TextInput value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01XXXXXXXXX" />
           </Field>
-          <Button type="submit" loading={saving}>Save profile</Button>
+          <Button type="submit" loading={saving}>{t("Save profile")}</Button>
         </form>
       )}
     </Card>
@@ -125,15 +128,16 @@ export function TenantProfileCard() {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [familyMembers, setFamilyMembers] = useState("");
+  const t = useT();
 
   useEffect(() => {
     (async () => {
       try {
         const res = await rentMasterFetch<{ data: TenantProfile }>("/api/admin/tenants/me", { role: "tenant" });
-        const t = res.data.tenant;
-        setTenant(t);
-        setName(t.name ?? "");
-        setFamilyMembers(t.family_members == null ? "" : String(t.family_members));
+        const row = res.data.tenant;
+        setTenant(row);
+        setName(row.name ?? "");
+        setFamilyMembers(row.family_members == null ? "" : String(row.family_members));
       } catch (e: any) {
         toast.error(`Could not load your profile: ${e.message}`);
       } finally {
@@ -157,7 +161,7 @@ export function TenantProfileCard() {
           }),
         },
       );
-      setTenant((t) => (t ? { ...t, ...res.data } : t));
+      setTenant((prev) => (prev ? { ...prev, ...res.data } : prev));
       syncSessionName(res.data.name ?? name.trim());
       toast.success("Profile updated.");
     } catch (e: any) { toast.error(e.message); }
@@ -169,13 +173,13 @@ export function TenantProfileCard() {
       <div className="mb-4 flex items-center gap-2">
         <div className="rounded-lg bg-primary/10 p-2 text-primary"><UserRound className="h-4 w-4" /></div>
         <div>
-          <h3 className="text-sm font-bold text-heading">Your profile</h3>
-          <p className="text-xs text-subtle">Your details as your owner sees them.</p>
+          <h3 className="text-sm font-bold text-heading">{t("Your profile")}</h3>
+          <p className="text-xs text-subtle">{t("Your details as your owner sees them.")}</p>
         </div>
       </div>
 
       {loading ? (
-        <p className="text-sm text-subtle">Loading…</p>
+        <p className="text-sm text-subtle">{t("Loading…")}</p>
       ) : (
         <form onSubmit={submit} className="max-w-md space-y-4">
           <ReadOnlyField
@@ -189,7 +193,7 @@ export function TenantProfileCard() {
             <TextInput type="number" min="0" max="99" value={familyMembers}
               onChange={(e) => setFamilyMembers(e.target.value)} placeholder="e.g. 4" />
           </Field>
-          <Button type="submit" loading={saving}>Save profile</Button>
+          <Button type="submit" loading={saving}>{t("Save profile")}</Button>
         </form>
       )}
     </Card>

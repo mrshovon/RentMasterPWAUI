@@ -4,6 +4,12 @@ import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttri
 import { createPortal } from "react-dom";
 import { X, Loader2, Search, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
+import { useT } from "../lib/i18n";
+
+// NOTE ON TRANSLATION: the primitives below take their text as plain string props, so they
+// translate it themselves. That is what makes the dashboards translatable without editing every
+// PageHeader/Field/EmptyState call — pages keep passing English, which doubles as the lookup key.
+// Strings with no dictionary entry (all of the admin console) render unchanged.
 
 // -----------------------------------------------------------------------------
 // Spinner
@@ -13,12 +19,13 @@ export function Spinner({ className }: { className?: string }) {
 }
 
 export function FullScreenLoader({ label, sub }: { label: string; sub?: string }) {
+  const t = useT();
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg">
       <div className="flex flex-col items-center gap-3 text-center animate-fade-in">
         <Spinner className="h-7 w-7 text-primary" />
-        <div className="text-lg font-semibold text-fg">{label}</div>
-        {sub && <div className="text-xs font-mono text-subtle">{sub}</div>}
+        <div className="text-lg font-semibold text-fg">{t(label)}</div>
+        {sub && <div className="text-xs font-mono text-subtle">{t(sub)}</div>}
       </div>
     </div>
   );
@@ -164,11 +171,12 @@ export function StatCard({
   icon?: LucideIcon;
   accent?: keyof typeof accentMap;
 }) {
+  const t = useT();
   return (
     <Card className="p-5">
       <div className="flex items-start justify-between">
         <div className="text-[11px] font-bold uppercase tracking-wider text-muted">
-          {label}
+          {t(label)}
         </div>
         {Icon && (
           <div className={cn("rounded-lg bg-overlay/[0.04] p-1.5", accentMap[accent])}>
@@ -229,11 +237,12 @@ export function PageHeader({
   subtitle?: string;
   action?: ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-heading">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+        <h1 className="text-2xl font-extrabold tracking-tight text-heading">{t(title)}</h1>
+        {subtitle && <p className="mt-1 text-sm text-muted">{t(subtitle)}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>
@@ -254,13 +263,14 @@ export function EmptyState({
   hint?: string;
   action?: ReactNode;
 }) {
+  const t = useT();
   return (
     <Card className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
       <div className="rounded-2xl border border-line/[0.08] bg-overlay/[0.03] p-4 text-subtle">
         <Icon className="h-7 w-7" />
       </div>
-      <div className="text-sm font-semibold text-fg">{title}</div>
-      {hint && <div className="max-w-sm text-xs text-subtle">{hint}</div>}
+      <div className="text-sm font-semibold text-fg">{t(title)}</div>
+      {hint && <div className="max-w-sm text-xs text-subtle">{t(hint)}</div>}
       {action && <div className="mt-2">{action}</div>}
     </Card>
   );
@@ -298,6 +308,7 @@ export function Modal({
   /** false = no close button and no backdrop dismissal (blocking dialogs, e.g. maintenance). */
   dismissible?: boolean;
 }) {
+  const t = useT();
   // Portal to <body> so the modal escapes any transformed ancestor (e.g. the
   // dashboard's `animate-slide-up` wrapper retains a transform, which would otherwise
   // make it the containing block for our `position: fixed` overlay and shrink it).
@@ -334,8 +345,8 @@ export function Modal({
         >
           <div className="flex shrink-0 items-start justify-between gap-4 border-b border-line/[0.08] p-5">
             <div>
-              <h2 className="text-lg font-bold text-heading">{title}</h2>
-              {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
+              <h2 className="text-lg font-bold text-heading">{t(title)}</h2>
+              {subtitle && <p className="mt-0.5 text-xs text-muted">{t(subtitle)}</p>}
             </div>
             {dismissible && (
               <button
@@ -375,13 +386,14 @@ export function Field({
   children: ReactNode;
   required?: boolean;
 }) {
+  const t = useT();
   return (
     <label className="block space-y-1.5">
       <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">
-        {label} {required && <span className="text-danger">*</span>}
+        {t(label)} {required && <span className="text-danger">*</span>}
       </span>
       {children}
-      {hint && <span className="block text-[11px] text-subtle">{hint}</span>}
+      {hint && <span className="block text-[11px] text-subtle">{t(hint)}</span>}
     </label>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Sun, Moon } from "lucide-react";
 import { cn } from "../lib/cn";
+import { useT } from "../lib/i18n";
 
 // =============================================================================
 // THEME TOGGLE — flips between the soothing light default and the softened dark.
@@ -40,6 +41,7 @@ export function applyTheme(theme: Theme) {
 export function ThemeToggle({ className, variant = "sidebar" }: { className?: string; variant?: "sidebar" | "icon" }) {
   // Start from a stable value for SSR, then sync to the real theme after mount.
   const [theme, setTheme] = useState<Theme>("light");
+  const t = useT();
   useEffect(() => { setTheme(currentTheme()); }, []);
 
   function toggle() {
@@ -49,7 +51,7 @@ export function ThemeToggle({ className, variant = "sidebar" }: { className?: st
   }
 
   const isDark = theme === "dark";
-  const label = isDark ? "Switch to light theme" : "Switch to dark theme";
+  const label = isDark ? t("Switch to light theme") : t("Switch to dark theme");
   const Icon = isDark ? Sun : Moon;
 
   if (variant === "icon") {
@@ -76,7 +78,7 @@ export function ThemeToggle({ className, variant = "sidebar" }: { className?: st
       )}
     >
       <Icon className="h-[18px] w-[18px]" />
-      {isDark ? "Light theme" : "Dark theme"}
+      {isDark ? t("Light theme") : t("Dark theme")}
     </button>
   );
 }

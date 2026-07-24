@@ -20,6 +20,7 @@ import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { AppSettingsCard } from "../../components/app-settings-card";
 import { TenantProfileCard } from "../../components/profile-card";
+import { useT, useLang } from "../../lib/i18n";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader,
@@ -33,6 +34,8 @@ const priorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
 };
 
 export default function TenantDashboard() {
+  const t = useT();
+  const lang = useLang();
   const { session, checkingSession, logout } = useSessionGuard("tenant");
   // No demo fallback: useSessionGuard resolves the session in an effect, so on the first render
   // this is undefined. A placeholder id here meant the loader below fired immediately with an id
@@ -55,7 +58,7 @@ export default function TenantDashboard() {
   const [rentHistoryOpen, setRentHistoryOpen] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
   const [breakdown, setBreakdown] = useState<BillingLedger | null>(null);
-  const [receiptHtml, setReceiptHtml] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<{ html: string; fileName: string } | null>(null);
 
   useEffect(() => {
     if (!tenantId) return; // wait for the real session — never fetch with a placeholder identity
@@ -122,12 +125,12 @@ export default function TenantDashboard() {
   }, [ledgers, logs]);
 
   const nav: NavItem[] = [
-    { key: "overview", label: "Home", icon: LayoutDashboard },
-    { key: "billing", label: "Rent", icon: CreditCard },
-    { key: "maintenance", label: "Requests", icon: Wrench, badge: metrics.openTickets },
-    { key: "notices", label: "Notices", icon: Bell, badge: notices.length },
-    { key: "documents", label: "Documents", icon: FileText, badge: documents.length },
-    { key: "settings", label: "Settings", icon: Settings },
+    { key: "overview", label: t("Home"), icon: LayoutDashboard },
+    { key: "billing", label: t("Rent"), icon: CreditCard },
+    { key: "maintenance", label: t("Requests"), icon: Wrench, badge: metrics.openTickets },
+    { key: "notices", label: t("Notices"), icon: Bell, badge: notices.length },
+    { key: "documents", label: t("Documents"), icon: FileText, badge: documents.length },
+    { key: "settings", label: t("Settings"), icon: Settings },
   ];
 
   const propertyId = ledgers[0]?.property_id;
@@ -151,7 +154,7 @@ export default function TenantDashboard() {
 
   // Build a "Tenant Copy" receipt for a paid invoice and open the preview.
   function openTenantReceipt(l: BillingLedger) {
-    setReceiptHtml(buildReceiptHtml({
+    const html = buildReceiptHtml({
       copyLabel: "Tenant Copy",
       ownerName: profile?.owner?.name || "Owner",
       propertyAddress: profile?.property?.address || null,
@@ -168,7 +171,8 @@ export default function TenantDashboard() {
       dueDay: profile?.tenant.due_date,
       note: l.extra_charge_remarks,
       signatureUrl: profile?.owner?.signature_url,
-    }));
+    });
+    setReceipt({ html, fileName: `rent-receipt-${l.billing_month}` });
   }
 
   if (checkingSession || loading)
@@ -177,7 +181,7 @@ export default function TenantDashboard() {
   return (
     <DashboardShell
       brand="tenant"
-      roleLabel="Resident Hub"
+      roleLabel={t("Resident Hub")}
       sessionName={session?.name}
       sessionId={session?.userId}
       nav={nav}
@@ -195,7 +199,7 @@ export default function TenantDashboard() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard label="Amount due" accent={metrics.dueLedger ? "rose" : "emerald"} icon={CircleDollarSign}
               value={formatCurrency(metrics.dueLedger?.total_payable ?? 0)}
-              sub={metrics.dueLedger ? `${formatMonth(metrics.dueLedger.billing_month)} · ${metrics.dueLedger.payment_status}` : "All settled 🎉"} />
+              sub={metrics.dueLedger ? `${formatMonth(metrics.dueLedger.billing_month, lang)} · ${metrics.dueLedger.payment_status}` : "All settled 🎉"} />
             <StatCard label="Open requests" accent="amber" icon={Wrench}
               value={metrics.openTickets} sub="In progress" />
             <StatCard label="Notices" accent="indigo" icon={Bell}
@@ -213,7 +217,7 @@ export default function TenantDashboard() {
           {metrics.dueLedger && (
             <Card className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-sm font-bold text-fg">Rent for {formatMonth(metrics.dueLedger.billing_month)}</div>
+                <div className="text-sm font-bold text-fg">Rent for {formatMonth(metrics.dueLedger.billing_month, lang)}</div>
                 <div className="mt-1 text-xs text-muted">
                   Rent {formatCurrency(metrics.dueLedger.rent_amount)} · Service {formatCurrency(metrics.dueLedger.service_charge)}
                   {Number(metrics.dueLedger.extra_charge) > 0 && ` · Extra ${formatCurrency(metrics.dueLedger.extra_charge)}`}
@@ -233,16 +237,16 @@ export default function TenantDashboard() {
           <Card className="space-y-3 p-6">
             <div className="flex items-center gap-2">
               <Megaphone className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-bold text-fg">Latest notice</h3>
+              <h3 className="text-sm font-bold text-fg">{t("Latest notice")}</h3>
             </div>
             {notices[0] ? (
               <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.03] p-4">
                 <h4 className="font-bold text-primary">{notices[0].title}</h4>
                 <p className="mt-1 text-sm text-fg">{notices[0].content}</p>
-                <p className="mt-2 font-mono text-[10px] text-subtle">{formatDate(notices[0].created_at)}</p>
+                <p className="mt-2 font-mono text-[10px] text-subtle">{formatDate(notices[0].created_at, lang)}</p>
               </div>
             ) : (
-              <p className="text-sm text-subtle">No announcements right now.</p>
+              <p className="text-sm text-subtle">{t("No announcements right now.")}</p>
             )}
           </Card>
         </div>
@@ -265,15 +269,15 @@ export default function TenantDashboard() {
                   <table className="w-full min-w-[560px] text-left text-sm">
                     <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                       <tr>
-                        <th className="p-4">Month</th><th className="p-4">Rent</th>
-                        <th className="p-4">Service + Extra</th><th className="p-4">Total</th><th className="p-4">Status</th>
-                        <th className="p-4 text-right">Payment</th>
+                        <th className="p-4">{t("Month")}</th><th className="p-4">Rent</th>
+                        <th className="p-4">{t("Service + Extra")}</th><th className="p-4">Total</th><th className="p-4">{t("Status")}</th>
+                        <th className="p-4 text-right">{t("Payment")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line/[0.04]">
                       {ledgers.map((l) => (
                         <tr key={l.id} className="hover:bg-overlay/[0.02]">
-                          <td className="p-4 font-semibold text-heading">{formatMonth(l.billing_month)}</td>
+                          <td className="p-4 font-semibold text-heading">{formatMonth(l.billing_month, lang)}</td>
                           <td className="p-4 text-fg">{formatCurrency(l.rent_amount)}</td>
                           <td className="p-4 text-fg">{formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}</td>
                           <td className="p-4 font-bold text-success">
@@ -305,7 +309,7 @@ export default function TenantDashboard() {
                 {ledgers.map((l) => (
                   <Card key={l.id} className="p-4">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-heading">{formatMonth(l.billing_month)}</span>
+                      <span className="font-semibold text-heading">{formatMonth(l.billing_month, lang)}</span>
                       <Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge>
                     </div>
                     <div className="mt-2 flex items-end justify-between">
@@ -338,13 +342,13 @@ export default function TenantDashboard() {
       {tab === "maintenance" && (
         <div className="space-y-6">
           <PageHeader title="Maintenance" subtitle="Report issues and track their progress."
-            action={<Button icon={Plus} onClick={() => setTicketOpen(true)} disabled={!propertyId}>New request</Button>} />
+            action={<Button icon={Plus} onClick={() => setTicketOpen(true)} disabled={!propertyId}>{t("New request")}</Button>} />
           {!propertyId && (
             <Alert>We couldn't determine your unit yet — once you have a billing record you can file tickets.</Alert>
           )}
           {logs.length === 0 ? (
             <EmptyState icon={Wrench} title="No requests filed" hint="Report a maintenance issue and your owner will be notified."
-              action={<Button icon={Plus} onClick={() => setTicketOpen(true)} disabled={!propertyId}>New request</Button>} />
+              action={<Button icon={Plus} onClick={() => setTicketOpen(true)} disabled={!propertyId}>{t("New request")}</Button>} />
           ) : (
             <div className="grid gap-4">
               {logs.map((m) => (
@@ -364,7 +368,7 @@ export default function TenantDashboard() {
                     </div>
                   )}
                   <div className="flex items-center gap-2 border-t border-line/[0.06] pt-3 text-xs text-subtle">
-                    <span>{formatDate(m.created_at)}</span>
+                    <span>{formatDate(m.created_at, lang)}</span>
                     <Badge
                       tone={m.resolution_status === "resolved" ? "emerald" : m.resolution_status === "in_progress" ? "cyan" : "amber"}
                       className="ml-auto">
@@ -389,7 +393,7 @@ export default function TenantDashboard() {
                 <Card key={n.id} className="space-y-2 p-5">
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="font-bold text-primary">{n.title}</h3>
-                    <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at)}</span>
+                    <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at, lang)}</span>
                   </div>
                   <p className="text-sm leading-relaxed text-fg">{n.content}</p>
                 </Card>
@@ -415,7 +419,7 @@ export default function TenantDashboard() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-semibold text-heading">{d.title}</div>
                     <div className="text-[11px] uppercase tracking-wider text-subtle">
-                      {d.doc_type ?? "document"} · {formatDate(d.created_at)}
+                      {d.doc_type ?? "document"} · {formatDate(d.created_at, lang)}
                     </div>
                   </div>
                   <a href={d.file_url} target="_blank" rel="noreferrer"
@@ -457,7 +461,8 @@ export default function TenantDashboard() {
         revisions={rentRevisions}
         currentRent={profile?.tenant.monthly_rent}
       />
-      <ReceiptModal open={!!receiptHtml} onClose={() => setReceiptHtml(null)} html={receiptHtml || ""} />
+      <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)}
+        html={receipt?.html || ""} fileName={receipt?.fileName} />
     </DashboardShell>
   );
 }
@@ -465,6 +470,7 @@ export default function TenantDashboard() {
 /* ============================================================ RESIDENCE CARDS */
 // Compact property card pinned to the top of the desktop sidebar.
 function PropertySidebarCard({ profile }: { profile: TenantProfile }) {
+  const t = useT();
   const p = profile.property;
   if (!p) return null;
   return (
@@ -483,7 +489,7 @@ function PropertySidebarCard({ profile }: { profile: TenantProfile }) {
         <span className="line-clamp-2">{p.address}</span>
       </div>
       <div className="mt-2.5 flex items-center justify-between border-t border-line/[0.06] pt-2">
-        <span className="text-[10px] uppercase tracking-wider text-subtle">Monthly rent</span>
+        <span className="text-[10px] uppercase tracking-wider text-subtle">{t("Monthly rent")}</span>
         <span className="text-xs font-bold text-success">{formatCurrency(profile.tenant.monthly_rent)}</span>
       </div>
     </div>
@@ -496,11 +502,12 @@ function InfoRow({
   icon: LucideIcon; label: string; value: string; strong?: boolean;
   action?: { icon: LucideIcon; title: string; onClick: () => void };
 }) {
+  const t = useT();
   return (
     <div className="flex items-start gap-2.5">
       <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-subtle" />
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-wider text-subtle">{label}</div>
+        <div className="text-[10px] uppercase tracking-wider text-subtle">{t(label)}</div>
         <div className={cn("text-sm text-fg", strong && "font-bold text-success")}>{value}</div>
       </div>
       {action && (
@@ -521,23 +528,25 @@ function ResidenceCard({
   onServiceBreakdown: () => void;
   onRentHistory: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const { tenant, property, owner } = profile;
   const ownerName = owner?.name || "Your property owner";
   return (
     <Card className="p-6">
       <div className="mb-5 flex items-center gap-2">
         <Building2 className="h-4 w-4 text-success" />
-        <h3 className="text-sm font-bold text-fg">Your residence</h3>
+        <h3 className="text-sm font-bold text-fg">{t("Your residence")}</h3>
       </div>
       <div className="grid gap-6 md:grid-cols-3">
         <div className="space-y-3">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">Property</div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">{t("Property")}</div>
           <div className="text-sm font-semibold text-heading">{property?.name ?? "—"}</div>
           <InfoRow icon={Home} label="Flat / Unit" value={property?.flat_no ?? "—"} />
           <InfoRow icon={MapPin} label="Address" value={property?.address ?? "—"} />
         </div>
         <div className="space-y-3">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">Rent terms</div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">{t("Rent terms")}</div>
           <InfoRow icon={Wallet} label="Monthly rent" value={formatCurrency(tenant.monthly_rent)} strong
             action={{ icon: History, title: "Rent revision history", onClick: onRentHistory }} />
           <InfoRow icon={ReceiptText} label="Service charge" value={formatCurrency(tenant.service_charge)}
@@ -547,14 +556,14 @@ function ResidenceCard({
         </div>
         <div className="space-y-4">
           <div className="space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">Your details</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">{t("Your details")}</div>
             <InfoRow icon={User} label="Name" value={tenant.name} />
             <InfoRow icon={Phone} label="Number" value={tenant.phone} />
             <InfoRow icon={Users} label="Household" value={`${tenant.family_members} member${tenant.family_members === 1 ? "" : "s"}`} />
-            {tenant.rented_date && <InfoRow icon={CalendarClock} label="Resident since" value={formatDate(tenant.rented_date)} />}
+            {tenant.rented_date && <InfoRow icon={CalendarClock} label="Resident since" value={formatDate(tenant.rented_date, lang)} />}
           </div>
           <div className="space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">Owner contact</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">{t("Owner contact")}</div>
             <InfoRow icon={User} label="Owner" value={ownerName} />
             {owner?.phone && <InfoRow icon={Phone} label="Number" value={owner.phone} />}
           </div>
@@ -565,9 +574,10 @@ function ResidenceCard({
 }
 
 function BreakRow({ label, value, strong, tone }: { label: string; value: string; strong?: boolean; tone?: "emerald" }) {
+  const t = useT();
   return (
     <div className="flex items-center justify-between py-1.5">
-      <span className={strong ? "text-sm font-bold text-heading" : "text-sm text-muted"}>{label}</span>
+      <span className={strong ? "text-sm font-bold text-heading" : "text-sm text-muted"}>{t(label)}</span>
       <span className={
         strong ? "text-base font-black text-success"
           : tone === "emerald" ? "text-sm font-semibold text-success"
@@ -579,9 +589,11 @@ function BreakRow({ label, value, strong, tone }: { label: string; value: string
 
 // Itemised breakdown of a single invoice's charges.
 function BillBreakdownModal({ ledger, onClose }: { ledger: BillingLedger | null; onClose: () => void }) {
+  const t = useT();
+  const lang = useLang();
   return (
     <Modal open={!!ledger} onClose={onClose} title="Charge breakdown"
-      subtitle={ledger ? `Invoice for ${formatMonth(ledger.billing_month)}` : undefined}>
+      subtitle={ledger ? `Invoice for ${formatMonth(ledger.billing_month, lang)}` : undefined}>
       {ledger && (
         <div className="space-y-1">
           <BreakRow label="Base rent" value={formatCurrency(ledger.rent_amount)} />
@@ -597,7 +609,7 @@ function BillBreakdownModal({ ledger, onClose }: { ledger: BillingLedger | null;
           <div className="my-3 border-t border-line/[0.08]" />
           <BreakRow label="Total payable" value={formatCurrency(ledger.total_payable)} strong />
           <div className="flex items-center justify-between pt-3">
-            <span className="text-xs text-subtle">Status</span>
+            <span className="text-xs text-subtle">{t("Status")}</span>
             <Badge tone={statusTone[ledger.payment_status]}>{ledger.payment_status}</Badge>
           </div>
         </div>
@@ -664,6 +676,7 @@ function RentHistoryModal({
   revisions: RentRevision[];
   currentRent?: number;
 }) {
+  const lang = useLang();
   return (
     <Modal open={open} onClose={onClose} title="Rent revision history"
       subtitle="Every change to your rent, most recent first.">
@@ -681,7 +694,7 @@ function RentHistoryModal({
             const increased = Number(r.new_rent) >= Number(r.old_rent);
             return (
               <div key={r.id} className="flex items-center justify-between rounded-lg border border-line/[0.06] bg-overlay/[0.02] px-3 py-2.5">
-                <span className="text-xs text-muted">{formatDate(r.changed_at)}</span>
+                <span className="text-xs text-muted">{formatDate(r.changed_at, lang)}</span>
                 <span className="text-sm">
                   <span className="text-muted">{formatCurrency(r.old_rent)}</span>
                   <span className="mx-1.5 text-subtle">→</span>

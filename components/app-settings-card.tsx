@@ -9,6 +9,7 @@ import { ensurePushSubscription, getPushPermission, type PushPermission } from "
 import { getSessionToken } from "../lib/api-service";
 import { isNativeApp } from "../lib/platform";
 import { APP_VERSION } from "../lib/app-config";
+import { useT } from "../lib/i18n";
 
 // =============================================================================
 // "App & notifications" — the home for the per-device actions that used to float
@@ -20,6 +21,7 @@ export function AppSettingsCard() {
   const [permission, setPermission] = useState<PushPermission>("unsupported");
   const [native, setNative] = useState(false);
   const [busy, setBusy] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     // Inside the native app notifications go through FCM, not Web Push — the OS owns the
@@ -45,9 +47,9 @@ export function AppSettingsCard() {
       <div className="mb-4 flex items-center gap-2">
         <div className="rounded-lg bg-primary/10 p-2 text-primary"><Smartphone className="h-4 w-4" /></div>
         <div>
-          <h3 className="text-sm font-bold text-heading">App &amp; notifications</h3>
+          <h3 className="text-sm font-bold text-heading">{t("App & notifications")}</h3>
           <p className="text-xs text-subtle">
-            Settings for this device only — they don&apos;t affect your other phones or browsers.
+            {t("Settings for this device only — they do not affect your other phones or browsers.")}
           </p>
         </div>
       </div>
@@ -56,29 +58,27 @@ export function AppSettingsCard() {
         {/* --- Notification status --- */}
         {permission === "unsupported" ? (
           <p className="text-sm text-muted">
-            This browser can&apos;t receive push notifications. Install the Android app or use Chrome
-            to get rent, invoice and maintenance alerts.
+            {t("This browser cannot receive push notifications. Install the Android app or use Chrome to get rent, invoice and maintenance alerts.")}
           </p>
         ) : permission === "denied" ? (
           <div className="flex items-start gap-2.5 rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-4 py-3 text-xs text-muted">
             <BellOff className="mt-0.5 h-4 w-4 shrink-0 text-subtle" />
             <span>
-              Notifications are blocked for this app. Re-enable them in your browser or system
-              settings, then reload this page.
+              {t("Notifications are blocked for this app. Re-enable them in your browser or system settings, then reload this page.")}
             </span>
           </div>
         ) : permission === "granted" ? (
           <div className="flex items-center gap-2 text-sm font-semibold text-success">
             <CheckCircle2 className="h-4 w-4" />
-            Notifications are on for this device.
+            {t("Notifications are on for this device.")}
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3">
             <p className="text-xs text-fg">
-              Turn on notifications for invoices, payments and maintenance updates.
+              {t("Turn on notifications for invoices, payments and maintenance updates.")}
             </p>
             <Button size="sm" variant="secondary" icon={Bell} loading={busy} onClick={enable}>
-              Enable notifications
+              {t("Enable notifications")}
             </Button>
           </div>
         )}
@@ -91,8 +91,8 @@ export function AppSettingsCard() {
 
         <p className="text-[11px] text-subtle">
           {native
-            ? "Android app — updates install from the in-app prompt."
-            : `Web app v${APP_VERSION} — it updates automatically when you reload.`}
+            ? t("Android app — updates install from the in-app prompt.")
+            : `${t("Web app")} v${APP_VERSION} — ${t("it updates automatically when you reload.")}`}
         </p>
       </div>
     </Card>

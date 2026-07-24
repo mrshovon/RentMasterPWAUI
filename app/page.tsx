@@ -9,10 +9,14 @@ import {
 import { Button, Modal, Field, TextInput } from "../components/ui";
 import { toast } from "../components/toast";
 import { DownloadAndroid } from "../components/download-android";
+import { LanguageToggle } from "../components/language-toggle";
 import { APP_VERSION } from "../lib/app-config";
+import { useT } from "../lib/i18n";
 
 export default function EntryGatewayPage() {
-  const [tab, setTab] = useState<"tenant" | "owner">("tenant");
+  const t = useT();
+  // Owners are the primary audience, so their portal is the default and the leftmost tab.
+  const [tab, setTab] = useState<"tenant" | "owner">("owner");
   const [phone, setPhone] = useState("");
   const [pass, setPass] = useState("");
   const [email, setEmail] = useState("");
@@ -109,14 +113,13 @@ export default function EntryGatewayPage() {
 
           <div className="max-w-md space-y-5">
             <span className="inline-block rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-primary">
-              Property Management, Reimagined
+              {t("Property Management, Reimagined")}
             </span>
             <h1 className="text-4xl font-black leading-tight tracking-tight text-heading">
-              Properties, tenants, billing and requests — one calm dashboard.
+              {t("Properties, tenants, billing and requests — one calm dashboard.")}
             </h1>
             <p className="text-sm leading-relaxed text-muted">
-              Track occupancy, generate rent invoices, resolve maintenance
-              tickets and broadcast notices from a single, mobile-ready portal.
+              {t("Track occupancy, generate rent invoices, resolve maintenance tickets and broadcast notices from a single, mobile-ready portal.")}
             </p>
           </div>
 
@@ -129,30 +132,36 @@ export default function EntryGatewayPage() {
         {/* Form panel */}
         <div className="flex flex-col items-center justify-center px-4 py-12 sm:px-8">
           <div className="w-full max-w-md space-y-8">
+            {/* The language switch has to be reachable BEFORE signing in, or it's out of reach
+                for exactly the users who need it. */}
+            <div className="flex justify-center lg:justify-end">
+              <LanguageToggle variant="icon" className="border border-line/[0.08]" />
+            </div>
+
             <div className="space-y-1.5 text-center lg:text-left">
               <h2 className="text-3xl font-extrabold tracking-tight text-heading">
-                Welcome back
+                {t("Welcome back")}
               </h2>
               <p className="text-sm text-muted">
-                Choose your access portal to continue.
+                {t("Choose your access portal to continue.")}
               </p>
             </div>
 
             {/* Segmented control */}
             <div className="flex rounded-xl border border-line/[0.06] bg-bg/60 p-1">
-              {(["tenant", "owner"] as const).map((t) => (
+              {(["owner", "tenant"] as const).map((portal) => (
                 <button
-                  key={t}
-                  onClick={() => setTab(t)}
+                  key={portal}
+                  onClick={() => setTab(portal)}
                   className={`flex-1 rounded-lg py-2.5 text-xs font-bold uppercase tracking-wider transition-all ${
-                    tab === t
-                      ? t === "tenant"
+                    tab === portal
+                      ? portal === "tenant"
                         ? "bg-surface text-success shadow"
                         : "bg-surface text-primary shadow"
                       : "text-subtle hover:text-fg"
                   }`}
                 >
-                  {t === "tenant" ? "Resident" : "Owner / Admin"}
+                  {portal === "tenant" ? t("Resident") : t("Owner")}
                 </button>
               ))}
             </div>
@@ -162,7 +171,7 @@ export default function EntryGatewayPage() {
                 <form onSubmit={loginTenant} className="space-y-5">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                      Registered phone
+                      {t("Registered phone")}
                     </label>
                     <div className="relative">
                       <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
@@ -177,7 +186,7 @@ export default function EntryGatewayPage() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                      Passcode
+                      {t("Passcode")}
                     </label>
                     <div className="relative">
                       <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
@@ -190,18 +199,18 @@ export default function EntryGatewayPage() {
                       />
                     </div>
                     <p className="text-[11px] text-subtle">
-                      Tip: your passcode was provided by your landlord.
+                      {t("Tip: your passcode was provided by your landlord.")}
                     </p>
                   </div>
                   {error && <p className="text-xs text-danger">{error}</p>}
                   <Button type="submit" loading={loading} variant="success" className="w-full" icon={ArrowRight}>
-                    Enter resident portal
+                    {t("Enter resident portal")}
                   </Button>
                 </form>
               ) : (
                 <form onSubmit={loginOwner} className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">Email</label>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">{t("Email")}</label>
                     <div className="relative">
                       <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                       <input type="email" placeholder="owner@example.com" value={email}
@@ -209,7 +218,7 @@ export default function EntryGatewayPage() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">Password</label>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">{t("Password")}</label>
                     <div className="relative">
                       <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                       <input type="password" placeholder="••••••••" value={ownerPass}
@@ -218,17 +227,17 @@ export default function EntryGatewayPage() {
                   </div>
                   {error && <p className="text-xs text-danger">{error}</p>}
                   <Button type="submit" loading={loading} className="w-full" icon={ArrowRight}>
-                    Sign in
+                    {t("Sign in")}
                   </Button>
                   <button type="button" onClick={() => setForgotOpen(true)}
                     className="block w-full text-center text-xs font-medium text-muted transition hover:text-primary">
-                    Forgot password?
+                    {t("Forgot password?")}
                   </button>
                   <p className="text-center text-xs text-subtle">
-                    New here?{" "}
+                    {t("New here?")}{" "}
                     <button type="button" onClick={() => setSignupOpen(true)}
                       className="font-semibold text-primary transition hover:text-primary">
-                      Create an owner account
+                      {t("Create an owner account")}
                     </button>
                   </p>
                 </form>
@@ -263,16 +272,17 @@ function SignupModal({
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const t = useT();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { toast.error("Enter your name."); return; }
-    if (!email.trim() || !email.includes("@")) { toast.error("Enter a valid email."); return; }
-    if (password.length < 8) { toast.error("Password must be at least 8 characters."); return; }
+    if (!name.trim()) { toast.error(t("Enter your name.")); return; }
+    if (!email.trim() || !email.includes("@")) { toast.error(t("Enter a valid email.")); return; }
+    if (password.length < 8) { toast.error(t("Password must be at least 8 characters.")); return; }
     try {
       setSubmitting(true);
       const r = await apiSignup({ name: name.trim(), email: email.trim(), phone: phone.trim(), password });
-      toast.success("Welcome to RentMaster!");
+      toast.success(t("Welcome to RentMaster!"));
       onSuccess(r.id, r.name, r.token, r.refreshToken, r.expiresAt);
     } catch (err: any) {
       toast.error(err.message);
@@ -281,25 +291,25 @@ function SignupModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Create your owner account"
-      subtitle="Start free — you can upgrade your plan anytime.">
+    <Modal open={open} onClose={onClose} title={t("Create your owner account")}
+      subtitle={t("Start free — you can upgrade your plan anytime.")}>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Your name" required>
+        <Field label={t("Your name")} required>
           <TextInput required placeholder="Jane Landlord" value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Email" required>
+          <Field label={t("Email")} required>
             <TextInput type="email" required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           </Field>
-          <Field label="Phone">
+          <Field label={t("Phone")}>
             <TextInput placeholder="01712345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </Field>
         </div>
-        <Field label="Password" required hint="At least 8 characters.">
+        <Field label={t("Password")} required hint={t("At least 8 characters.")}>
           <TextInput type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         <Button type="submit" loading={submitting} className="w-full" icon={User}>
-          Create account
+          {t("Create account")}
         </Button>
       </form>
     </Modal>
@@ -316,10 +326,11 @@ function ForgotPasswordModal({
   const [email, setEmail] = useState(initialEmail);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const t = useT();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !email.includes("@")) { toast.error("Enter a valid email."); return; }
+    if (!email.trim() || !email.includes("@")) { toast.error(t("Enter a valid email.")); return; }
     try {
       setSending(true);
       await apiForgotPassword(email.trim());
@@ -334,24 +345,24 @@ function ForgotPasswordModal({
   function close() { setSent(false); onClose(); }
 
   return (
-    <Modal open={open} onClose={close} title="Reset your password"
-      subtitle="We'll email you a secure link to set a new password.">
+    <Modal open={open} onClose={close} title={t("Reset your password")}
+      subtitle={t("We'll email you a secure link to set a new password.")}>
       {sent ? (
         <div className="space-y-5">
           <p className="text-sm text-fg">
-            If an account exists for <span className="font-semibold text-heading">{email.trim()}</span>, a password
-            reset link is on its way. Check your inbox (and spam folder).
+            {t("If an account exists for")} <span className="font-semibold text-heading">{email.trim()}</span>
+            {t(", a password reset link is on its way. Check your inbox (and spam folder).")}
           </p>
-          <Button className="w-full" onClick={close}>Done</Button>
+          <Button className="w-full" onClick={close}>{t("Done")}</Button>
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Account email" required>
+          <Field label={t("Account email")} required>
             <TextInput type="email" required placeholder="owner@example.com" value={email}
               onChange={(e) => setEmail(e.target.value)} />
           </Field>
           <Button type="submit" loading={sending} className="w-full" icon={ArrowRight}>
-            Send reset link
+            {t("Send reset link")}
           </Button>
         </form>
       )}

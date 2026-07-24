@@ -6,6 +6,8 @@ import { cn } from "../lib/cn";
 import { PushToggle } from "./push-toggle";
 import { DownloadAndroid } from "./download-android";
 import { ThemeToggle } from "./theme-toggle";
+import { LanguageToggle } from "./language-toggle";
+import { useT } from "../lib/i18n";
 
 export interface NavItem {
   key: string;
@@ -49,6 +51,7 @@ export function DashboardShell({
   const activeTab = nav.find((n) => n.key === active);
 
   const [moreOpen, setMoreOpen] = useState(false);
+  const t = useT();
 
   // Mobile bottom bar: keep it to a single non-scrolling row. Up to 5 items fit as equal tabs;
   // beyond that, show the first 4 + a "More" button that opens a sheet with the rest.
@@ -123,6 +126,7 @@ export function DashboardShell({
         {/* Bottom band — always visible. */}
         <div className="shrink-0 space-y-1 pt-4">
           <ThemeToggle variant="sidebar" />
+          <LanguageToggle variant="sidebar" />
           {/* Renders only in a browser (hidden inside the installed Android app). */}
           <DownloadAndroid variant="sidebar" />
           <button
@@ -130,7 +134,7 @@ export function DashboardShell({
             className="flex w-full items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold text-muted transition hover:bg-danger/10 hover:text-danger"
           >
             <LogOut className="h-[18px] w-[18px]" />
-            Sign out
+            {t("Sign out")}
           </button>
         </div>
       </aside>
@@ -146,11 +150,12 @@ export function DashboardShell({
             </span>
           </div>
           <div className="flex items-center gap-1">
+            <LanguageToggle variant="icon" />
             <ThemeToggle variant="icon" />
             <button
               onClick={onLogout}
               className="rounded-lg p-2 text-muted hover:text-danger"
-              aria-label="Sign out"
+              aria-label={t("Sign out")}
             >
               <LogOut className="h-5 w-5" />
             </button>
@@ -173,7 +178,7 @@ export function DashboardShell({
       {moreOpen && (
         <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
           <button
-            aria-label="Close menu"
+            aria-label={t("Close menu")}
             onClick={() => setMoreOpen(false)}
             className="absolute inset-0 bg-scrim/70 backdrop-blur-sm"
           />
@@ -183,11 +188,11 @@ export function DashboardShell({
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-overlay/20" />
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-bold text-fg">More</span>
+              <span className="text-sm font-bold text-fg">{t("More")}</span>
               <button
                 onClick={() => setMoreOpen(false)}
                 className="rounded-lg p-1.5 text-muted hover:bg-overlay/[0.06] hover:text-heading"
-                aria-label="Close"
+                aria-label={t("Close")}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -269,11 +274,11 @@ export function DashboardShell({
               "relative flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition-colors",
               activeInOverflow || moreOpen ? "text-primary" : "text-subtle"
             )}
-            aria-label="More"
+            aria-label={t("More")}
             aria-expanded={moreOpen}
           >
             <MoreHorizontal className="h-5 w-5" />
-            <span>More</span>
+            <span>{t("More")}</span>
             {activeInOverflow && (
               <span className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-primary" />
             )}

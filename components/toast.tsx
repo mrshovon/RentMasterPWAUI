@@ -2,11 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle, Info, TriangleAlert, X } from "lucide-react";
+import { useT } from "../lib/i18n";
 
 // =============================================================================
 // Lightweight toast system. A module-level pub/sub lets ANY file (component or
 // plain function) fire a toast via `import { toast }` — no context threading.
 // Render <Toaster /> once at the app root (see app/layout.tsx).
+//
+// TRANSLATION HAPPENS HERE, at the render boundary, not at the ~200 call sites. `toast.success
+// ("Profile updated.")` stays plain English in the calling code and is looked up on the way to
+// the screen. Messages built with interpolation ("Invoice marked paid.") simply miss the
+// dictionary and render English, which is the intended fallback.
 // =============================================================================
 
 export type ToastType = "success" | "error" | "info" | "warning";
@@ -43,6 +49,7 @@ const AUTO_DISMISS_MS = 4500;
 
 export function Toaster() {
   const [items, setItems] = useState<ToastItem[]>([]);
+  const translate = useT();
 
   useEffect(() => {
     const listener: Listener = (t) => {
@@ -73,11 +80,11 @@ export function Toaster() {
             className={`pointer-events-auto flex w-full max-w-sm animate-toast-in items-start gap-3 rounded-xl border ${tone.ring} bg-surface/95 px-4 py-3 shadow-2xl shadow-black/40 backdrop-blur-xl`}
           >
             <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${tone.iconColor}`} />
-            <p className={`flex-1 text-sm leading-snug ${tone.text}`}>{t.message}</p>
+            <p className={`flex-1 text-sm leading-snug ${tone.text}`}>{translate(t.message)}</p>
             <button
               onClick={() => dismiss(t.id)}
               className="shrink-0 rounded-md p-0.5 text-subtle transition hover:text-fg"
-              aria-label="Dismiss"
+              aria-label={translate("Dismiss")}
             >
               <X className="h-4 w-4" />
             </button>
