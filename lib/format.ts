@@ -31,6 +31,20 @@ export function formatDate(iso: string | null | undefined): string {
   });
 }
 
+/** ISO timestamp -> "7 Jul 2026, 14:30". For windows where the time of day matters. */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /** Day-of-month with ordinal suffix: 5 -> "5th". */
 export function ordinalDay(day: number | null | undefined): string {
   const d = Number(day ?? 0);

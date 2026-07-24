@@ -1,26 +1,75 @@
 name: Android Release
 
-# Triggered by the one-command release script (scripts/release-android.mjs), which pushes
-# a v* tag. Builds a SIGNED APK + AAB and publishes them as a GitHub Release. The app reads
-# /releases/latest to power the in-app update popup.
+# Every push to `main` builds a SIGNED APK and publishes it as a GitHub Release. The app reads
+# /releases/latest to power the in-app update popup, so shipping is just: merge to main.
+#
+# Why it works this way (the previous tag-driven flow kept failing):
+#   * the version is computed HERE, so nothing has to be bumped, committed or tagged by hand;
+#   * the tag + Release are created by the LAST step, only after a green build — a failed build
+#     can no longer leave a published-but-empty tag that has to be deleted by hand;
+#   * a pre-flight step fails fast with a readable message when a secret is missing, instead of
+#     dying somewhere deep inside Gradle.
+#
+# Skip a release for a commit by putting [skip apk] in its message.
 
 on:
   push:
-    tags:
-      - "v*"
-  # Manual re-run from the Actions tab (e.g. after fixing a secret). Builds the current commit;
-  # only a tag push publishes a versioned Release.
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      build_aab:
+        description: "Also build the Play Store bundle (.aab)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
+# Never let two pushes race each other to create the same tag.
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
 jobs:
   build:
+    if: "!contains(github.event.head_commit.message, '[skip apk]')"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Pre-flight — required secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+        run: |
+          missing=""
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD NEXT_PUBLIC_APP_URL; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing — add them under Settings → Secrets and variables → Actions (see ANDROID_RELEASE.md)."
+            exit 1
+          fi
+          echo "All required secrets are present."
+
+      - name: Compute version
+        id: version
+        run: |
+          # MAJOR.MINOR come from package.json; the patch is the CI run number, so every build
+          # gets a version strictly higher than the last with nothing to bump by hand. Edit
+          # package.json's version to roll MAJOR/MINOR (e.g. "1.2.0" -> releases become 1.2.x).
+          BASE=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
+          VERSION="$BASE.${{ github.run_number }}"
+          # versionCode must increase forever. The offset keeps it clear of the hand-managed
+          # codes (up to 4) used before this workflow existed.
+          VERSION_CODE=$(( 1000 + ${{ github.run_number }} ))
+          echo "version=$VERSION"           >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "Building v$VERSION (versionCode $VERSION_CODE)"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -43,6 +92,18 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Stamp the version (not committed — the artefact carries it)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+        run: |
+          # package.json first: capacitor.config.js reads it during `cap sync` to stamp the
+          # "RentMasterApp/<version>" user-agent the web bundle uses to detect the installed build.
+          node -e "const f='package.json',p=require('./'+f);p.version=process.env.VERSION;require('fs').writeFileSync(f,JSON.stringify(p,null,2)+'\n')"
+          sed -i "s/versionCode .*/versionCode ${VERSION_CODE}/"    android/app/build.gradle
+          sed -i "s/versionName \".*\"/versionName \"${VERSION}\"/"  android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
 
       - name: Capacitor sync (bakes the production web URL into the shell)
         run: npx cap sync android
@@ -77,19 +138,45 @@ jobs:
           keyPassword=$ANDROID_KEY_PASSWORD
           EOF
 
-      - name: Build signed APK + AAB
+      - name: Build signed APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon
+
+      # The .aab is only needed for a Play Store upload, so it's off by default — it roughly
+      # doubles the Gradle step for an artefact nobody downloads from the Releases page.
+      - name: Build Play Store bundle (.aab)
+        if: inputs.build_aab
+        run: |
+          cd android
+          ./gradlew bundleRelease --no-daemon
+
+      # Built from what's actually on disk, so the optional .aab never turns into a
+      # "file not found" that fails an otherwise perfect release.
+      - name: Collect release assets
+        id: assets
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          if [ ! -f "$APK" ]; then
+            echo "::error::Gradle succeeded but $APK is missing."
+            exit 1
+          fi
+          {
+            echo 'list<<ASSETS_EOF'
+            echo "$APK"
+            if [ -f "$AAB" ]; then echo "$AAB"; fi
+            echo 'ASSETS_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub Release
-        # Only a tag push publishes a versioned Release; a manual dispatch just builds/validates.
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          # tag_name/name come from the pushed tag; body from the notes the release script wrote.
-          body_path: RELEASE_NOTES.md
-          files: |
-            android/app/build/outputs/apk/release/app-release.apk
-            android/app/build/outputs/bundle/release/app-release.aab
+          # The action creates the tag itself, pointing at this commit — AFTER a green build.
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          # Keep the app-release.apk filename: lib/app-config.ts builds the permanent
+          # /releases/latest/download/app-release.apk URL from it.
+          files: ${{ steps.assets.outputs.list }}

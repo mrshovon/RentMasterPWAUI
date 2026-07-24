@@ -4,16 +4,16 @@ The Android app is a **Capacitor** shell that loads the live site in a native We
 **FCM** push and an in-app **update popup** driven by **GitHub Releases**. Builds are produced by
 GitHub Actions (`.github/workflows/android-release.yml`) — no local Android SDK needed.
 
-This is a one-time setup. After it, shipping an update is a single command.
+**Shipping an update is just: push to `main`.** Sections 0–3 are one-time setup.
 
 ---
 
 ## 0. Confirm the two permanent values
-- **`appId`** = `com.rentmaster.app` (in `capacitor.config.ts` + `android/app/build.gradle`).
+- **`appId`** = `com.rentmaster.app` (in `capacitor.config.js` + `android/app/build.gradle`).
   ⚠️ Permanent once published to the Play Store. Change it now if you want something else.
 - **Production web URL** the app loads: set repo/CI secret **`NEXT_PUBLIC_APP_URL`** to your real
   Vercel domain (e.g. `https://app.rentmaster.com`). Also update the fallback in
-  `lib/app-config.ts` / `capacitor.config.ts` if you build locally.
+  `lib/app-config.ts` / `capacitor.config.js` if you build locally.
 
 ## 1. Firebase (for push)
 1. https://console.firebase.google.com → **Add project** (messaging only; no other services needed).
@@ -48,27 +48,53 @@ keytool -genkeypair -v \
 | `NEXT_PUBLIC_APP_URL` | your production web URL |
 | `FIREBASE_GOOGLE_SERVICES` | contents of `google-services.json` (skip if you committed the file) |
 
-Enable **Actions** on the repo if it isn't already.
+Enable **Actions** on the repo if it isn't already. The workflow's first step checks every secret
+above and stops with a plain-English error if one is missing — so a misconfigured repo fails in
+ten seconds instead of five minutes into a Gradle build.
 
-## 4. Ship a release (the one command)
+---
+
+## Shipping a release
+
 ```bash
-npm run release:android -- --version 1.1.0 --notes "What changed in this release"
-# or bump automatically:
-npm run release:android -- --patch --notes "Bug fixes"
+git push origin main
 ```
-This bumps the version everywhere, writes `RELEASE_NOTES.md`, commits, tags `v1.1.0`, and pushes.
-The tag triggers GitHub Actions, which builds the **signed APK + AAB** and publishes a **GitHub
-Release**. Within a couple of minutes:
-- the **APK** is downloadable from the Releases page (and the in-app "Download / Upgrade" links),
-- installed apps see the **update popup** (they compare their version to the latest release),
-- upload the **AAB** to the Play Store.
+
+That's it. Every push to `main`:
+1. builds a **signed APK**,
+2. and only then creates the tag `v<version>` and a **GitHub Release** with auto-generated notes
+   from the commits since the last release.
+
+Within a couple of minutes the APK is downloadable from the Releases page (and from the in-app
+"Download / Upgrade" links), and installed apps see the **update popup** on their next launch or
+foreground.
+
+**Versioning is automatic.** `MAJOR.MINOR` comes from `package.json`; the patch number is the CI
+run number — so `1.1.23`, `1.1.24`, … with nothing to bump by hand. To start a new series, edit
+`version` in `package.json` to e.g. `1.2.0` and push; releases become `1.2.<run>`.
+
+**Skip a release** for a commit that can't affect the app (docs, CI tweaks) by putting
+`[skip apk]` anywhere in the commit message.
+
+**Play Store bundle (.aab):** not built by default. Actions tab → *Android Release* → **Run
+workflow** → tick *Also build the Play Store bundle* — the `.aab` is attached to that run's release.
+
+### Why it's built this way
+The old flow bumped versions locally, pushed a `v*` tag, and *then* let CI try to build it. When
+the build failed (wrong Node, wrong JDK, a config that wouldn't load) the tag was already public
+and had to be deleted and re-pushed by hand. Now the tag is the **last** thing that happens, so a
+red build simply produces no release — fix and push again.
+
+---
 
 ## How it fits together
-- `capacitor.config.ts` — the native shell (remote `server.url`, appId, UA tag).
+- `capacitor.config.js` — the native shell (remote `server.url`, appId, UA tag). Deliberately
+  CommonJS: a `.ts` config breaks `cap sync` on Node ≥ 22.12.
 - `lib/platform.ts` / `lib/app-config.ts` / `lib/updates.ts` — platform detection, version source,
   and the GitHub-Releases update check.
 - `components/download-android.tsx` — browser-only "Download" links (login + sidebar).
-- `components/update-gate.tsx` — native-only "Update available" popup (Upgrade → download + install).
+- `components/update-gate.tsx` — native-only "Update available" popup (Upgrade → download + install),
+  plus the manual "Check for updates" button shown in **Settings → App & notifications**.
 - `lib/native-push.ts` — registers the FCM token with `/api/notifications/register`.
 - Backend `lib/fcm-send.ts` + `lib/push-send.ts` — fan notifications out to browser (Web Push) and
   Android (FCM). Notification icon = the logo silhouette (`android/.../ic_stat_notify`).

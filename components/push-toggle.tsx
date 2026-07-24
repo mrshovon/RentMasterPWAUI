@@ -7,7 +7,6 @@ import { ensureNativePush } from "../lib/native-push";
 import { isNativeApp } from "../lib/platform";
 import { getSessionToken, rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
-import { UpdateCheckButton } from "./update-gate";
 import { Button } from "./ui";
 
 interface PushTestResult {
@@ -61,8 +60,9 @@ export function PushTestButton({ className }: { className?: string }) {
  * failed register call leaves exactly that state), and registering only at login means
  * such a device stays dark forever. Re-checking on every dashboard load heals it.
  *
- * Once permission is granted it collapses to a single quiet "send test notification" action,
- * so a user on a phone can verify the whole chain without a console.
+ * Once permission is granted it renders NOTHING. The self-test and update-check actions it used
+ * to show here now live in Settings → "App & notifications" (components/app-settings-card.tsx);
+ * a row of diagnostic buttons above every page was noise for the 99% of visits that don't need it.
  */
 export function PushToggle() {
   const [permission, setPermission] = useState<PushPermission>("unsupported");
@@ -86,16 +86,8 @@ export function PushToggle() {
 
   if (permission === "unsupported") return null;
 
-  // Working: stay out of the way, but keep the self-tests reachable. UpdateCheckButton
-  // renders nothing outside the native app, so this row is just the push test in a browser.
-  if (permission === "granted") {
-    return (
-      <div className="mb-5 flex flex-wrap justify-end gap-1">
-        <UpdateCheckButton />
-        <PushTestButton />
-      </div>
-    );
-  }
+  // Working: stay completely out of the way (see Settings → App & notifications).
+  if (permission === "granted") return null;
 
   if (permission === "denied") {
     return (

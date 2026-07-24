@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from "react";
+import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Search, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
@@ -287,6 +287,7 @@ export function Modal({
   subtitle,
   children,
   size = "md",
+  dismissible = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -294,23 +295,40 @@ export function Modal({
   subtitle?: string;
   children: ReactNode;
   size?: "md" | "lg";
+  /** false = no close button and no backdrop dismissal (blocking dialogs, e.g. maintenance). */
+  dismissible?: boolean;
 }) {
   // Portal to <body> so the modal escapes any transformed ancestor (e.g. the
   // dashboard's `animate-slide-up` wrapper retains a transform, which would otherwise
   // make it the containing block for our `position: fixed` overlay and shrink it).
+  //
+  // Safe areas: `body` carries the inset padding (globals.css), but this overlay is
+  // `position: fixed`, so it is sized against the VIEWPORT and ignores that padding entirely.
+  // On a phone the modal is a bottom sheet, so without its own insets the footer buttons sit
+  // underneath the Android gesture bar. Hence the explicit env() padding below.
   if (!open || typeof document === "undefined") return null;
   return createPortal(
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-scrim/80 backdrop-blur-sm animate-fade-in"
-      onClick={onClose}
+      className="fixed inset-0 z-[60] overflow-y-auto bg-scrim/80 backdrop-blur-sm animate-fade-in"
+      onClick={dismissible ? onClose : undefined}
     >
       {/* min-h-full wrapper: centers when short, lets the whole thing scroll from the
           true top when tall — so the modal header is never clipped. */}
-      <div className="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
+      <div
+        className="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
         <div
           onClick={(e) => e.stopPropagation()}
+          // The insets go through CSS vars so the max-height can still differ per breakpoint
+          // (inline `max-height` would win over every class and flatten that distinction).
+          style={{
+            "--safe-t": "env(safe-area-inset-top)",
+            "--safe-b": "env(safe-area-inset-bottom)",
+          } as CSSProperties}
           className={cn(
-            "flex max-h-[100dvh] w-full animate-scale-in flex-col overflow-hidden rounded-t-3xl border border-line/[0.1] bg-surface shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl",
+            "flex w-full animate-scale-in flex-col overflow-hidden rounded-t-3xl border border-line/[0.1] bg-surface shadow-2xl",
+            "max-h-[calc(100dvh-var(--safe-t)-var(--safe-b))] sm:max-h-[calc(100dvh-2rem-var(--safe-t)-var(--safe-b))] sm:rounded-2xl",
             size === "lg" ? "sm:max-w-2xl" : "sm:max-w-md"
           )}
         >
@@ -319,15 +337,23 @@ export function Modal({
               <h2 className="text-lg font-bold text-heading">{title}</h2>
               {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
             </div>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-muted transition hover:bg-overlay/[0.06] hover:text-heading"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            {dismissible && (
+              <button
+                onClick={onClose}
+                className="rounded-lg p-1.5 text-muted transition hover:bg-overlay/[0.06] hover:text-heading"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
-          <div className="flex-1 overflow-y-auto p-5">{children}</div>
+          <div
+            className="flex-1 overflow-y-auto p-5"
+            // Clears the phone's gesture bar so the last control in a bottom sheet stays tappable.
+            style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+          >
+            {children}
+          </div>
         </div>
       </div>
     </div>,

@@ -5,10 +5,10 @@ import {
   LayoutDashboard, CreditCard, Wrench, Bell, Plus, TriangleAlert,
   Megaphone, ReceiptText, CircleDollarSign, Send, Upload, X, CheckCircle2,
   Home, MapPin, Phone, User, Wallet, CalendarClock, Info, Building2, Users,
-  FileText, Download, History, Receipt, type LucideIcon,
+  FileText, Download, History, Receipt, Settings, type LucideIcon,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { rentMasterFetch, uploadFile, DEMO_TENANT_ID, ApiError } from "../../lib/api-service";
+import { rentMasterFetch, uploadFile, ApiError } from "../../lib/api-service";
 import { toast } from "../../components/toast";
 import { buildReceiptHtml } from "../../lib/receipt";
 import { ReceiptModal } from "../../components/receipt-modal";
@@ -18,6 +18,7 @@ import { BillingLedger, MaintenanceLog, Notice, PaymentStatus, PriorityLevel, Te
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
+import { AppSettingsCard } from "../../components/app-settings-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader,
@@ -32,7 +33,11 @@ const priorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
 
 export default function TenantDashboard() {
   const { session, checkingSession, logout } = useSessionGuard("tenant");
-  const tenantId = session?.userId || DEMO_TENANT_ID;
+  // No demo fallback: useSessionGuard resolves the session in an effect, so on the first render
+  // this is undefined. A placeholder id here meant the loader below fired immediately with an id
+  // that isn't ours — and the backend's IDOR guard answered "You may only view your own billing
+  // history", which then sat at the top of the dashboard forever.
+  const tenantId = session?.userId;
 
   const [tab, setTab] = useTabState("overview");
   const [loading, setLoading] = useState(true);
@@ -52,9 +57,11 @@ export default function TenantDashboard() {
   const [receiptHtml, setReceiptHtml] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!tenantId) return; // wait for the real session — never fetch with a placeholder identity
     (async () => {
       try {
         setLoading(true);
+        setError(""); // a stale failure must not outlive the request that caused it
         const [b, m, n, p] = await Promise.allSettled([
           rentMasterFetch(`/api/admin/billing/tenant/${tenantId}`, { role: "tenant" }),
           rentMasterFetch("/api/admin/maintenance", { role: "tenant" }),
@@ -119,6 +126,7 @@ export default function TenantDashboard() {
     { key: "maintenance", label: "Requests", icon: Wrench, badge: metrics.openTickets },
     { key: "notices", label: "Notices", icon: Bell, badge: notices.length },
     { key: "documents", label: "Documents", icon: FileText, badge: documents.length },
+    { key: "settings", label: "Settings", icon: Settings },
   ];
 
   const propertyId = ledgers[0]?.property_id;
@@ -420,6 +428,13 @@ export default function TenantDashboard() {
         </div>
       )}
 
+      {tab === "settings" && (
+        <div className="space-y-6">
+          <PageHeader title="Settings" subtitle="Preferences for this device." />
+          <AppSettingsCard />
+        </div>
+      )}
+
       <TicketModal
         open={ticketOpen}
         onClose={() => setTicketOpen(false)}
@@ -706,7 +721,7 @@ function BillPaymentAction({
 function TicketModal({
   open, onClose, propertyId, tenantId, onCreated,
 }: {
-  open: boolean; onClose: () => void; propertyId?: string; tenantId: string;
+  open: boolean; onClose: () => void; propertyId?: string; tenantId?: string;
   onCreated: (m: MaintenanceLog) => void;
 }) {
   const empty = { issueTitle: "", issueDescription: "", priorityLevel: "medium" };
@@ -740,7 +755,7 @@ function TicketModal({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!propertyId) return;
+    if (!propertyId || !tenantId) return;
     try {
       setSaving(true);
       // Upload every selected image in parallel, then attach their URLs to the ticket.

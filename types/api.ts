@@ -7,7 +7,9 @@
 export type PaymentStatus = "unpaid" | "sent" | "paid";
 export type PriorityLevel = "low" | "medium" | "high" | "urgent";
 export type ResolutionStatus = "reported" | "in_progress" | "resolved";
-export type NoticeScope = "all_owners" | "all_tenants" | "individual_tenant" | "individual_owner";
+// "everyone" = every owner AND every tenant on the platform (admin circulations only).
+export type NoticeScope =
+  | "everyone" | "all_owners" | "all_tenants" | "individual_tenant" | "individual_owner";
 
 export interface Property {
   id: string;
@@ -85,9 +87,18 @@ export interface Notice {
   sender_id: string;
   target_scope: NoticeScope;
   target_tenant_id: string | null;
+  target_owner_id: string | null;
   title: string;
   content: string;
   created_at: string;
+}
+
+// ---- Platform maintenance window (admin-declared, app_settings.maintenance_mode) ----
+export interface MaintenanceMode {
+  enabled: boolean;
+  startAt: string | null;
+  endAt: string | null;
+  message: string;
 }
 
 // ---- Rent reminders (owner-scheduled, to tenants) ----

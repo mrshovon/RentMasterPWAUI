@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "../components/toast";
 import { ConfirmHost } from "../components/confirm";
 import { UpdateGate } from "../components/update-gate";
+import { MaintenanceGate } from "../components/maintenance-gate";
 
 export const metadata: Metadata = {
   title: "RentMaster — Property Management",
@@ -52,6 +53,7 @@ export default function RootLayout({
         <Toaster />
         <ConfirmHost />
         <UpdateGate />
+        <MaintenanceGate />
       </body>
     </html>
   );

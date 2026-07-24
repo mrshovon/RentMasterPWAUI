@@ -30,6 +30,7 @@ import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { StaffTab } from "../../components/staff-tab";
 import { AccountsTab } from "../../components/accounts-tab";
+import { AppSettingsCard } from "../../components/app-settings-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
@@ -2788,6 +2789,9 @@ function SettingsTab({
           <Button type="submit" loading={savingReminder}>Save reminder message</Button>
         </form>
       </Card>
+
+      {/* This device: notifications + app updates */}
+      <AppSettingsCard />
 
       {/* Change password */}
       <ChangePasswordCard />

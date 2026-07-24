@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, CreditCard, Megaphone, Plus, Ban, KeyRound,
   Trash2, Mail, CheckCircle2, ShieldOff, ShieldCheck, Inbox, Building2, Eye,
   RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User,
-  Wallet, Upload, Image as ImageIcon, X, Check, HardHat,
+  Wallet, Upload, Image as ImageIcon, X, Check, HardHat, Settings, Wrench,
 } from "lucide-react";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
 import { toast } from "../../components/toast";
@@ -18,10 +18,12 @@ import {
   SupportTicket, TicketStatus, TicketCategory, PriorityLevel,
   PasswordResetRecord, ResetMethod, ContactMessage, ContactStatus,
   PaymentSubmission, PaymentSubmissionStatus, PaymentConfig,
+  MaintenanceMode, NoticeScope,
 } from "../../types/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
+import { AppSettingsCard } from "../../components/app-settings-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
@@ -117,6 +119,7 @@ export default function AdminDashboard() {
     { key: "tickets", label: "Tickets", icon: LifeBuoy, badge: metrics.openTickets },
     { key: "messages", label: "Messages", icon: Mail, badge: metrics.newMessages },
     { key: "reset-log", label: "Reset log", icon: KeyRound },
+    { key: "settings", label: "Settings", icon: Settings },
   ];
 
   function applyMessageUpdate(updated: ContactMessage) {
@@ -268,13 +271,15 @@ export default function AdminDashboard() {
 
       {tab === "payment-setup" && <PaymentSetupTab />}
 
-      {tab === "notices" && <CirculateTab />}
+      {tab === "notices" && <CirculateTab owners={owners} />}
 
       {tab === "tickets" && <TicketsTab tickets={tickets} onOpen={setActiveTicket} />}
 
       {tab === "messages" && <MessagesTab messages={messages} onOpen={setActiveMessage} />}
 
       {tab === "reset-log" && <ResetLogTab resets={resets} />}
+
+      {tab === "settings" && <AdminSettingsTab />}
 
       <CreateOwnerModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={refreshOwners} />
       <OwnerDetailModal
@@ -1365,43 +1370,225 @@ function TierModal({
   );
 }
 
-/* ============================================================ CIRCULATE TAB */
-function CirculateTab() {
-  const [form, setForm] = useState({ title: "", content: "" });
+/* ============================================================ ADMIN SETTINGS TAB */
+function AdminSettingsTab() {
+  return (
+    <div className="space-y-8">
+      <PageHeader title="Settings" subtitle="Platform controls and this device's preferences." />
+      <MaintenanceCard />
+      <AppSettingsCard />
+    </div>
+  );
+}
+
+/**
+ * System maintenance window. While it is on, every owner and tenant gets a blocking modal on
+ * app open (components/maintenance-gate.tsx). The admin is never blocked — otherwise turning
+ * it back off would need a database edit.
+ */
+function MaintenanceCard() {
+  const [mode, setMode] = useState<MaintenanceMode | null>(null);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [sent, setSent] = useState(false);
+
+  // The <input type="datetime-local"> value is local wall-clock with no zone; the API stores
+  // UTC ISO. These two convert between them without dragging in a date library.
+  function toLocalInput(iso: string | null): string {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  function fromLocalInput(value: string): string | null {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+
+  const [enabled, setEnabled] = useState(false);
+  const [startAt, setStartAt] = useState("");
+  const [endAt, setEndAt] = useState("");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: MaintenanceMode }>("/api/super-admin/maintenance", { role: "admin" });
+        const m = res.data;
+        setMode(m);
+        setEnabled(!!m.enabled);
+        setStartAt(toLocalInput(m.startAt));
+        setEndAt(toLocalInput(m.endAt));
+        setMessage(m.message || "");
+      } catch (e: any) { toast.error(e.message); }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  async function save(nextEnabled = enabled) {
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ data: MaintenanceMode }>("/api/super-admin/maintenance", {
+        method: "PATCH", role: "admin",
+        body: JSON.stringify({
+          enabled: nextEnabled,
+          startAt: fromLocalInput(startAt),
+          endAt: fromLocalInput(endAt),
+          message,
+        }),
+      });
+      setMode(res.data);
+      setEnabled(!!res.data.enabled);
+      toast.success(res.data.enabled ? "Maintenance mode is ON." : "Maintenance mode is off.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg bg-warning/10 p-2 text-warning"><Wrench className="h-4 w-4" /></div>
+          <div>
+            <h3 className="text-sm font-bold text-heading">System maintenance</h3>
+            <p className="text-xs text-subtle">
+              Owners and tenants see a blocking notice on app open. You are never blocked.
+            </p>
+          </div>
+        </div>
+        <Badge tone={mode?.enabled ? "rose" : "emerald"}>{mode?.enabled ? "ON" : "Off"}</Badge>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-subtle">Loading…</p>
+      ) : (
+        <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="From" hint="Shown to users. Leave blank for “until further notice”.">
+              <TextInput type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} />
+            </Field>
+            <Field label="To">
+              <TextInput type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} />
+            </Field>
+          </div>
+          <Field label="Message" hint="Leave blank for the default wording.">
+            <TextArea rows={3} value={message} onChange={(e) => setMessage(e.target.value)}
+              placeholder="e.g. We're upgrading the billing engine. The app will be back shortly." />
+          </Field>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="secondary" loading={saving}>Save window</Button>
+            {mode?.enabled ? (
+              <Button type="button" variant="secondary" icon={Power} loading={saving} onClick={() => save(false)}>
+                Turn maintenance off
+              </Button>
+            ) : (
+              <Button type="button" variant="danger" icon={Power} loading={saving} onClick={() => save(true)}>
+                Turn maintenance on
+              </Button>
+            )}
+          </div>
+        </form>
+      )}
+    </Card>
+  );
+}
+
+/* ============================================================ CIRCULATE TAB */
+
+// The audiences the super-admin can address, in the order they're offered.
+const CIRCULATE_AUDIENCES: { scope: NoticeScope; label: string; hint: string }[] = [
+  { scope: "everyone", label: "Owners and tenants", hint: "everyone on the platform" },
+  { scope: "all_owners", label: "All owners", hint: "every owner account" },
+  { scope: "all_tenants", label: "All tenants", hint: "every tenant on the platform" },
+  { scope: "individual_owner", label: "A specific owner", hint: "one owner account" },
+];
+
+function CirculateTab({ owners }: { owners: AdminOwner[] }) {
+  const [form, setForm] = useState<{
+    scope: NoticeScope; targetOwnerId: string; title: string; content: string;
+  }>({ scope: "everyone", targetOwnerId: "", title: "", content: "" });
+  const [saving, setSaving] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+
+  const audience = CIRCULATE_AUDIENCES.find((a) => a.scope === form.scope)!;
+  const selectedOwner = owners.find((o) => o.id === form.targetOwnerId);
+  const audienceLabel =
+    form.scope === "individual_owner"
+      ? selectedOwner ? (selectedOwner.name || selectedOwner.email) : "the selected owner"
+      : audience.hint;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (form.scope === "individual_owner" && !form.targetOwnerId) {
+      toast.error("Choose which owner should receive this notice.");
+      return;
+    }
     try {
       setSaving(true);
       const res = await rentMasterFetch("/api/admin/notices", {
         method: "POST", role: "admin",
         body: JSON.stringify({
-          senderType: "system_admin", targetScope: "all_owners",
+          senderType: "system_admin",
+          targetScope: form.scope,
+          targetOwnerId: form.scope === "individual_owner" ? form.targetOwnerId : null,
           title: form.title, content: form.content,
         }),
       });
-      if (res.success) { setForm({ title: "", content: "" }); setSent(true); toast.success("Notice circulated to all owners."); }
+      if (res.success) {
+        setSentTo(audienceLabel);
+        setForm({ ...form, title: "", content: "" });
+        toast.success(`Notice circulated to ${audienceLabel}.`);
+      }
     } catch (e: any) { toast.error(e.message); }
     finally { setSaving(false); }
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Circulate notice" subtitle="Broadcast an announcement to every owner on the platform." />
-      {sent && <Alert>Notice circulated to all owners. <button className="underline" onClick={() => setSent(false)}>Send another</button></Alert>}
+      <PageHeader title="Circulate notice" subtitle="Broadcast an announcement and choose who receives it." />
+      {sentTo && (
+        <Alert>
+          Notice circulated to {sentTo}.{" "}
+          <button className="underline" onClick={() => setSentTo(null)}>Send another</button>
+        </Alert>
+      )}
       <Card className="max-w-2xl p-6">
         <form onSubmit={submit} className="space-y-4">
+          <Field label="Send to" required>
+            <Select value={form.scope}
+              onChange={(e) => setForm({ ...form, scope: e.target.value as NoticeScope, targetOwnerId: "" })}>
+              {CIRCULATE_AUDIENCES.map((a) => (
+                <option key={a.scope} value={a.scope}>{a.label}</option>
+              ))}
+            </Select>
+          </Field>
+
+          {form.scope === "individual_owner" && (
+            <Field label="Owner" required hint="Only this owner sees the notice — their tenants do not.">
+              <Select required value={form.targetOwnerId}
+                onChange={(e) => setForm({ ...form, targetOwnerId: e.target.value })}>
+                <option value="">Choose an owner…</option>
+                {owners.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name ? `${o.name} — ${o.email}` : o.email}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
           <Field label="Title" required>
             <TextInput required placeholder="e.g. Scheduled maintenance window" value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })} />
           </Field>
           <Field label="Message" required>
-            <TextArea required rows={5} placeholder="Write your platform-wide announcement…" value={form.content}
+            <TextArea required rows={5} placeholder="Write your announcement…" value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })} />
           </Field>
-          <Button type="submit" loading={saving} icon={Inbox} className="w-full">Circulate to all owners</Button>
+          <Button type="submit" loading={saving} icon={Inbox} className="w-full">
+            Circulate to {audienceLabel}
+          </Button>
         </form>
       </Card>
     </div>

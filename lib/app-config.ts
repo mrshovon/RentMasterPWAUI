@@ -1,10 +1,11 @@
 // =============================================================================
-// App-wide constants: the single source of truth for the app version and the
-// GitHub Releases feed that powers the Android "Download" link + update popup.
+// App-wide constants: the single source of truth for the GitHub Releases feed that
+// powers the Android "Download" link + update popup.
 //
-// APP_VERSION is bumped by scripts/release-android.mjs (kept in lockstep with
-// android/app/build.gradle versionName and package.json). The native app compares
-// its built-in version to the latest GitHub Release tag to detect updates.
+// APP_VERSION is a WEB-ONLY label. The APK's real version is set by CI at build time
+// (.github/workflows/android-release.yml computes MAJOR.MINOR from package.json plus the run
+// number) and is read back at runtime from App.getInfo() / the user-agent token — see
+// lib/updates.ts getInstalledVersion(). Nothing here ever decides whether an update exists.
 // =============================================================================
 
 export const APP_VERSION = "1.1.0";
