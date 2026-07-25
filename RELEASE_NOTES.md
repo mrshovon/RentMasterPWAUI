@@ -3,7 +3,7 @@
 - Each property can carry its own name for receipts. Set it when adding or editing a property, and that property's receipts print it instead of your account name. Leave it blank to keep using your account name.
 - The signature block on the receipt no longer prints a name above the line, just the signature and the caption.
 - Rent can now be paid in parts. Tap the green tick, enter how much came in and when, and the invoice shows as partly paid with the balance still owed. Record the rest whenever it arrives.
-- The receipt now lists each payment with its own date and amount, and shows the balance still due. Anything paid after the due date is printed in red.
+- When rent is paid in more than one go, the receipt lists each payment with its own date and amount, and shows the balance still due. Anything paid after the due date is printed in red. Rent settled in a single payment keeps the plain receipt.
 - An invoice that is partly paid past its due date is marked PARTIAL LATE, so a half-paid month no longer looks settled.
 - A payments list on each invoice lets you review what was received and delete anything entered by mistake. Deleting a payment moves the invoice back to partly paid or unpaid on its own.
 - Outstanding and Collected now count part payments properly, instead of treating a half-paid invoice as fully unpaid.

@@ -94,15 +94,15 @@ export function buildReceiptHtml(o: ReceiptOptions): string {
   const statusHtml = `${statusWord}${late ? ` <span class="status late">LATE</span>` : ""}`;
   const totalLabel = isPaid ? "Total Paid" : "Total Due";
 
-  // The payment list only earns its place when it says something the Date row can't: more than
-  // one payment, money still owed, or something arrived late. A single full on-time payment
-  // keeps the plain receipt.
-  const showPayments = installments.length > 1 || (installments.length > 0 && (balance > 0 || late));
+  // A payment history is only worth printing when there is more than one payment. A rent
+  // settled in one go — on time or late — says everything it needs to through the Date row
+  // and the status word; itemising a list of one adds nothing.
+  const showPayments = installments.length > 1;
 
   const row = (label: string, value: string, bold = false, red = false) =>
     `<div class="row${red ? " r" : ""}"><div class="lbl">${label}</div><div class="val${bold ? " b" : ""}">${value}</div></div>`;
 
-  // Either the plain "Date:" line, or the itemised payment history that replaces it.
+  // Either the itemised payment history, or the plain "Date:" line it replaces.
   const paymentRowsHtml = showPayments
     ? installments
         .map((p, i) =>
@@ -113,11 +113,16 @@ export function buildReceiptHtml(o: ReceiptOptions): string {
             !!(dueKey && p.key > dueKey) // red: this one arrived after the due date
           )
         )
-        .join("") + (balance > 0 ? row("Balance Due:", money(balance), true, overdueBalance) : "")
+        .join("")
     : row("Date:", dateStr);
+
+  // Outside the branch above: what is still owed is not payment history, and a single
+  // part-payment needs it printed just as much as several do.
+  const balanceRowHtml = balance > 0 ? row("Balance Due:", money(balance), true, overdueBalance) : "";
 
   let rowsHtml =
     paymentRowsHtml +
+    balanceRowHtml +
     row("Month:", esc(monthLabel)) +
     row("Tenant Name:", esc(o.tenantName || "Tenant"), true) +
     row("House Rent:", money(o.houseRent)) +
