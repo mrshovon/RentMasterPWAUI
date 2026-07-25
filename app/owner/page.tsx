@@ -35,7 +35,7 @@ import { useT, useLang } from "../../lib/i18n";
 import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
-  PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
+  PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner, PasswordInput,
 } from "../../components/ui";
 
 const priorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
@@ -1844,7 +1844,7 @@ function RaiseTicketModal({
             </Select>
           </Field>
         </div>
-        <Field label="Screenshots" hint="Optional — attach one or more images (max 8MB each).">
+        <Field label="Screenshots" hint="Attach one or more images (max 8MB each).">
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {items.map((it) => (
               <div key={it.key} className="relative aspect-square overflow-hidden rounded-xl border border-line/[0.08]">
@@ -2361,7 +2361,7 @@ function InvoiceModal({
                 onChange={(e) => setForm({ ...form, discount: e.target.value })} />
             </Field>
           </div>
-          <Field label="Note (optional)" hint="Appears on the receipt — e.g. explain an extra charge.">
+          <Field label="Note" hint="Appears on the receipt — e.g. explain an extra charge.">
             <TextArea rows={2} placeholder="e.g. Extra charge is for the shared water-tank repair."
               value={form.extraChargeRemarks}
               onChange={(e) => setForm({ ...form, extraChargeRemarks: e.target.value })} />
@@ -3208,13 +3208,13 @@ function ChangePasswordCard() {
       </div>
       <form onSubmit={submit} className="max-w-md space-y-4">
         <Field label="Current password" required>
-          <TextInput type="password" required value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="••••••••" />
+          <PasswordInput required value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="••••••••" />
         </Field>
         <Field label="New password" required hint="At least 8 characters.">
-          <TextInput type="password" required value={next} onChange={(e) => setNext(e.target.value)} placeholder="••••••••" />
+          <PasswordInput required value={next} onChange={(e) => setNext(e.target.value)} placeholder="••••••••" />
         </Field>
         <Field label="Confirm new password" required>
-          <TextInput type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" />
+          <PasswordInput required value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" />
         </Field>
         <Button type="submit" loading={saving}>Update password</Button>
       </form>

@@ -173,6 +173,8 @@ export const bn: Record<string, string> = {
   "Confirm new password": "নতুন পাসওয়ার্ড নিশ্চিত করুন",
   "Update password": "পাসওয়ার্ড হালনাগাদ করুন",
   "Password updated.": "পাসওয়ার্ড হালনাগাদ হয়েছে।",
+  "Show password": "পাসওয়ার্ড দেখান",
+  "Hide password": "পাসওয়ার্ড লুকান",
   "New passwords do not match.": "নতুন পাসওয়ার্ড দুটি মিলছে না।",
   "New password must be at least 8 characters.": "নতুন পাসওয়ার্ড কমপক্ষে ৮টি অক্ষরের হতে হবে।",
   "Your profile and this device's preferences.": "আপনার প্রোফাইল ও এই ডিভাইসের পছন্দসমূহ।",
@@ -356,6 +358,9 @@ export const bn: Record<string, string> = {
   "JPG, PNG or WebP.": "JPG, PNG বা WebP।",
   File: "ফাইল",
   Edit: "সম্পাদনা",
+
+  // Rendered by every Field that isn't marked required — lowercase, as an aside.
+  optional: "ঐচ্ছিক",
 
   // ---------------------------------------------------------------- statuses
   paid: "পরিশোধিত",

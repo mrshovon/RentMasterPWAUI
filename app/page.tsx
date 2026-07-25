@@ -6,7 +6,7 @@ import {
   apiLogin, apiForgotPassword, apiSignup,
   getStoredSession, setStoredSession, clearSession, ensureValidToken,
 } from "../lib/api-service";
-import { Button, Modal, Field, TextInput } from "../components/ui";
+import { Button, Modal, Field, TextInput, PasswordInput } from "../components/ui";
 import { toast } from "../components/toast";
 import { DownloadAndroid } from "../components/download-android";
 import { LanguageToggle } from "../components/language-toggle";
@@ -173,7 +173,7 @@ export default function EntryGatewayPage() {
                 <form onSubmit={loginTenant} className="space-y-5">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                      {t("Registered phone")}
+                      {t("Registered phone")} <span className="text-danger">*</span>
                     </label>
                     <div className="relative">
                       <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
@@ -188,18 +188,15 @@ export default function EntryGatewayPage() {
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                      {t("Passcode")}
+                      {t("Passcode")} <span className="text-danger">*</span>
                     </label>
-                    <div className="relative">
-                      <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-                      <input
-                        type="password"
-                        placeholder="••••"
-                        value={pass}
-                        onChange={(e) => setPass(e.target.value)}
-                        className="field-input pl-10 font-mono"
-                      />
-                    </div>
+                    <PasswordInput
+                      leftIcon={Lock}
+                      placeholder="••••"
+                      value={pass}
+                      onChange={(e) => setPass(e.target.value)}
+                      className="font-mono"
+                    />
                     <p className="text-[11px] text-subtle">
                       {t("Tip: your passcode was provided by your landlord.")}
                     </p>
@@ -212,7 +209,9 @@ export default function EntryGatewayPage() {
               ) : (
                 <form onSubmit={loginOwner} className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">{t("Email")}</label>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
+                      {t("Email")} <span className="text-danger">*</span>
+                    </label>
                     <div className="relative">
                       <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                       <input type="email" placeholder="owner@example.com" value={email}
@@ -220,12 +219,11 @@ export default function EntryGatewayPage() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">{t("Password")}</label>
-                    <div className="relative">
-                      <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-                      <input type="password" placeholder="••••••••" value={ownerPass}
-                        onChange={(e) => setOwnerPass(e.target.value)} className="field-input pl-10" />
-                    </div>
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
+                      {t("Password")} <span className="text-danger">*</span>
+                    </label>
+                    <PasswordInput leftIcon={Lock} placeholder="••••••••" value={ownerPass}
+                      onChange={(e) => setOwnerPass(e.target.value)} />
                   </div>
                   {error && <p className="text-xs text-danger">{error}</p>}
                   <Button type="submit" loading={loading} className="w-full" icon={ArrowRight}>
@@ -308,7 +306,7 @@ function SignupModal({
           </Field>
         </div>
         <Field label={t("Password")} required hint={t("At least 8 characters.")}>
-          <TextInput type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordInput required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
         <Button type="submit" loading={submitting} className="w-full" icon={User}>
           {t("Create account")}

@@ -1,8 +1,8 @@
 "use client";
 
-import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, type CSSProperties } from "react";
+import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, Search, type LucideIcon } from "lucide-react";
+import { X, Loader2, Search, Eye, EyeOff, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
 import { useT } from "../lib/i18n";
 
@@ -389,8 +389,17 @@ export function Field({
   const t = useT();
   return (
     <label className="block space-y-1.5">
+      {/* Every field says which it is: a red asterisk when it must be filled in, a quiet
+          "optional" when it need not be. Silence used to mean optional, which only reads that
+          way once you already know the form. The tag drops out of the label's bold uppercase so
+          it reads as an aside rather than part of the name. */}
       <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">
-        {t(label)} {required && <span className="text-danger">*</span>}
+        {t(label)}{" "}
+        {required ? (
+          <span className="text-danger">*</span>
+        ) : (
+          <span className="text-[10px] font-normal normal-case tracking-normal text-faint">{t("optional")}</span>
+        )}
       </span>
       {children}
       {hint && <span className="block text-[11px] text-subtle">{t(hint)}</span>}
@@ -400,6 +409,47 @@ export function Field({
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn("field-input", props.className)} />;
+}
+
+/**
+ * A password box with a reveal toggle. Typing a password blind is the main way people mistype
+ * one, and this app asks for them on screens with no "try again" affordance (reset links expire).
+ *
+ * `leftIcon` exists because the sign-in and reset screens already draw a Lock inside the box;
+ * passing it here keeps that markup in one place instead of each caller positioning its own.
+ */
+export function PasswordInput({
+  leftIcon: Left,
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { leftIcon?: LucideIcon }) {
+  const [show, setShow] = useState(false);
+  const t = useT();
+  const label = show ? t("Hide password") : t("Show password");
+
+  return (
+    <div className="relative">
+      {Left && (
+        <Left className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+      )}
+      <input
+        {...props}
+        type={show ? "text" : "password"}
+        // field-input reserves no room on the right, so without pr-11 the toggle sits on top of
+        // a long value.
+        className={cn("field-input pr-11", Left && "pl-10", className)}
+      />
+      <button
+        type="button" // never submits the form it lives in
+        onClick={() => setShow((s) => !s)}
+        aria-label={label}
+        title={label}
+        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted transition hover:text-heading"
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  );
 }
 
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {

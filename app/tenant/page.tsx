@@ -864,7 +864,7 @@ function TicketModal({
             <option value="urgent">Urgent — critical failure</option>
           </Select>
         </Field>
-        <Field label="Photos of the issue" hint="Optional — attach one or more images (max 8MB each).">
+        <Field label="Photos of the issue" hint="Attach one or more images (max 8MB each).">
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {items.map((it) => (
               <div key={it.key} className="relative aspect-square overflow-hidden rounded-xl border border-line/[0.08]">

@@ -292,7 +292,9 @@ export async function rentMasterFetch<T = any>(
         `Cannot reach backend at ${BACKEND_API_BASE}. Is the API server running on :3000?`
       );
     }
-    console.error(`[API] ${endpoint} —`, error.message);
+    // Optional-chained: a thrown null would otherwise throw again here, inside the catch,
+    // and the caller's toast would never fire at all.
+    console.error(`[API] ${endpoint} —`, error?.message);
     throw error;
   }
 }

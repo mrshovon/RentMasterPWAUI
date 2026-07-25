@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Lock, ArrowRight, CheckCircle2, TriangleAlert } from "lucide-react";
 import { getSupabaseBrowser } from "../../lib/supabase-browser";
 import { apiResetComplete } from "../../lib/api-service";
-import { Button } from "../../components/ui";
+import { Button, PasswordInput } from "../../components/ui";
 import { ThemeToggle } from "../../components/theme-toggle";
 
 // Landing page for the password-recovery email link. Supabase drops a recovery session into the
@@ -130,20 +130,18 @@ export default function ResetPasswordPage() {
                 <p className="text-sm text-muted">Enter and confirm your new password below.</p>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted">New password</label>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-                  <input type="password" placeholder="••••••••" value={password}
-                    onChange={(e) => setPassword(e.target.value)} className="field-input pl-10" autoFocus />
-                </div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
+                  New password <span className="text-danger">*</span>
+                </label>
+                <PasswordInput leftIcon={Lock} placeholder="••••••••" value={password}
+                  onChange={(e) => setPassword(e.target.value)} autoFocus />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted">Confirm password</label>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-                  <input type="password" placeholder="••••••••" value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)} className="field-input pl-10" />
-                </div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
+                  Confirm password <span className="text-danger">*</span>
+                </label>
+                <PasswordInput leftIcon={Lock} placeholder="••••••••" value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)} />
               </div>
               {error && <p className="text-xs text-danger">{error}</p>}
               <Button type="submit" loading={phase === "saving"} className="w-full" icon={ArrowRight}>

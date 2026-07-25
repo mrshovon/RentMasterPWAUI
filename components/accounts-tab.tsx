@@ -736,7 +736,7 @@ function TransactionModal({
               placeholder="Type a category" />
           </Field>
         )}
-        <Field label="Property" hint="Optional — tie this entry to one of your properties.">
+        <Field label="Property" hint="Tie this entry to one of your properties.">
           <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
             <option value="">No property</option>
             {properties.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.flat_no}</option>)}

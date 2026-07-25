@@ -1,3 +1,6 @@
+- Fixed adding a new tenant failing with a database error when a National ID was entered.
+- Every field now says whether it is needed: required ones are marked with a red star, and the rest are labelled optional in small grey text.
+- Password boxes have an eye button that shows what you have typed, on sign-in, password reset, sign-up and when changing your password.
 - You can now edit a tenant's National ID and their move-in date after onboarding. The NID is shown as you typed it so you can check or correct it, and only you can see it.
 - Tenant documents can now be PDFs, not just photos. Deeds and agreements upload the way they arrive.
 - Each property can carry its own name for receipts. Set it when adding or editing a property, and that property's receipts print it instead of your account name. Leave it blank to keep using your account name.

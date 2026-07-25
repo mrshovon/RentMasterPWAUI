@@ -480,7 +480,7 @@ function StaffModal({
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Property" hint="Optional — leave blank if they cover everything.">
+          <Field label="Property" hint="Leave blank if they cover everything.">
             <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
               <option value="">No property assigned</option>
               {properties.map((p) => (
