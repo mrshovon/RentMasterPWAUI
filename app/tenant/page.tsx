@@ -14,7 +14,7 @@ import { buildReceiptHtml } from "../../lib/receipt";
 import { ReceiptModal } from "../../components/receipt-modal";
 import { useSessionGuard } from "../../lib/use-session";
 import { useTabState } from "../../lib/use-tab";
-import { BillingLedger, MaintenanceLog, Notice, PaymentStatus, PriorityLevel, TenantProfile, Document, ServiceChargeBreakdown, RentRevision } from "../../types/api";
+import { BillingLedger, BillingPayment, MaintenanceLog, Notice, PaymentStatus, PriorityLevel, TenantProfile, Document, ServiceChargeBreakdown, RentRevision } from "../../types/api";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
@@ -26,8 +26,8 @@ import {
   PageHeader, EmptyState, Alert, FullScreenLoader,
 } from "../../components/ui";
 
-const statusTone: Record<PaymentStatus, "emerald" | "amber" | "rose"> = {
-  paid: "emerald", sent: "amber", unpaid: "rose",
+const statusTone: Record<PaymentStatus, "emerald" | "amber" | "cyan" | "rose"> = {
+  paid: "emerald", sent: "amber", partial: "cyan", unpaid: "rose",
 };
 const priorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
   low: "slate", medium: "amber", high: "rose", urgent: "rose",
@@ -58,6 +58,8 @@ export default function TenantDashboard() {
   const [rentHistoryOpen, setRentHistoryOpen] = useState(false);
   const [ticketOpen, setTicketOpen] = useState(false);
   const [breakdown, setBreakdown] = useState<BillingLedger | null>(null);
+  // Read-only: the installments the owner has recorded against this tenant's invoices.
+  const [payments, setPayments] = useState<BillingPayment[]>([]);
   const [receipt, setReceipt] = useState<{ html: string; fileName: string } | null>(null);
 
   useEffect(() => {
@@ -66,11 +68,12 @@ export default function TenantDashboard() {
       try {
         setLoading(true);
         setError(""); // a stale failure must not outlive the request that caused it
-        const [b, m, n, p] = await Promise.allSettled([
+        const [b, m, n, p, bp] = await Promise.allSettled([
           rentMasterFetch(`/api/admin/billing/tenant/${tenantId}`, { role: "tenant" }),
           rentMasterFetch("/api/admin/maintenance", { role: "tenant" }),
           rentMasterFetch("/api/admin/notices", { role: "tenant" }),
           rentMasterFetch("/api/admin/tenants/me", { role: "tenant" }),
+          rentMasterFetch("/api/admin/billing/payments", { role: "tenant" }),
         ]);
         // The owner has cut this tenant's access (unassigned, no override). Tenant JWTs carry no
         // revocation, so this mount check is what actually ends an already-signed-in session.
@@ -81,6 +84,7 @@ export default function TenantDashboard() {
         }
 
         if (b.status === "fulfilled") setLedgers(b.value.data || []);
+        if (bp.status === "fulfilled") setPayments(bp.value.data || []);
         if (m.status === "fulfilled") setLogs(m.value.data || []);
         if (n.status === "fulfilled") setNotices(n.value.data || []);
         if (p.status === "fulfilled") setProfile(p.value.data || null);
@@ -119,10 +123,19 @@ export default function TenantDashboard() {
   const metrics = useMemo(() => {
     const dueLedger = ledgers.find((l) => l.payment_status !== "paid");
     const openTickets = logs.filter((l) => l.resolution_status !== "resolved").length;
-    const totalPaid = ledgers.filter((l) => l.payment_status === "paid")
-      .reduce((s, l) => s + Number(l.total_payable), 0);
-    return { dueLedger, openTickets, totalPaid };
+    // What was actually received, including part-payments on invoices still open.
+    const totalPaid = ledgers.reduce((s, l) => s + Number(l.amount_paid || 0), 0);
+    // What's still owed on the open invoice — not its face value, which the tenant may have
+    // already paid half of.
+    const amountDue = dueLedger
+      ? Math.max(0, Number(dueLedger.total_payable || 0) - Number(dueLedger.amount_paid || 0))
+      : 0;
+    return { dueLedger, openTickets, totalPaid, amountDue };
   }, [ledgers, logs]);
+
+  /** One invoice's installments, oldest first. */
+  const paymentsFor = (ledgerId: string) =>
+    payments.filter((p) => p.ledger_id === ledgerId).sort((a, b) => a.paid_on.localeCompare(b.paid_on));
 
   const nav: NavItem[] = [
     { key: "overview", label: t("Home"), icon: LayoutDashboard },
@@ -156,7 +169,8 @@ export default function TenantDashboard() {
   function openTenantReceipt(l: BillingLedger) {
     const html = buildReceiptHtml({
       copyLabel: "Tenant Copy",
-      ownerName: profile?.owner?.name || "Owner",
+      // Matches the owner's copy: a property can carry its own name for receipts.
+      ownerName: profile?.property?.receipt_name || profile?.owner?.name || "Owner",
       propertyAddress: profile?.property?.address || null,
       refNo: l.property_id || profile?.property?.id,
       billingMonth: l.billing_month,
@@ -169,6 +183,8 @@ export default function TenantDashboard() {
       paymentStatus: l.payment_status,
       paidAt: l.paid_at,
       dueDay: profile?.tenant.due_date,
+      payments: paymentsFor(l.id).map((p) => ({ paidOn: p.paid_on, amount: Number(p.amount) })),
+      amountPaid: Number(l.amount_paid || 0),
       note: l.extra_charge_remarks,
       signatureUrl: profile?.owner?.signature_url,
     });
@@ -198,7 +214,7 @@ export default function TenantDashboard() {
             subtitle="Here's the current status of your suite." />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard label="Amount due" accent={metrics.dueLedger ? "rose" : "emerald"} icon={CircleDollarSign}
-              value={formatCurrency(metrics.dueLedger?.total_payable ?? 0)}
+              value={formatCurrency(metrics.amountDue)}
               sub={metrics.dueLedger ? `${formatMonth(metrics.dueLedger.billing_month, lang)} · ${metrics.dueLedger.payment_status}` : "All settled 🎉"} />
             <StatCard label="Open requests" accent="amber" icon={Wrench}
               value={metrics.openTickets} sub="In progress" />
@@ -224,7 +240,12 @@ export default function TenantDashboard() {
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1 text-right">
-                <div className="text-2xl font-black text-success">{formatCurrency(metrics.dueLedger.total_payable)}</div>
+                <div className="text-2xl font-black text-success">{formatCurrency(metrics.amountDue)}</div>
+                {Number(metrics.dueLedger.amount_paid) > 0 && (
+                  <div className="text-[11px] text-muted">
+                    {formatCurrency(metrics.dueLedger.amount_paid)} of {formatCurrency(metrics.dueLedger.total_payable)} paid
+                  </div>
+                )}
                 <Badge tone={statusTone[metrics.dueLedger.payment_status]}>{metrics.dueLedger.payment_status}</Badge>
                 <button type="button" onClick={() => setBreakdown(metrics.dueLedger!)}
                   className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary transition hover:underline">
@@ -256,8 +277,7 @@ export default function TenantDashboard() {
         <div className="space-y-6">
           <PageHeader title="Rent & ledger" subtitle="Your complete billing history." />
           <div className="grid grid-cols-2 gap-4">
-            <StatCard label="Amount due" accent="rose"
-              value={formatCurrency(metrics.dueLedger?.total_payable ?? 0)} />
+            <StatCard label="Amount due" accent="rose" value={formatCurrency(metrics.amountDue)} />
             <StatCard label="Total paid" accent="emerald" value={formatCurrency(metrics.totalPaid)} />
           </div>
           {ledgers.length === 0 ? (
@@ -287,10 +307,19 @@ export default function TenantDashboard() {
                               <Info className="h-3.5 w-3.5 text-subtle" />
                             </button>
                           </td>
-                          <td className="p-4"><Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge></td>
+                          <td className="p-4">
+                            <Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge>
+                            {l.payment_status === "partial" && (
+                              <div className="mt-1 text-xs text-subtle">
+                                {formatCurrency(l.amount_paid)} paid
+                              </div>
+                            )}
+                          </td>
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {l.payment_status === "paid" && (
+                              {/* Any recorded payment is worth a receipt — it's the tenant's proof
+                                  of what they've handed over so far, settled or not. */}
+                              {Number(l.amount_paid) > 0 && (
                                 <button title="Download receipt" onClick={() => openTenantReceipt(l)}
                                   className="inline-flex items-center gap-1 rounded-lg bg-surface-2/80 px-2.5 py-1.5 text-xs font-semibold text-heading transition hover:bg-surface-2/80">
                                   <Receipt className="h-3.5 w-3.5" /> Receipt
@@ -323,7 +352,7 @@ export default function TenantDashboard() {
                       </button>
                     </div>
                     <div className="mt-3 flex items-center justify-end gap-2">
-                      {l.payment_status === "paid" && (
+                      {Number(l.amount_paid) > 0 && (
                         <button title="Download receipt" onClick={() => openTenantReceipt(l)}
                           className="inline-flex items-center gap-1 rounded-lg bg-surface-2/80 px-2.5 py-1.5 text-xs font-semibold text-heading">
                           <Receipt className="h-3.5 w-3.5" /> Receipt
@@ -448,7 +477,8 @@ export default function TenantDashboard() {
         tenantId={tenantId}
         onCreated={(m) => setLogs((x) => [m, ...x])}
       />
-      <BillBreakdownModal ledger={breakdown} onClose={() => setBreakdown(null)} />
+      <BillBreakdownModal ledger={breakdown} payments={breakdown ? paymentsFor(breakdown.id) : []}
+        onClose={() => setBreakdown(null)} />
       <ServiceChargeBreakdownModal
         open={serviceModalOpen}
         onClose={() => setServiceModalOpen(false)}
@@ -588,9 +618,14 @@ function BreakRow({ label, value, strong, tone }: { label: string; value: string
 }
 
 // Itemised breakdown of a single invoice's charges.
-function BillBreakdownModal({ ledger, onClose }: { ledger: BillingLedger | null; onClose: () => void }) {
+function BillBreakdownModal({
+  ledger, payments, onClose,
+}: { ledger: BillingLedger | null; payments: BillingPayment[]; onClose: () => void }) {
   const t = useT();
   const lang = useLang();
+  const balance = ledger
+    ? Math.max(0, Number(ledger.total_payable || 0) - Number(ledger.amount_paid || 0))
+    : 0;
   return (
     <Modal open={!!ledger} onClose={onClose} title="Charge breakdown"
       subtitle={ledger ? `Invoice for ${formatMonth(ledger.billing_month, lang)}` : undefined}>
@@ -608,6 +643,16 @@ function BillBreakdownModal({ ledger, onClose }: { ledger: BillingLedger | null;
           )}
           <div className="my-3 border-t border-line/[0.08]" />
           <BreakRow label="Total payable" value={formatCurrency(ledger.total_payable)} strong />
+          {payments.length > 0 && (
+            <>
+              <div className="my-3 border-t border-line/[0.08]" />
+              {payments.map((p, i) => (
+                <BreakRow key={p.id} label={`${ordinalDay(i + 1)} payment · ${formatDate(p.paid_on, lang)}`}
+                  value={`− ${formatCurrency(p.amount)}`} tone="emerald" />
+              ))}
+              {balance > 0 && <BreakRow label="Balance due" value={formatCurrency(balance)} strong />}
+            </>
+          )}
           <div className="flex items-center justify-between pt-3">
             <span className="text-xs text-subtle">{t("Status")}</span>
             <Badge tone={statusTone[ledger.payment_status]}>{ledger.payment_status}</Badge>
@@ -725,6 +770,15 @@ function BillPaymentAction({
   }
   if (ledger.payment_status === "sent") {
     return <span className="text-xs text-warning">Awaiting owner confirmation</span>;
+  }
+  // Partly paid: the owner has confirmed some of it, so "I've sent it" would be misleading —
+  // what the tenant needs to see is what's left.
+  if (ledger.payment_status === "partial") {
+    return (
+      <span className="text-xs font-semibold text-danger">
+        {formatCurrency(Math.max(0, Number(ledger.total_payable || 0) - Number(ledger.amount_paid || 0)))} still due
+      </span>
+    );
   }
   return (
     <Button variant="secondary" icon={Send} onClick={() => onSend(ledger.id)}>

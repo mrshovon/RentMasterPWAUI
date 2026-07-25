@@ -6,7 +6,10 @@
 
 export interface ReceiptOptions {
   copyLabel: string;                 // "Owner Copy" | "Tenant Copy"
-  ownerName?: string | null;         // landlord — header title + signature name
+  // The name in the header. Falls back to the owner's account name, but a property can override
+  // it (properties.receipt_name) so a building or business name goes on its receipts instead.
+  // Deliberately NOT repeated in the signature block, which shows only the rule and its caption.
+  ownerName?: string | null;
   propertyAddress?: string | null;   // header address line
   refNo?: string | null;             // bottom-left "Ref: ..."
   billingMonth: string;              // "YYYY-MM" -> "June 2026"
@@ -16,9 +19,13 @@ export interface ReceiptOptions {
   extraCharge: number;
   discount?: number;
   total: number;
-  paymentStatus?: string;            // 'paid' | 'unpaid' | 'sent'
-  paidAt?: string | null;            // ISO timestamp of payment
+  paymentStatus?: string;            // 'paid' | 'partial' | 'unpaid' | 'sent'
+  paidAt?: string | null;            // ISO timestamp of the LAST payment
   dueDay?: number | null;            // tenant's rent due day-of-month
+  // Installments, oldest first. Rent is often paid in parts, and the receipt has to show each
+  // part with its own date so a tenant can prove what they paid and when.
+  payments?: { paidOn: string; amount: number }[];
+  amountPaid?: number;               // total received so far
   note?: string | null;              // owner's free-text note
   signatureUrl?: string | null;
 }
@@ -43,35 +50,74 @@ export function buildReceiptHtml(o: ReceiptOptions): string {
   const [y, m] = (o.billingMonth || "").split("-");
   const monthLabel = MONTHS[parseInt(m, 10) - 1] ? `${MONTHS[parseInt(m, 10) - 1]} ${y}` : o.billingMonth;
 
-  // Late is a CALENDAR-DAY comparison, not a timestamp one: paying on the due day is on time,
-  // which is what the note printed further down actually promises ("by or on the 5th"). Comparing
+  // Dates are compared as CALENDAR DAYS, not timestamps: paying on the due day is on time, which
+  // is what the note printed further down actually promises ("by or on the 5th"). Comparing
   // timestamps made any payment after midnight on the due day read as late, and mixed a UTC
   // paid_at against a local-midnight due date.
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dayKey = (d: Date) => d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+
   const paid = o.paidAt ? new Date(o.paidAt) : null;
   // A due day of 31 in a 30-day month means "the last day" — new Date(y, m, 0) is that day.
   const dueDayClamped = o.dueDay && y && m
     ? Math.min(o.dueDay, new Date(Number(y), Number(m), 0).getDate())
     : null;
-  const paidKey = paid ? paid.getFullYear() * 10000 + (paid.getMonth() + 1) * 100 + paid.getDate() : null;
   const dueKey = dueDayClamped ? Number(y) * 10000 + Number(m) * 100 + dueDayClamped : null;
-  const late = !!(paidKey && dueKey && paidKey > dueKey);
+
+  const installments = (o.payments || []).map((p) => {
+    const d = new Date(`${String(p.paidOn).slice(0, 10)}T12:00:00.000Z`);
+    return { date: d, key: dayKey(d), amount: Number(p.amount || 0) };
+  });
+
   const isPaid = (o.paymentStatus || "paid") === "paid";
+  const isPartial = o.paymentStatus === "partial";
+  const amountPaid = Number(o.amountPaid ?? (isPaid ? o.total : 0));
+  const balance = Math.max(0, Number(o.total || 0) - amountPaid);
 
-  // Receipt date (payment date if paid, else today), DD/MM/YYYY.
-  const dt = paid || new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const dateStr = `${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}/${dt.getFullYear()}`;
+  // Late when a payment landed after the due date, OR money is still owed once the due date has
+  // passed — an invoice sitting half-paid weeks later is late whatever the installments say.
+  const latePayment = !!(dueKey && installments.some((p) => p.key > dueKey));
+  const overdueBalance = !!(dueKey && balance > 0 && dayKey(new Date()) > dueKey);
+  // Falls back to the single paid_at for receipts built before the payment log existed.
+  const legacyLate = !!(dueKey && !installments.length && paid && dayKey(paid) > dueKey);
+  const late = latePayment || overdueBalance || legacyLate;
 
-  const statusHtml = isPaid
-    ? `<span class="status paid">PAID</span>${late ? ` <span class="status late">LATE</span>` : ""}`
-    : `<span class="status due">DUE</span>`;
+  const fmtDay = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  // Receipt date (last payment if there is one, else today), DD/MM/YYYY.
+  const dateStr = fmtDay(paid || new Date());
+
+  const statusWord = isPaid
+    ? `<span class="status paid">PAID</span>`
+    : isPartial
+      ? `<span class="status partial">PARTIAL</span>`
+      : `<span class="status due">DUE</span>`;
+  const statusHtml = `${statusWord}${late ? ` <span class="status late">LATE</span>` : ""}`;
   const totalLabel = isPaid ? "Total Paid" : "Total Due";
 
-  const row = (label: string, value: string, bold = false) =>
-    `<div class="row"><div class="lbl">${label}</div><div class="val${bold ? " b" : ""}">${value}</div></div>`;
+  // The payment list only earns its place when it says something the Date row can't: more than
+  // one payment, money still owed, or something arrived late. A single full on-time payment
+  // keeps the plain receipt.
+  const showPayments = installments.length > 1 || (installments.length > 0 && (balance > 0 || late));
+
+  const row = (label: string, value: string, bold = false, red = false) =>
+    `<div class="row${red ? " r" : ""}"><div class="lbl">${label}</div><div class="val${bold ? " b" : ""}">${value}</div></div>`;
+
+  // Either the plain "Date:" line, or the itemised payment history that replaces it.
+  const paymentRowsHtml = showPayments
+    ? installments
+        .map((p, i) =>
+          row(
+            `${ordinal(i + 1)} Payment:`,
+            `${fmtDay(p.date)} — ${money(p.amount)}`,
+            false,
+            !!(dueKey && p.key > dueKey) // red: this one arrived after the due date
+          )
+        )
+        .join("") + (balance > 0 ? row("Balance Due:", money(balance), true, overdueBalance) : "")
+    : row("Date:", dateStr);
 
   let rowsHtml =
-    row("Date:", dateStr) +
+    paymentRowsHtml +
     row("Month:", esc(monthLabel)) +
     row("Tenant Name:", esc(o.tenantName || "Tenant"), true) +
     row("House Rent:", money(o.houseRent)) +
@@ -97,7 +143,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#eef2f6;color:#1
 .receipt{max-width:780px;margin:0 auto;background:#fff;border:3px solid #000;padding:24px 28px;position:relative}
 .head{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:8px}
 .status{font-weight:700;font-size:17px}
-.status.paid{color:#16a34a}.status.due,.status.late{color:#dc2626}
+.status.paid{color:#16a34a}.status.partial{color:#b45309}.status.due,.status.late{color:#dc2626}
 .title{text-align:center;font-weight:800;font-size:26px;text-decoration:underline;letter-spacing:1px}
 .copy{text-align:right;font-weight:700;font-size:13px;color:#111}
 .oname{text-align:center;font-weight:800;font-size:20px;margin-top:10px}
@@ -105,6 +151,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#eef2f6;color:#1
 .divider{border-top:3px solid #000;margin:12px 0 2px}
 .row{display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-bottom:2px dotted #bcbcbc;font-size:15px}
 .val.b{font-weight:700}
+.row.r,.row.r .val{color:#dc2626;font-weight:700}
 .total-box{display:flex;justify-content:space-between;align-items:center;border:3px solid #000;padding:10px 16px;margin-top:12px}
 .t-lbl{font-weight:800;font-size:19px}.t-val{font-weight:800;font-size:22px}
 .notes{margin-top:8px}
@@ -114,8 +161,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#eef2f6;color:#1
 .sign{text-align:center;min-width:200px}
 .sig-img{max-height:44px;max-width:160px;object-fit:contain;display:block;margin:0 auto 4px}
 .sig-line{border-top:1.5px solid #000;width:190px;margin:0 auto}
-.sig-name{font-weight:700;font-size:14px;margin-top:6px}
-.sig-role{font-size:12px;margin-top:2px}
+.sig-role{font-size:12px;margin-top:6px}
 @page{size:A4 portrait;margin:12mm}
 @media print{body{background:#fff;padding:0}.receipt{zoom:.45;margin:0;max-width:none;width:780px;padding:24px 28px}}
 </style></head><body><div class="receipt">
@@ -128,7 +174,7 @@ ${rowsHtml}
 <div class="notes">${notesHtml}</div>
 <div class="bottom">
 <div class="ref">Ref: ${esc(o.refNo || "")}</div>
-<div class="sign">${sigImg}<div class="sig-line"></div><div class="sig-name">${esc(o.ownerName || "Owner")}</div><div class="sig-role">Landlord's Signature</div></div>
+<div class="sign">${sigImg}<div class="sig-line"></div><div class="sig-role">Landlord's Signature</div></div>
 </div>
 </div></body></html>`
   );

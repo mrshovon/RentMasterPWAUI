@@ -4,7 +4,8 @@
 // maintenance_logs, notices.
 // =============================================================================
 
-export type PaymentStatus = "unpaid" | "sent" | "paid";
+// 'partial' is DERIVED on the server from the payment log — clients never write it.
+export type PaymentStatus = "unpaid" | "sent" | "partial" | "paid";
 export type PriorityLevel = "low" | "medium" | "high" | "urgent";
 export type ResolutionStatus = "reported" | "in_progress" | "resolved";
 // "everyone" = every owner AND every tenant on the platform (admin circulations only).
@@ -17,6 +18,8 @@ export interface Property {
   name: string;
   address: string;
   flat_no: string;
+  // Name printed on this property's receipts. Null = use the owner's account name.
+  receipt_name: string | null;
   owner_phone: string | null;
   is_vacant: boolean;
   created_at: string;
@@ -29,8 +32,13 @@ export interface Tenant {
   name: string;
   phone: string;
   family_members: number;
-  nid_hash: string | null;
-  password_hash: string | null;
+  // Decrypted server-side for the OWNER only (GET /api/admin/tenants). Null for tenants
+  // onboarded before NIDs were stored reversibly — their old hash can't be recovered.
+  nid?: string | null;
+  // Legacy: the one-way hash NIDs used to be stored as. Nothing reads it, and it is no longer
+  // sent to the client. Kept on the type only to describe the column.
+  nid_hash?: string | null;
+  password_hash?: string | null;
   monthly_rent: number;
   due_date: number; // day of month (1-31)
   rented_date: string | null;
@@ -58,10 +66,26 @@ export interface BillingLedger {
   payment_status: PaymentStatus;
   created_by_owner: string;
   created_at: string;
-  paid_at?: string | null;
+  // Derived from billing_payments by recalcLedger() on the server — never written by hand.
+  amount_paid: number;
+  paid_at?: string | null; // the LAST payment's date
   // Relational joins
   properties?: { name: string } | null;
   tenants?: { name: string; phone: string } | null;
+}
+
+/** One installment against an invoice. Rent is often paid in parts, so an invoice has a list. */
+export interface BillingPayment {
+  id: string;
+  payment_no: number;
+  ledger_id: string;
+  owner_id: string;
+  tenant_id: string | null;
+  amount: number;
+  paid_on: string; // "YYYY-MM-DD"
+  method: StaffPaymentMethod;
+  note: string | null;
+  created_at: string;
 }
 
 export interface MaintenanceLog {
@@ -156,6 +180,7 @@ export interface TenantProfile {
     flat_no: string;
     is_vacant: boolean;
     owner_phone: string | null;
+    receipt_name: string | null;
   } | null;
   owner: OwnerContact | null;
 }

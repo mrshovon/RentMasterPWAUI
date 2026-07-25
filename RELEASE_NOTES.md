@@ -1,3 +1,13 @@
+- You can now edit a tenant's National ID and their move-in date after onboarding. The NID is shown as you typed it so you can check or correct it, and only you can see it.
+- Tenant documents can now be PDFs, not just photos. Deeds and agreements upload the way they arrive.
+- Each property can carry its own name for receipts. Set it when adding or editing a property, and that property's receipts print it instead of your account name. Leave it blank to keep using your account name.
+- The signature block on the receipt no longer prints a name above the line, just the signature and the caption.
+- Rent can now be paid in parts. Tap the green tick, enter how much came in and when, and the invoice shows as partly paid with the balance still owed. Record the rest whenever it arrives.
+- The receipt now lists each payment with its own date and amount, and shows the balance still due. Anything paid after the due date is printed in red.
+- An invoice that is partly paid past its due date is marked PARTIAL LATE, so a half-paid month no longer looks settled.
+- A payments list on each invoice lets you review what was received and delete anything entered by mistake. Deleting a payment moves the invoice back to partly paid or unpaid on its own.
+- Outstanding and Collected now count part payments properly, instead of treating a half-paid invoice as fully unpaid.
+- Tenants can see what they have paid so far, what is left, and can download a receipt for a part payment.
 - When you mark rent as received, you now choose the date it was actually paid. It opens on today's date, so nothing changes if the tenant just paid — but you can set an earlier date when you are entering an older month.
 - Recording rent for a past month no longer prints LATE on the receipt. The receipt now checks the date you entered against that month's due date, so a tenant who paid on time is shown as having paid on time.
 - You can correct a payment date afterwards. Tap the green tick on a bill that is already marked paid, change the date, and the receipt updates. The tenant is not notified a second time.

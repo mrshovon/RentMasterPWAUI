@@ -18,7 +18,7 @@ import { useSessionGuard } from "../../lib/use-session";
 import { useTabState } from "../../lib/use-tab";
 import { usePendingAction } from "../../lib/use-pending";
 import {
-  Property, Tenant, BillingLedger, MaintenanceLog, Notice,
+  Property, Tenant, BillingLedger, BillingPayment, MaintenanceLog, Notice,
   PaymentStatus, PriorityLevel, ResolutionStatus, Document, OccupancyHistory, RentRevision,
   PlanState, PlanUsage, SubscriptionResponse, SubscriptionTier,
   SupportTicket, TicketStatus, TicketCategory,
@@ -41,8 +41,8 @@ import {
 const priorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
   low: "slate", medium: "amber", high: "rose", urgent: "rose",
 };
-const statusTone: Record<PaymentStatus, "emerald" | "amber" | "rose"> = {
-  paid: "emerald", sent: "amber", unpaid: "rose",
+const statusTone: Record<PaymentStatus, "emerald" | "amber" | "cyan" | "rose"> = {
+  paid: "emerald", sent: "amber", partial: "cyan", unpaid: "rose",
 };
 const maintStatusTone: Record<ResolutionStatus, "amber" | "cyan" | "emerald"> = {
   reported: "amber", in_progress: "cyan", resolved: "emerald",
@@ -70,6 +70,9 @@ export default function OwnerDashboard() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [ledgers, setLedgers] = useState<BillingLedger[]>([]);
+  // Every installment the owner has recorded, filtered per invoice where it's needed — same
+  // shape as staff-tab's staff + payments pair.
+  const [payments, setPayments] = useState<BillingPayment[]>([]);
   const [maintenance, setMaintenance] = useState<MaintenanceLog[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [plan, setPlan] = useState<SubscriptionResponse | null>(null);
@@ -96,8 +99,9 @@ export default function OwnerDashboard() {
   const [whatsappTemplate, setWhatsappTemplate] = useState<string>("");
   const [receipt, setReceipt] = useState<{ html: string; phone: string | null; message: string; fileName: string } | null>(null);
   const [revealPasscode, setRevealPasscode] = useState<{ name: string; code: string } | null>(null);
-  // Invoice awaiting a "payment received" confirmation (also the edit-the-payment-date path).
+  // Invoice awaiting a "payment received" entry, and the one whose installments are being reviewed.
   const [payFor, setPayFor] = useState<BillingLedger | null>(null);
+  const [historyFor, setHistoryFor] = useState<BillingLedger | null>(null);
   // Staff add-on enquiry (opened from the locked Staff tab).
   const [staffContactOpen, setStaffContactOpen] = useState(false);
   // Accounts add-on enquiry (opened from the locked Accounts tab).
@@ -146,7 +150,7 @@ export default function OwnerDashboard() {
     (async () => {
       try {
         setLoading(true);
-        const [p, t, b, m, n, s, rm] = await Promise.allSettled([
+        const [p, t, b, m, n, s, rm, bp] = await Promise.allSettled([
           rentMasterFetch("/api/admin/properties", { role: "owner" }),
           rentMasterFetch("/api/admin/tenants", { role: "owner" }),
           rentMasterFetch("/api/admin/billing", { role: "owner" }),
@@ -154,10 +158,12 @@ export default function OwnerDashboard() {
           rentMasterFetch("/api/admin/notices", { role: "owner" }),
           rentMasterFetch("/api/admin/support-tickets", { role: "owner" }),
           rentMasterFetch("/api/admin/reminders", { role: "owner" }),
+          rentMasterFetch("/api/admin/billing/payments", { role: "owner" }),
         ]);
         if (p.status === "fulfilled") setProperties(p.value.data || []);
         if (t.status === "fulfilled") setTenants(t.value.data || []);
         if (b.status === "fulfilled") setLedgers(b.value.data || []);
+        if (bp.status === "fulfilled") setPayments(bp.value.data || []);
         if (m.status === "fulfilled") setMaintenance(m.value.data || []);
         if (n.status === "fulfilled") setNotices(n.value.data || []);
         if (s.status === "fulfilled") setTickets(s.value.data || []);
@@ -206,9 +212,10 @@ export default function OwnerDashboard() {
   const metrics = useMemo(() => {
     const occupied = properties.filter((p) => !p.is_vacant).length;
     const monthlyRevenue = tenants.reduce((s, t) => s + Number(t.monthly_rent || 0), 0);
+    // What is still OWED — a partly-paid invoice contributes only its remaining balance.
     const outstanding = ledgers
       .filter((l) => l.payment_status !== "paid")
-      .reduce((s, l) => s + Number(l.total_payable || 0), 0);
+      .reduce((s, l) => s + Math.max(0, Number(l.total_payable || 0) - Number(l.amount_paid || 0)), 0);
     const unpaidCount = ledgers.filter((l) => l.payment_status !== "paid").length;
     const openTickets = maintenance.filter((m) => m.resolution_status !== "resolved").length;
     const openSupport = tickets.filter((t) => t.status !== "done").length;
@@ -233,35 +240,60 @@ export default function OwnerDashboard() {
   ];
 
   // ---- Status mutation (PATCH) ----
-  // `paidOn` ("YYYY-MM-DD") is the date the owner says the money arrived — supplied when marking a
-  // bill paid, or when correcting the date on one that's already paid. Omitted, the server uses today.
-  async function setPaymentStatus(id: string, paymentStatus: PaymentStatus, paidOn?: string) {
+  // Only 'unpaid' and 'sent' come through here now. 'unpaid' clears every recorded payment
+  // server-side, so the caller must confirm first. Recording money uses recordPayment below.
+  async function setPaymentStatus(id: string, paymentStatus: PaymentStatus) {
     const prev = ledgers;
-    // Mirror the server's midday-UTC storage so the receipt is right without waiting for a refetch.
-    const optimisticPaidAt =
-      paymentStatus === "paid" && paidOn ? new Date(`${paidOn}T12:00:00.000Z`).toISOString() : null;
-    setLedgers((ls) =>
-      ls.map((l) =>
-        l.id === id
-          ? { ...l, payment_status: paymentStatus, ...(optimisticPaidAt ? { paid_at: optimisticPaidAt } : {}) }
-          : l
-      )
-    );
+    setLedgers((ls) => ls.map((l) => (l.id === id ? { ...l, payment_status: paymentStatus } : l)));
     try {
-      await rentMasterFetch(`/api/admin/billing/${id}`, {
+      const res = await rentMasterFetch<{ data: BillingLedger }>(`/api/admin/billing/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(paidOn ? { paymentStatus, paidOn } : { paymentStatus }),
+        body: JSON.stringify({ paymentStatus }),
         role: "owner",
       });
-      toast.success(
-        paymentStatus === "paid" && paidOn
-          ? `Payment recorded for ${formatDate(optimisticPaidAt)}.`
-          : `Invoice marked ${paymentStatus}.`
-      );
+      // The server re-derives the invoice from its payments; take its answer over the guess.
+      if (res.data) setLedgers((ls) => ls.map((l) => (l.id === id ? { ...l, ...res.data } : l)));
+      if (paymentStatus === "unpaid") setPayments((ps) => ps.filter((p) => p.ledger_id !== id));
+      toast.success(`Invoice marked ${paymentStatus}.`);
     } catch (e: any) {
       setLedgers(prev); // rollback
       toast.error(`Status update failed: ${e.message}`);
     }
+  }
+
+  // ---- Record one installment against an invoice ----
+  // Rent often arrives in parts, so this appends to the payment log rather than flipping a flag.
+  // The server derives the invoice's status from the log and hands the updated row back.
+  async function recordPayment(ledgerId: string, amount: number, paidOn: string) {
+    const res = await rentMasterFetch<{ data: BillingPayment; ledger: BillingLedger }>(
+      "/api/admin/billing/payments",
+      { method: "POST", role: "owner", body: JSON.stringify({ ledgerId, amount, paidOn }) }
+    );
+    setPayments((ps) => [...ps, res.data]);
+    if (res.ledger) setLedgers((ls) => ls.map((l) => (l.id === ledgerId ? { ...l, ...res.ledger } : l)));
+    toast.success(`${formatCurrency(amount)} recorded for ${formatDate(paidOn)}.`);
+  }
+
+  // ---- Back to unpaid: wipes the payment log, so ask first when there's anything to lose ----
+  async function clearPayments(l: BillingLedger) {
+    const recorded = payments.filter((p) => p.ledger_id === l.id);
+    if (recorded.length > 0 && !(await confirmDialog({
+      title: "Mark as unpaid?",
+      message: `This deletes ${recorded.length} recorded payment${recorded.length === 1 ? "" : "s"} totalling ${formatCurrency(Number(l.amount_paid || 0))} for this invoice.`,
+      confirmLabel: "Delete payments",
+      danger: true,
+    }))) return;
+    await setPaymentStatus(l.id, "unpaid");
+  }
+
+  // ---- Delete a mis-entered installment ----
+  async function deletePayment(p: BillingPayment) {
+    const res = await rentMasterFetch<{ ledger: BillingLedger }>(`/api/admin/billing/payments/${p.id}`, {
+      method: "DELETE", role: "owner",
+    });
+    setPayments((ps) => ps.filter((x) => x.id !== p.id));
+    if (res.ledger) setLedgers((ls) => ls.map((l) => (l.id === p.ledger_id ? { ...l, ...res.ledger } : l)));
+    toast.success("Payment deleted.");
   }
 
   // Load the owner's saved signature (from auth metadata) for receipts.
@@ -304,6 +336,13 @@ export default function OwnerDashboard() {
     } catch { /* non-fatal */ }
   };
 
+  /** This invoice's installments, oldest first — the order the receipt numbers them in. */
+  function paymentsFor(ledgerId: string) {
+    return payments
+      .filter((p) => p.ledger_id === ledgerId)
+      .sort((a, b) => a.paid_on.localeCompare(b.paid_on));
+  }
+
   // Build an "Owner Copy" receipt (paid OR due) and open the preview, ready to share via WhatsApp.
   function openOwnerReceipt(l: BillingLedger) {
     const t = tenants.find((x) => x.id === l.tenant_id);
@@ -311,7 +350,9 @@ export default function OwnerDashboard() {
     const tenantName = l.tenants?.name || t?.name || "Tenant";
     const html = buildReceiptHtml({
       copyLabel: "Owner Copy",
-      ownerName: session?.name || "Owner",
+      // A property can carry its own name for receipts (a building or business name); the
+      // account name is the fallback.
+      ownerName: prop?.receipt_name || session?.name || "Owner",
       propertyAddress: prop?.address || null,
       refNo: l.property_id,
       billingMonth: l.billing_month,
@@ -324,6 +365,8 @@ export default function OwnerDashboard() {
       paymentStatus: l.payment_status,
       paidAt: l.paid_at,
       dueDay: t?.due_date,
+      payments: paymentsFor(l.id).map((p) => ({ paidOn: p.paid_on, amount: Number(p.amount) })),
+      amountPaid: Number(l.amount_paid || 0),
       note: l.extra_charge_remarks,
       signatureUrl: ownerSignature,
     });
@@ -424,10 +467,13 @@ export default function OwnerDashboard() {
       {tab === "billing" && (
         <BillingTab
           ledgers={ledgers}
+          payments={payments}
           outstanding={metrics.outstanding}
           onCreate={() => setInvoiceOpen(true)}
-          onStatus={setPaymentStatus}
+          onUnpaid={clearPayments}
+          onSent={setPaymentStatus}
           onPaid={setPayFor}
+          onHistory={setHistoryFor}
           onReceipt={openOwnerReceipt}
           onSignature={() => setSigOpen(true)}
           hasSignature={!!ownerSignature}
@@ -524,7 +570,14 @@ export default function OwnerDashboard() {
         ledger={payFor}
         dueDay={tenants.find((x) => x.id === payFor?.tenant_id)?.due_date ?? null}
         onClose={() => setPayFor(null)}
-        onConfirm={(id, date) => setPaymentStatus(id, "paid", date)}
+        onConfirm={recordPayment}
+      />
+      <PaymentHistoryModal
+        ledger={historyFor}
+        payments={historyFor ? paymentsFor(historyFor.id) : []}
+        dueDay={tenants.find((x) => x.id === historyFor?.tenant_id)?.due_date ?? null}
+        onClose={() => setHistoryFor(null)}
+        onDelete={deletePayment}
       />
       <NoticeModal
         open={noticeOpen}
@@ -1462,13 +1515,18 @@ function TenantsTab({
 
 /* ============================================================ BILLING */
 function BillingTab({
-  ledgers, outstanding, onCreate, onStatus, onPaid, onReceipt, onSignature, hasSignature,
+  ledgers, payments, outstanding, onCreate, onUnpaid, onSent, onPaid, onHistory,
+  onReceipt, onSignature, hasSignature,
 }: {
-  ledgers: BillingLedger[]; outstanding: number;
-  onCreate: () => void; onStatus: (id: string, s: PaymentStatus) => void;
+  ledgers: BillingLedger[]; payments: BillingPayment[]; outstanding: number;
+  onCreate: () => void;
+  onUnpaid: (l: BillingLedger) => void;
+  onSent: (id: string, s: PaymentStatus) => void;
   onPaid: (l: BillingLedger) => void;
+  onHistory: (l: BillingLedger) => void;
   onReceipt: (l: BillingLedger) => void; onSignature: () => void; hasSignature: boolean;
 }) {
+  const paymentCount = (id: string) => payments.filter((p) => p.ledger_id === id).length;
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const filtered = q
@@ -1493,8 +1551,9 @@ function BillingTab({
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <StatCard label="Invoices" value={ledgers.length} accent="indigo" />
         <StatCard label="Outstanding" value={formatCurrency(outstanding)} accent="rose" />
+        {/* Money actually received, including part-payments on invoices that aren't settled yet. */}
         <StatCard label="Collected"
-          value={formatCurrency(ledgers.filter((l) => l.payment_status === "paid").reduce((s, l) => s + Number(l.total_payable), 0))}
+          value={formatCurrency(ledgers.reduce((s, l) => s + Number(l.amount_paid || 0), 0))}
           accent="emerald" />
       </div>
 
@@ -1541,6 +1600,11 @@ function BillingTab({
                       {l.payment_status === "paid" && l.paid_at && (
                         <div className="mt-1 text-xs text-subtle">on {formatDate(l.paid_at)}</div>
                       )}
+                      {l.payment_status === "partial" && (
+                        <div className="mt-1 text-xs text-subtle">
+                          {formatCurrency(l.amount_paid)} of {formatCurrency(l.total_payable)}
+                        </div>
+                      )}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-1">
@@ -1548,15 +1612,20 @@ function BillingTab({
                           className="rounded-lg p-1.5 text-primary transition hover:bg-primary/10">
                           <Receipt className="h-4 w-4" />
                         </button>
+                        {paymentCount(l.id) > 0 && (
+                          <button title={`Payments (${paymentCount(l.id)})`} onClick={() => onHistory(l)}
+                            className="rounded-lg p-1.5 text-muted transition hover:bg-overlay/[0.06] hover:text-heading">
+                            <History className="h-4 w-4" />
+                          </button>
+                        )}
                         <StatusButton active={l.payment_status === "unpaid"} tone="rose" icon={Circle}
-                          onClick={() => onStatus(l.id, "unpaid")} title="Unpaid" />
+                          onClick={() => onUnpaid(l)} title="Unpaid" />
                         <StatusButton active={l.payment_status === "sent"} tone="amber" icon={Send}
-                          onClick={() => onStatus(l.id, "sent")} title="Sent" />
-                        {/* Paid asks for the date first — that's also how an already-paid
-                            invoice's payment date gets corrected. */}
+                          onClick={() => onSent(l.id, "sent")} title="Sent" />
+                        {/* Asks for the amount and date, so rent paid in parts can be recorded
+                            part by part. Stays enabled on a settled invoice for a late top-up. */}
                         <StatusButton active={l.payment_status === "paid"} tone="emerald" icon={CheckCircle2}
-                          onClick={() => onPaid(l)}
-                          title={l.payment_status === "paid" ? "Edit payment date" : "Payment received"} />
+                          onClick={() => onPaid(l)} title="Payment received" />
                       </div>
                     </td>
                   </tr>
@@ -1842,7 +1911,7 @@ function NoticesTab({ notices, onCreate }: { notices: Notice[]; onCreate: () => 
 function PropertyModal({
   open, onClose, onCreated,
 }: { open: boolean; onClose: () => void; onCreated: (p: Property) => void }) {
-  const [form, setForm] = useState({ name: "", address: "", flatNo: "" });
+  const [form, setForm] = useState({ name: "", address: "", flatNo: "", receiptName: "" });
   const [saving, setSaving] = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -1854,7 +1923,7 @@ function PropertyModal({
       });
       if (res.success) {
         onCreated(res.data);
-        setForm({ name: "", address: "", flatNo: "" });
+        setForm({ name: "", address: "", flatNo: "", receiptName: "" });
         onClose();
         toast.success("Property added.");
       }
@@ -1876,6 +1945,10 @@ function PropertyModal({
         <Field label="Flat / Unit no." required>
           <TextInput required placeholder="e.g. 4B" value={form.flatNo}
             onChange={(e) => setForm({ ...form, flatNo: e.target.value })} />
+        </Field>
+        <Field label="Name on receipts" hint="Printed at the top of this property's receipts. Leave blank to use your account name.">
+          <TextInput placeholder="e.g. Grand Crimson Holdings" value={form.receiptName}
+            onChange={(e) => setForm({ ...form, receiptName: e.target.value })} />
         </Field>
         <Button type="submit" loading={saving} className="w-full">Save property</Button>
       </form>
@@ -1968,7 +2041,7 @@ function TenantModal({
               onChange={(e) => setForm({ ...form, rentedDate: e.target.value })} />
           </Field>
         </div>
-        <Field label="National ID (NID)" hint="Stored hashed for verification.">
+        <Field label="National ID (NID)" hint="Stored encrypted. Visible only to you.">
           <TextInput placeholder="NID number" value={form.nid}
             onChange={(e) => setForm({ ...form, nid: e.target.value })} />
         </Field>
@@ -1979,11 +2052,10 @@ function TenantModal({
 }
 
 /**
- * "Payment received" — confirms a bill as paid on a date the OWNER chooses, defaulting to today.
- *
- * This exists because rent is often entered after the fact: recording a March invoice in July with
- * today's date made the receipt print LATE even though the tenant paid on the 3rd of March. Opening
- * it on an already-paid invoice pre-fills the stored date, so this is also the edit path.
+ * "Payment received" — records ONE payment against an invoice, for an amount and a date the
+ * OWNER chooses. Both fields matter for the same reason: rent is entered after the fact and
+ * often arrives in parts, so neither "today" nor "the full amount" can be assumed. The amount
+ * defaults to the balance still owed and the date to today, which is the common case in one click.
  */
 function PaymentReceivedModal({
   ledger, dueDay, onClose, onConfirm,
@@ -1991,27 +2063,35 @@ function PaymentReceivedModal({
   ledger: BillingLedger | null;
   dueDay: number | null;
   onClose: () => void;
-  onConfirm: (id: string, date: string) => Promise<void> | void;
+  onConfirm: (ledgerId: string, amount: number, date: string) => Promise<void>;
 }) {
   const today = new Date().toISOString().slice(0, 10);
-  const alreadyPaid = ledger?.payment_status === "paid";
+  const total = Number(ledger?.total_payable || 0);
+  const alreadyPaid = Number(ledger?.amount_paid || 0);
+  const balance = Math.max(0, total - alreadyPaid);
+  const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today);
   const [saving, setSaving] = useState(false);
 
-  // Re-seed whenever a different invoice is opened: today for a new payment, the stored date
-  // when correcting one that's already recorded.
+  // Re-seed whenever a different invoice is opened.
   useEffect(() => {
     if (!ledger) return;
-    setDate(ledger.payment_status === "paid" && ledger.paid_at ? ledger.paid_at.slice(0, 10) : today);
+    const owed = Math.max(0, Number(ledger.total_payable || 0) - Number(ledger.amount_paid || 0));
+    setAmount(owed > 0 ? String(owed) : "");
+    setDate(today);
   }, [ledger?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!ledger || !date) return;
+    const value = Number(amount);
+    if (!(value > 0)) { toast.error("Enter an amount greater than zero."); return; }
     try {
       setSaving(true);
-      await onConfirm(ledger.id, date);
+      await onConfirm(ledger.id, value, date);
       onClose();
+    } catch (e: any) {
+      toast.error(e.message);
     } finally {
       setSaving(false);
     }
@@ -2021,42 +2101,64 @@ function PaymentReceivedModal({
     <Modal
       open={!!ledger}
       onClose={onClose}
-      title={alreadyPaid ? "Edit payment date" : "Payment received"}
-      subtitle={alreadyPaid
-        ? "Correct the date this rent was actually received."
-        : "Confirm when this rent was actually received — not necessarily today."}
+      title="Payment received"
+      subtitle="Record what was received and when — a part payment is fine."
     >
       {ledger && (
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2 rounded-xl border border-line/[0.06] bg-overlay/[0.03] px-4 py-3 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-muted">Tenant</span>
-              <span className="font-semibold text-heading">{ledger.tenants?.name ?? "Tenant"}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted">Month</span>
+              <span className="text-muted">{ledger.tenants?.name ?? "Tenant"}</span>
               <span className="font-semibold text-heading">{formatMonth(ledger.billing_month)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted">Amount</span>
-              <span className="font-black text-success">{formatCurrency(ledger.total_payable)}</span>
+              <span className="text-muted">Invoice total</span>
+              <span className="font-semibold text-heading">{formatCurrency(total)}</span>
+            </div>
+            {alreadyPaid > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted">Already paid</span>
+                <span className="font-semibold text-heading">{formatCurrency(alreadyPaid)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-muted">Balance</span>
+              <span className={`font-black ${balance > 0 ? "text-danger" : "text-success"}`}>
+                {formatCurrency(balance)}
+              </span>
             </div>
           </div>
 
-          {/* Not a <Field>: its label element wraps its children, and a "Today" button nested in a
-              label would pop the date picker on every click. */}
+          {/* Neither of these is a <Field>: its label element wraps its children, and the quick
+              buttons nested in a label would re-trigger the input on every click. */}
+          <div className="space-y-1.5">
+            <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">
+              Amount received <span className="text-danger">*</span>
+            </span>
+            <div className="flex gap-2">
+              <TextInput
+                required type="number" min="1" step="any" inputMode="decimal" placeholder="0"
+                value={amount} onChange={(e) => setAmount(e.target.value)} className="flex-1"
+              />
+              {balance > 0 && (
+                <Button type="button" variant="secondary" onClick={() => setAmount(String(balance))}>Full</Button>
+              )}
+            </div>
+            <span className="block text-[11px] text-subtle">
+              {balance > 0
+                ? `Less than ${formatCurrency(balance)} marks this invoice partly paid.`
+                : "This invoice is already settled — anything recorded here is on top of it."}
+            </span>
+          </div>
+
           <div className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">
               Payment date <span className="text-danger">*</span>
             </span>
             <div className="flex gap-2">
               <TextInput
-                required
-                type="date"
-                value={date}
-                max={today}
-                onChange={(e) => setDate(e.target.value)}
-                className="flex-1"
+                required type="date" value={date} max={today}
+                onChange={(e) => setDate(e.target.value)} className="flex-1"
               />
               <Button type="button" variant="secondary" onClick={() => setDate(today)}>Today</Button>
             </div>
@@ -2069,11 +2171,95 @@ function PaymentReceivedModal({
 
           <div className="flex gap-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button type="submit" loading={saving} className="flex-1">
-              {alreadyPaid ? "Save date" : "Confirm payment"}
-            </Button>
+            <Button type="submit" loading={saving} className="flex-1">Record payment</Button>
           </div>
         </form>
+      )}
+    </Modal>
+  );
+}
+
+/**
+ * The installments recorded against one invoice, with the running balance. Also the undo path:
+ * deleting a payment walks the invoice's status back down on its own.
+ */
+function PaymentHistoryModal({
+  ledger, payments, dueDay, onClose, onDelete,
+}: {
+  ledger: BillingLedger | null;
+  payments: BillingPayment[];
+  dueDay: number | null;
+  onClose: () => void;
+  onDelete: (p: BillingPayment) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const total = Number(ledger?.total_payable || 0);
+  const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const balance = Math.max(0, total - paid);
+
+  /** Was this installment received after the month's due day? Mirrors the receipt's rule. */
+  function isLate(p: BillingPayment) {
+    if (!dueDay || !ledger) return false;
+    const [y, m] = ledger.billing_month.split("-");
+    if (!y || !m) return false;
+    const lastDay = new Date(Number(y), Number(m), 0).getDate();
+    return p.paid_on.slice(0, 10) > `${y}-${m}-${String(Math.min(dueDay, lastDay)).padStart(2, "0")}`;
+  }
+
+  async function remove(p: BillingPayment) {
+    if (!(await confirmDialog({
+      title: "Delete payment?",
+      message: `Remove the ${formatCurrency(p.amount)} payment from ${formatDate(p.paid_on)}?`,
+      confirmLabel: "Delete",
+      danger: true,
+    }))) return;
+    try {
+      setBusy(p.id);
+      await onDelete(p);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Modal open={!!ledger} onClose={onClose} size="lg" title="Payments"
+      subtitle={ledger ? `${ledger.tenants?.name ?? "Tenant"} · ${formatMonth(ledger.billing_month)}` : undefined}>
+      {ledger && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-4 py-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted">
+              {formatCurrency(paid)} of {formatCurrency(total)}
+            </span>
+            <span className={`text-lg font-extrabold ${balance > 0 ? "text-danger" : "text-success"}`}>
+              {balance > 0 ? `${formatCurrency(balance)} due` : "Settled"}
+            </span>
+          </div>
+
+          {payments.length === 0 ? (
+            <EmptyState icon={History} title="No payments yet"
+              hint="Payments you record for this invoice will appear here." />
+          ) : (
+            payments.map((p, i) => (
+              <div key={p.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-4 py-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs text-subtle">{ordinalDay(i + 1)}</span>
+                    <span className="text-sm font-bold text-heading">{formatCurrency(p.amount)}</span>
+                    {isLate(p) && <Badge tone="rose">late</Badge>}
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted">{formatDate(p.paid_on)}</div>
+                </div>
+                <button title="Delete" disabled={busy === p.id} onClick={() => remove(p)}
+                  className="rounded-lg p-1.5 text-danger transition hover:bg-danger/10 disabled:opacity-50">
+                  {busy === p.id ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       )}
     </Modal>
   );
@@ -2484,11 +2670,14 @@ function ReminderModal({
 function EditPropertyModal({
   property, onClose, onSaved,
 }: { property: Property | null; onClose: () => void; onSaved: (p: Property) => void }) {
-  const [form, setForm] = useState({ name: "", address: "", flatNo: "" });
+  const [form, setForm] = useState({ name: "", address: "", flatNo: "", receiptName: "" });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (property) setForm({ name: property.name, address: property.address, flatNo: property.flat_no });
+    if (property) setForm({
+      name: property.name, address: property.address, flatNo: property.flat_no,
+      receiptName: property.receipt_name ?? "",
+    });
   }, [property]);
 
   async function submit(e: React.FormEvent) {
@@ -2498,7 +2687,9 @@ function EditPropertyModal({
       setSaving(true);
       const res = await rentMasterFetch(`/api/admin/properties/${property.id}`, {
         method: "PATCH", role: "owner",
-        body: JSON.stringify({ name: form.name, address: form.address, flatNo: form.flatNo }),
+        body: JSON.stringify({
+          name: form.name, address: form.address, flatNo: form.flatNo, receiptName: form.receiptName,
+        }),
       });
       if (res.success) { onSaved(res.data); onClose(); toast.success("Property updated."); }
     } catch (e: any) { toast.error(e.message); }
@@ -2516,6 +2707,10 @@ function EditPropertyModal({
         </Field>
         <Field label="Flat / Unit no." required>
           <TextInput required value={form.flatNo} onChange={(e) => setForm({ ...form, flatNo: e.target.value })} />
+        </Field>
+        <Field label="Name on receipts" hint="Printed at the top of this property's receipts. Leave blank to use your account name.">
+          <TextInput placeholder="e.g. Grand Crimson Holdings" value={form.receiptName}
+            onChange={(e) => setForm({ ...form, receiptName: e.target.value })} />
         </Field>
         <Button type="submit" loading={saving} className="w-full">Save changes</Button>
       </form>
@@ -2607,7 +2802,10 @@ function ServiceChargeModal({ property, onClose }: { property: Property | null; 
 function EditTenantModal({
   tenant, properties, onClose, onSaved,
 }: { tenant: Tenant | null; properties: Property[]; onClose: () => void; onSaved: (t: Tenant) => void }) {
-  const empty = { propertyId: "", name: "", phone: "", monthlyRent: "", serviceCharge: "", advanceAmount: "", dueDate: "", familyMembers: "" };
+  const empty = {
+    propertyId: "", name: "", phone: "", monthlyRent: "", serviceCharge: "", advanceAmount: "",
+    dueDate: "", familyMembers: "", nid: "", rentedDate: "",
+  };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
 
@@ -2620,6 +2818,10 @@ function EditTenantModal({
       advanceAmount: String(tenant.advance_amount ?? 0),
       dueDate: String(tenant.due_date ?? ""),
       familyMembers: String(tenant.family_members ?? 1),
+      // Blank for tenants onboarded before NIDs were stored reversibly — the old hash can't be
+      // read back, so the owner simply re-enters the number.
+      nid: tenant.nid ?? "",
+      rentedDate: (tenant.rented_date ?? "").slice(0, 10),
     });
   }, [tenant]);
 
@@ -2653,6 +2855,7 @@ function EditTenantModal({
           monthlyRent: form.monthlyRent, serviceCharge: form.serviceCharge,
           advanceAmount: form.advanceAmount, dueDate: form.dueDate, familyMembers: form.familyMembers,
           propertyId: form.propertyId || null,
+          nid: form.nid, rentedDate: form.rentedDate,
         }),
       });
       if (res.success) { onSaved(res.data); onClose(); toast.success("Tenant updated."); }
@@ -2710,9 +2913,19 @@ function EditTenantModal({
               onChange={(e) => setForm({ ...form, advanceAmount: e.target.value })} />
           </Field>
         </div>
-        <Field label="Family members">
-          <TextInput type="number" min="1" value={form.familyMembers}
-            onChange={(e) => setForm({ ...form, familyMembers: e.target.value })} />
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Family members">
+            <TextInput type="number" min="1" value={form.familyMembers}
+              onChange={(e) => setForm({ ...form, familyMembers: e.target.value })} />
+          </Field>
+          <Field label="Rented since">
+            <TextInput type="date" value={form.rentedDate}
+              onChange={(e) => setForm({ ...form, rentedDate: e.target.value })} />
+          </Field>
+        </div>
+        <Field label="National ID (NID)" hint="Stored encrypted. Visible only to you.">
+          <TextInput placeholder="NID number" value={form.nid}
+            onChange={(e) => setForm({ ...form, nid: e.target.value })} />
         </Field>
         {rentChanged && (
           <div className="rounded-xl border border-warning/20 bg-warning/10 px-4 py-2.5 text-xs text-warning">
@@ -3077,6 +3290,21 @@ function OwnerDocumentsModal({ tenant, onClose }: { tenant: Tenant | null; onClo
     })();
   }, [tenant]);
 
+  // Checked here rather than only server-side, so a wrong or oversized file is rejected instantly
+  // instead of after a full upload round-trip. Mirrors the server's rules for this folder.
+  function pickFile(f: File | null) {
+    if (!f) { setFile(null); return; }
+    if (!f.type.startsWith("image/") && f.type !== "application/pdf") {
+      toast.warning("Please choose a PDF or an image.");
+      return;
+    }
+    if (f.size > 8 * 1024 * 1024) {
+      toast.warning(`"${f.name}" is larger than 8MB.`);
+      return;
+    }
+    setFile(f);
+  }
+
   async function upload(e: React.FormEvent) {
     e.preventDefault();
     if (!tenant || !file || !title.trim()) return;
@@ -3134,7 +3362,7 @@ function OwnerDocumentsModal({ tenant, onClose }: { tenant: Tenant | null; onClo
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] px-4 py-4 text-sm text-muted transition hover:border-primary/40 hover:text-fg">
               <Upload className="h-4 w-4" /> Choose a file
               <input type="file" accept="image/*,application/pdf" className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
             </label>
           )}
         </Field>
