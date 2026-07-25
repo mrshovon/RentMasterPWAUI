@@ -10,6 +10,7 @@ import { Button, Modal, Field, TextInput } from "../components/ui";
 import { toast } from "../components/toast";
 import { DownloadAndroid } from "../components/download-android";
 import { LanguageToggle } from "../components/language-toggle";
+import { ThemeToggle } from "../components/theme-toggle";
 import { APP_VERSION } from "../lib/app-config";
 import { useT } from "../lib/i18n";
 
@@ -132,10 +133,11 @@ export default function EntryGatewayPage() {
         {/* Form panel */}
         <div className="flex flex-col items-center justify-center px-4 py-12 sm:px-8">
           <div className="w-full max-w-md space-y-8">
-            {/* The language switch has to be reachable BEFORE signing in, or it's out of reach
-                for exactly the users who need it. */}
-            <div className="flex justify-center lg:justify-end">
+            {/* The language and theme switches have to be reachable BEFORE signing in, or they're
+                out of reach for exactly the users who need them. */}
+            <div className="flex items-center justify-center gap-2 lg:justify-end">
               <LanguageToggle variant="icon" className="border border-line/[0.08]" />
+              <ThemeToggle variant="icon" className="border border-line/[0.08]" />
             </div>
 
             <div className="space-y-1.5 text-center lg:text-left">

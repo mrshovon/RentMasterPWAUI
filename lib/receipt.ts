@@ -43,9 +43,18 @@ export function buildReceiptHtml(o: ReceiptOptions): string {
   const [y, m] = (o.billingMonth || "").split("-");
   const monthLabel = MONTHS[parseInt(m, 10) - 1] ? `${MONTHS[parseInt(m, 10) - 1]} ${y}` : o.billingMonth;
 
-  const dueDate = o.dueDay && y && m ? new Date(Number(y), Number(m) - 1, o.dueDay) : null;
+  // Late is a CALENDAR-DAY comparison, not a timestamp one: paying on the due day is on time,
+  // which is what the note printed further down actually promises ("by or on the 5th"). Comparing
+  // timestamps made any payment after midnight on the due day read as late, and mixed a UTC
+  // paid_at against a local-midnight due date.
   const paid = o.paidAt ? new Date(o.paidAt) : null;
-  const late = !!(paid && dueDate && paid.getTime() > dueDate.getTime());
+  // A due day of 31 in a 30-day month means "the last day" — new Date(y, m, 0) is that day.
+  const dueDayClamped = o.dueDay && y && m
+    ? Math.min(o.dueDay, new Date(Number(y), Number(m), 0).getDate())
+    : null;
+  const paidKey = paid ? paid.getFullYear() * 10000 + (paid.getMonth() + 1) * 100 + paid.getDate() : null;
+  const dueKey = dueDayClamped ? Number(y) * 10000 + Number(m) * 100 + dueDayClamped : null;
+  const late = !!(paidKey && dueKey && paidKey > dueKey);
   const isPaid = (o.paymentStatus || "paid") === "paid";
 
   // Receipt date (payment date if paid, else today), DD/MM/YYYY.

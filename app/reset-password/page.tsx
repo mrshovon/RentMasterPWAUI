@@ -5,6 +5,7 @@ import { Lock, ArrowRight, CheckCircle2, TriangleAlert } from "lucide-react";
 import { getSupabaseBrowser } from "../../lib/supabase-browser";
 import { apiResetComplete } from "../../lib/api-service";
 import { Button } from "../../components/ui";
+import { ThemeToggle } from "../../components/theme-toggle";
 
 // Landing page for the password-recovery email link. Supabase drops a recovery session into the
 // URL hash; the browser client (detectSessionInUrl) turns it into a live session on mount. We then
@@ -83,6 +84,11 @@ export default function ResetPasswordPage() {
       <div className="pointer-events-none absolute -bottom-40 -right-40 h-[440px] w-[440px] rounded-full bg-accent/10 blur-[120px]" />
 
       <div className="z-10 w-full max-w-md space-y-8">
+        {/* Same reason as the sign-in screen: the theme switch has to be reachable while signed out. */}
+        <div className="flex justify-end">
+          <ThemeToggle variant="icon" className="border border-line/[0.08]" />
+        </div>
+
         <div className="flex items-center justify-center gap-3">
           <img src="/logo.png" alt="RentMaster" className="h-9 w-9 rounded-xl object-cover" />
           <span className="text-sm font-black uppercase tracking-widest text-fg">RentMaster</span>

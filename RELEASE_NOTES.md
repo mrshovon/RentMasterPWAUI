@@ -1,9 +1,9 @@
+- When you mark rent as received, you now choose the date it was actually paid. It opens on today's date, so nothing changes if the tenant just paid — but you can set an earlier date when you are entering an older month.
+- Recording rent for a past month no longer prints LATE on the receipt. The receipt now checks the date you entered against that month's due date, so a tenant who paid on time is shown as having paid on time.
+- You can correct a payment date afterwards. Tap the green tick on a bill that is already marked paid, change the date, and the receipt updates. The tenant is not notified a second time.
+- Paying on the due date itself now counts as on time, which is what the note at the bottom of the receipt has always promised.
+- The billing list now shows the date each payment was received, under the Paid label.
+- You can switch between light and dark before signing in. The button sits next to the language switch on the sign-in screen, and on the password-reset screen too.
 - Downloading and printing a rent receipt now works inside the Android app. Tapping Download or Print saves the receipt as an image and opens it, and the viewer's own menu lets you share or print it.
 - The app is now available in Bangla. Use the language button next to the light/dark switch — on the sign-in screen too — and your choice is remembered on that device.
 - The sign-in page now opens on the Owner portal by default.
-- New Settings tab for everyone: edit your name and phone, see which account you are signed in with, and manage notifications for the device you are on.
-- Owners and admins now get a welcome line on the overview showing who is signed in.
-- Admins can send an announcement to owners and tenants, to all owners, to all tenants, or to one specific owner.
-- Admins can put the system into maintenance mode, and everyone else sees a notice with the time window when they open the app.
-- Tenants no longer see an incorrect "you may only view your own billing history" message after signing in.
-- Pop-ups and forms no longer sit behind the phone's gesture bar, so the buttons at the bottom are always tappable.
