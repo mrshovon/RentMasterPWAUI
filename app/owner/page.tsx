@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   LayoutDashboard, Building2, Users, ReceiptText, Wrench, Megaphone,
   Plus, MapPin, KeyRound, Phone, CircleDollarSign, Home, TriangleAlert,
@@ -32,6 +32,8 @@ import { StaffTab } from "../../components/staff-tab";
 import { AccountsTab } from "../../components/accounts-tab";
 import { AppSettingsCard } from "../../components/app-settings-card";
 import { useT, useLang } from "../../lib/i18n";
+import { translateNoticeText } from "../../lib/notice-i18n";
+import { useUnreadNotices } from "../../lib/notices-seen";
 import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
@@ -223,13 +225,23 @@ export default function OwnerDashboard() {
     return { occupied, monthlyRevenue, outstanding, unpaidCount, openTickets, openSupport, pendingReminders };
   }, [properties, tenants, ledgers, maintenance, tickets, reminders]);
 
+  // Badge shows what's NEW — admin bulletins, and the row a tenant generates by flagging rent
+  // as sent. Cleared by opening the tab.
+  const { unreadCount, markAllSeen } = useUnreadNotices(
+    notices,
+    session?.userId && `owner:${session.userId}`,
+  );
+  useEffect(() => {
+    if (tab === "notices") markAllSeen();
+  }, [tab, markAllSeen]);
+
   const nav: NavItem[] = [
     { key: "overview", label: t("Overview"), icon: LayoutDashboard },
     { key: "properties", label: t("Properties"), icon: Building2, badge: properties.length },
     { key: "tenants", label: t("Tenants"), icon: Users, badge: tenants.length },
     { key: "billing", label: t("Billing"), icon: ReceiptText, badge: metrics.unpaidCount },
     { key: "maintenance", label: t("Requests"), icon: Wrench, badge: metrics.openTickets },
-    { key: "notices", label: t("Notices"), icon: Megaphone },
+    { key: "notices", label: t("Notices"), icon: Megaphone, badge: unreadCount },
     { key: "reminders", label: t("Reminders"), icon: CalendarClock, badge: metrics.pendingReminders },
     // Always listed: when the add-on is off the tab explains the feature rather than hiding it.
     { key: "staff", label: t("Staff"), icon: HardHat },
@@ -729,6 +741,7 @@ function UsageMeter({ label, current, limit, icon: Icon }: { label: string; curr
 }
 
 function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | null; onReload: () => Promise<void>; ownerName: string | null }) {
+  const t = useT();
   const [busy, setBusy] = useState<string | null>(null);
   const [contactTier, setContactTier] = useState<SubscriptionTier | null>(null);
   const [paymentTier, setPaymentTier] = useState<SubscriptionTier | null>(null);
@@ -897,8 +910,17 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                 </ul>
                 <div className="mt-5">
                   {contact ? (
-                    <Button className="w-full" icon={Send} onClick={() => setContactTier(tier)}>
-                      Contact us
+                    <Button className="w-full" onClick={() => setContactTier(tier)}>
+                      {/* Brand glyph rather than a lucide icon. Masked so it inherits the
+                          button's text colour — white here in light mode, dark ink on the
+                          bright teal button in dark mode. Folder casing is `brandImages`;
+                          Vercel's filesystem is case-sensitive even though Windows isn't. */}
+                      <span
+                        aria-hidden
+                        className="mask-icon h-4 w-4 shrink-0 bg-current"
+                        style={{ "--mask-src": "url(/brandImages/customer-service.png)" } as CSSProperties}
+                      />
+                      {t("Contact us")}
                     </Button>
                   ) : isCurrent && s.isFree ? (
                     <Button variant="secondary" className="w-full" disabled>Current plan</Button>
@@ -1873,31 +1895,33 @@ function RaiseTicketModal({
 
 /* ============================================================ NOTICES */
 function NoticesTab({ notices, onCreate }: { notices: Notice[]; onCreate: () => void }) {
+  const t = useT();
+  const lang = useLang();
   const scopeLabel: Record<string, string> = {
     all_tenants: "All tenants", individual_tenant: "One tenant", all_owners: "All owners",
     individual_owner: "Payment update",
   };
-  const senderLabel = (t: Notice["sender_type"]) =>
-    t === "system_admin" ? "System" : t === "tenant" ? "Tenant" : "You";
+  const senderLabel = (s: Notice["sender_type"]) =>
+    s === "system_admin" ? "System" : s === "tenant" ? "Tenant" : "You";
   return (
     <div className="space-y-6">
       <PageHeader title="Notices" subtitle="Broadcast announcements to your tenants."
-        action={<Button icon={Plus} onClick={onCreate}>New notice</Button>} />
+        action={<Button icon={Plus} onClick={onCreate}>{t("New notice")}</Button>} />
       {notices.length === 0 ? (
         <EmptyState icon={Megaphone} title="No notices yet" hint="Broadcast rent reminders, maintenance windows or building updates."
-          action={<Button icon={Plus} onClick={onCreate}>New notice</Button>} />
+          action={<Button icon={Plus} onClick={onCreate}>{t("New notice")}</Button>} />
       ) : (
         <div className="space-y-4">
           {notices.map((n) => (
             <Card key={n.id} className="space-y-2 p-5">
               <div className="flex items-start justify-between gap-3">
-                <h3 className="font-bold text-primary">{n.title}</h3>
-                <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at)}</span>
+                <h3 className="font-bold text-primary">{translateNoticeText(n.title, t)}</h3>
+                <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at, lang)}</span>
               </div>
-              <p className="text-sm leading-relaxed text-fg">{n.content}</p>
+              <p className="text-sm leading-relaxed text-fg">{translateNoticeText(n.content, t)}</p>
               <div className="flex items-center gap-2 pt-1">
-                <Badge tone="indigo">{scopeLabel[n.target_scope] ?? n.target_scope}</Badge>
-                <Badge tone="slate">{senderLabel(n.sender_type)}</Badge>
+                <Badge tone="indigo">{t(scopeLabel[n.target_scope] ?? n.target_scope)}</Badge>
+                <Badge tone="slate">{t(senderLabel(n.sender_type))}</Badge>
               </div>
             </Card>
           ))}

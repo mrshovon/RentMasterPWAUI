@@ -123,10 +123,9 @@ export function DashboardShell({
           })}
         </nav>
 
-        {/* Bottom band — always visible. */}
+        {/* Bottom band — always visible. Theme/language live in the top header at every
+            width, so they are deliberately absent here. */}
         <div className="shrink-0 space-y-1 pt-4">
-          <ThemeToggle variant="sidebar" />
-          <LanguageToggle variant="sidebar" />
           {/* Renders only in a browser (hidden inside the installed Android app). */}
           <DownloadAndroid variant="sidebar" />
           <button
@@ -141,20 +140,26 @@ export function DashboardShell({
 
       {/* ---------------- Main column ---------------- */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Mobile top bar */}
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line/[0.08] bg-surface/80 px-4 py-3 backdrop-blur-xl md:hidden">
-          <div className="flex items-center gap-2">
+        {/* Top bar — every width. On mobile it carries the brand and sign out (there is no
+            sidebar); on desktop the sidebar already provides both, so those collapse and the
+            bar exists to keep theme/language reachable without opening a menu. */}
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line/[0.08] bg-surface/80 px-4 py-3 backdrop-blur-xl md:px-8 lg:px-10">
+          <div className="flex items-center gap-2 md:hidden">
             <img src="/logo.png" alt="RentMaster" className="h-8 w-8 rounded-lg object-cover" />
             <span className="text-sm font-bold text-fg">
               {activeTab?.label ?? "RentMaster"}
             </span>
           </div>
+          {/* Desktop: name the current section, so the bar isn't a lone cluster of buttons. */}
+          <span className="hidden text-sm font-bold text-fg md:block">
+            {activeTab?.label ?? roleLabel}
+          </span>
           <div className="flex items-center gap-1">
             <LanguageToggle variant="icon" />
             <ThemeToggle variant="icon" />
             <button
               onClick={onLogout}
-              className="rounded-lg p-2 text-muted hover:text-danger"
+              className="rounded-lg p-2 text-muted hover:text-danger md:hidden"
               aria-label={t("Sign out")}
             >
               <LogOut className="h-5 w-5" />

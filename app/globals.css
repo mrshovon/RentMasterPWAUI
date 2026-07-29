@@ -124,6 +124,14 @@ body {
       placeholder-faint outline-none transition
       focus:border-primary/60 focus:ring-2 focus:ring-primary/20;
   }
+  /* Paints a transparent-background PNG/SVG in the CURRENT text colour, so a brand glyph sits
+     beside a lucide icon and recolours with the theme (white on a primary button in light mode,
+     dark ink in dark mode) instead of being pinned to one hard-coded colour.
+     Pair with `bg-current` + a size, and set the source via `--mask-src`. */
+  .mask-icon {
+    -webkit-mask: var(--mask-src) center / contain no-repeat;
+    mask: var(--mask-src) center / contain no-repeat;
+  }
 }
 
 /* Hide number input spinners for a cleaner look */

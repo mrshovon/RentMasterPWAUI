@@ -21,6 +21,8 @@ import { AttachmentStrip } from "../../components/attachments";
 import { AppSettingsCard } from "../../components/app-settings-card";
 import { TenantProfileCard } from "../../components/profile-card";
 import { useT, useLang } from "../../lib/i18n";
+import { translateNoticeText } from "../../lib/notice-i18n";
+import { useUnreadNotices } from "../../lib/notices-seen";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader,
@@ -137,11 +139,17 @@ export default function TenantDashboard() {
   const paymentsFor = (ledgerId: string) =>
     payments.filter((p) => p.ledger_id === ledgerId).sort((a, b) => a.paid_on.localeCompare(b.paid_on));
 
+  // Badge shows what's NEW, not the lifetime total — cleared by opening the tab.
+  const { unreadCount, markAllSeen } = useUnreadNotices(notices, tenantId && `tenant:${tenantId}`);
+  useEffect(() => {
+    if (tab === "notices") markAllSeen();
+  }, [tab, markAllSeen]);
+
   const nav: NavItem[] = [
     { key: "overview", label: t("Home"), icon: LayoutDashboard },
     { key: "billing", label: t("Rent"), icon: CreditCard },
     { key: "maintenance", label: t("Requests"), icon: Wrench, badge: metrics.openTickets },
-    { key: "notices", label: t("Notices"), icon: Bell, badge: notices.length },
+    { key: "notices", label: t("Notices"), icon: Bell, badge: unreadCount },
     { key: "documents", label: t("Documents"), icon: FileText, badge: documents.length },
     { key: "settings", label: t("Settings"), icon: Settings },
   ];
@@ -262,8 +270,8 @@ export default function TenantDashboard() {
             </div>
             {notices[0] ? (
               <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.03] p-4">
-                <h4 className="font-bold text-primary">{notices[0].title}</h4>
-                <p className="mt-1 text-sm text-fg">{notices[0].content}</p>
+                <h4 className="font-bold text-primary">{translateNoticeText(notices[0].title, t)}</h4>
+                <p className="mt-1 text-sm text-fg">{translateNoticeText(notices[0].content, t)}</p>
                 <p className="mt-2 font-mono text-[10px] text-subtle">{formatDate(notices[0].created_at, lang)}</p>
               </div>
             ) : (
@@ -421,10 +429,10 @@ export default function TenantDashboard() {
               {notices.map((n) => (
                 <Card key={n.id} className="space-y-2 p-5">
                   <div className="flex items-start justify-between gap-3">
-                    <h3 className="font-bold text-primary">{n.title}</h3>
+                    <h3 className="font-bold text-primary">{translateNoticeText(n.title, t)}</h3>
                     <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at, lang)}</span>
                   </div>
-                  <p className="text-sm leading-relaxed text-fg">{n.content}</p>
+                  <p className="text-sm leading-relaxed text-fg">{translateNoticeText(n.content, t)}</p>
                 </Card>
               ))}
             </div>

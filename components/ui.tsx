@@ -305,7 +305,7 @@ export function Modal({
   subtitle?: string;
   children: ReactNode;
   size?: "md" | "lg";
-  /** false = no close button and no backdrop dismissal (blocking dialogs, e.g. maintenance). */
+  /** false = no close button at all, so the dialog cannot be dismissed (e.g. maintenance). */
   dismissible?: boolean;
 }) {
   const t = useT();
@@ -317,12 +317,12 @@ export function Modal({
   // `position: fixed`, so it is sized against the VIEWPORT and ignores that padding entirely.
   // On a phone the modal is a bottom sheet, so without its own insets the footer buttons sit
   // underneath the Android gesture bar. Hence the explicit env() padding below.
+  //
+  // Dismissal: the ✕ button only. The backdrop deliberately carries no onClick — a stray click
+  // or a text-selection drag that ended outside the panel used to discard a half-filled form.
   if (!open || typeof document === "undefined") return null;
   return createPortal(
-    <div
-      className="fixed inset-0 z-[60] overflow-y-auto bg-scrim/80 backdrop-blur-sm animate-fade-in"
-      onClick={dismissible ? onClose : undefined}
-    >
+    <div className="fixed inset-0 z-[60] overflow-y-auto bg-scrim/80 backdrop-blur-sm animate-fade-in">
       {/* min-h-full wrapper: centers when short, lets the whole thing scroll from the
           true top when tall — so the modal header is never clipped. */}
       <div
@@ -330,7 +330,6 @@ export function Modal({
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <div
-          onClick={(e) => e.stopPropagation()}
           // The insets go through CSS vars so the max-height can still differ per breakpoint
           // (inline `max-height` would win over every class and flatten that distinction).
           style={{

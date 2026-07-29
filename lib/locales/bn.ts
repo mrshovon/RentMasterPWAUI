@@ -225,6 +225,26 @@ export const bn: Record<string, string> = {
   "Inbox empty": "ইনবক্স খালি",
   "You'll see building updates and reminders here.":
     "ভবনের খবর ও রিমাইন্ডার এখানে দেখতে পাবেন।",
+
+  // ---------------------------------------------------------------- notices
+  // A notice's title/content is free text, so only the strings RentMaster's OWN backend writes
+  // can be translated — see lib/notice-i18n.ts. These must match the backend byte for byte:
+  // 'Rent reminder' comes from rent-master-pwa/lib/reminders.ts, the other two from
+  // rent-master-pwa/app/api/admin/billing/[id]/route.ts. An owner's typed prose is left as-is.
+  "Rent reminder": "ভাড়ার রিমাইন্ডার",
+  "Rent payment marked as sent": "ভাড়া পাঠানো হিসেবে চিহ্নিত",
+  "{0} marked the rent for {1} (৳{2}) as sent. Please verify the payment and confirm receipt.":
+    "{0} {1} মাসের ভাড়া (৳{2}) পাঠানো হিসেবে চিহ্নিত করেছেন। পেমেন্ট যাচাই করে প্রাপ্তি নিশ্চিত করুন।",
+  "New notice": "নতুন নোটিশ",
+  "No notices yet": "এখনো কোনো নোটিশ নেই",
+  // Audience + sender badges on the owner's notice cards.
+  "All tenants": "সব ভাড়াটিয়া",
+  "One tenant": "একজন ভাড়াটিয়া",
+  "All owners": "সব মালিক",
+  "Payment update": "পেমেন্ট আপডেট",
+  System: "সিস্টেম",
+  Tenant: "ভাড়াটিয়া",
+  You: "আপনি",
   "Your residence": "আপনার বাসস্থান",
   "Rent terms": "ভাড়ার শর্ত",
   "Your details": "আপনার তথ্য",

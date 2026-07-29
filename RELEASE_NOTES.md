@@ -20,3 +20,9 @@
 - Downloading and printing a rent receipt now works inside the Android app. Tapping Download or Print saves the receipt as an image and opens it, and the viewer's own menu lets you share or print it.
 - The app is now available in Bangla. Use the language button next to the light/dark switch — on the sign-in screen too — and your choice is remembered on that device.
 - The sign-in page now opens on the Owner portal by default.
+- A window no longer closes when you tap beside it. Only the X button closes it, so a form you are halfway through filling in cannot be lost by a stray tap.
+- The Notices count in the menu now shows only what is new. It clears when you open Notices, and comes back when a new notice arrives, instead of always showing the running total.
+- Owners now get a Notices count too, so a tenant marking rent as sent is easy to spot.
+- Notices the app writes itself, such as rent reminders and a tenant marking rent as sent, now read in Bangla when Bangla is on. Notices you type yourself are shown exactly as you wrote them.
+- New accounts start with a clean Notices inbox. You now see notices published from the day your account was created onwards, not the whole history from before you joined.
+- On a computer, the light/dark and language buttons have moved out of the side menu to the top right of the screen, where they are always in reach.
