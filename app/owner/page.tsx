@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, Building2, Users, ReceiptText, Wrench, Megaphone,
   Plus, MapPin, KeyRound, Phone, CircleDollarSign, Home, TriangleAlert,
@@ -38,6 +38,7 @@ import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner, PasswordInput,
+  ContactIcon,
 } from "../../components/ui";
 
 const priorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
@@ -244,8 +245,9 @@ export default function OwnerDashboard() {
     { key: "notices", label: t("Notices"), icon: Megaphone, badge: unreadCount },
     { key: "reminders", label: t("Reminders"), icon: CalendarClock, badge: metrics.pendingReminders },
     // Always listed: when the add-on is off the tab explains the feature rather than hiding it.
-    { key: "staff", label: t("Staff"), icon: HardHat },
-    { key: "accounts", label: t("Accounts"), icon: Wallet },
+    // The crown says so up front, instead of the tab looking free until you open it.
+    { key: "staff", label: t("Staff"), icon: HardHat, locked: !plan?.features?.staff?.enabled },
+    { key: "accounts", label: t("Accounts"), icon: Wallet, locked: !plan?.features?.accounts?.enabled },
     { key: "plan", label: t("Plan"), icon: Gem },
     { key: "support", label: t("Support"), icon: LifeBuoy, badge: metrics.openSupport },
     { key: "settings", label: t("Settings"), icon: Settings },
@@ -910,16 +912,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                 </ul>
                 <div className="mt-5">
                   {contact ? (
-                    <Button className="w-full" onClick={() => setContactTier(tier)}>
-                      {/* Brand glyph rather than a lucide icon. Masked so it inherits the
-                          button's text colour — white here in light mode, dark ink on the
-                          bright teal button in dark mode. Folder casing is `brandImages`;
-                          Vercel's filesystem is case-sensitive even though Windows isn't. */}
-                      <span
-                        aria-hidden
-                        className="mask-icon h-4 w-4 shrink-0 bg-current"
-                        style={{ "--mask-src": "url(/brandImages/customer-service.png)" } as CSSProperties}
-                      />
+                    <Button className="w-full" icon={ContactIcon} onClick={() => setContactTier(tier)}>
                       {t("Contact us")}
                     </Button>
                   ) : isCurrent && s.isFree ? (

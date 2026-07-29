@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Plus, Pencil, Trash2, Lock, Sparkles, HardHat, Phone, Building2, CircleDollarSign,
+  Plus, Pencil, Trash2, Crown, HardHat, Phone, Building2, CircleDollarSign,
   CalendarClock, History, BadgeCheck, UserRoundX, UserRoundCheck, Wallet, Upload, X,
 } from "lucide-react";
 import { rentMasterFetch, uploadFile } from "../lib/api-service";
@@ -12,7 +12,7 @@ import { formatCurrency, formatDate } from "../lib/format";
 import type { Property, Staff, StaffPayment, StaffPaymentMethod } from "../types/api";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
-  PageHeader, EmptyState, SearchInput, Spinner,
+  PageHeader, EmptyState, SearchInput, Spinner, ContactIcon,
 } from "./ui";
 
 // =============================================================================
@@ -221,8 +221,9 @@ function StaffLocked({ onContact }: { onContact: () => void }) {
       <PageHeader title="Staff" subtitle="Manage the people who work on your properties." />
       <Card className="overflow-hidden">
         <div className="border-b border-line/[0.06] bg-gradient-to-r from-primary/10 to-accent/5 px-6 py-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-line/[0.08] bg-overlay/[0.03] text-primary">
-            <Lock className="h-6 w-6" />
+          {/* Crown, not a padlock: this is a feature to buy, not a door that's been shut. */}
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-line/[0.08] bg-overlay/[0.03] text-warning">
+            <Crown className="h-6 w-6" />
           </div>
           <h2 className="text-xl font-extrabold tracking-tight text-heading">Staff is an add-on</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
@@ -248,7 +249,7 @@ function StaffLocked({ onContact }: { onContact: () => void }) {
             Included with the <span className="font-semibold text-fg">Whole Building</span> plan,
             or available as a paid add-on to your current plan.
           </div>
-          <Button icon={Sparkles} className="w-full" onClick={onContact}>
+          <Button icon={ContactIcon} className="w-full" onClick={onContact}>
             Contact us to enable Staff
           </Button>
         </div>

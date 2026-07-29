@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode, useState } from "react";
-import { LogOut, MoreHorizontal, X, type LucideIcon } from "lucide-react";
+import { LogOut, MoreHorizontal, X, Crown, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
 import { PushToggle } from "./push-toggle";
 import { DownloadAndroid } from "./download-android";
@@ -14,6 +14,12 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   badge?: number;
+  /**
+   * Paid add-on the account hasn't unlocked. Marks the item with a crown; the tab itself stays
+   * reachable and explains the feature, so this is a price tag, not a barrier.
+   * Mutually exclusive with `badge` in practice — a locked tab has no unread anything.
+   */
+  locked?: boolean;
 }
 
 interface ShellProps {
@@ -108,6 +114,12 @@ export function DashboardShell({
               >
                 <Icon className="h-[18px] w-[18px] shrink-0" />
                 <span className="flex-1 text-left">{item.label}</span>
+                {item.locked && (
+                  <Crown
+                    className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-btn-ink" : "text-warning")}
+                    aria-label={t("Paid add-on")}
+                  />
+                )}
                 {typeof item.badge === "number" && item.badge > 0 && (
                   <span
                     className={cn(
@@ -219,6 +231,9 @@ export function DashboardShell({
                   >
                     <span className="relative">
                       <Icon className="h-5 w-5" />
+                      {item.locked && (
+                        <Crown className="absolute -right-2.5 -top-1.5 h-3 w-3 text-warning" aria-label={t("Paid add-on")} />
+                      )}
                       {typeof item.badge === "number" && item.badge > 0 && (
                         <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white">
                           {item.badge}
@@ -258,6 +273,9 @@ export function DashboardShell({
             >
               <span className="relative">
                 <Icon className="h-5 w-5" />
+                {item.locked && (
+                  <Crown className="absolute -right-2.5 -top-1.5 h-3 w-3 text-warning" aria-label={t("Paid add-on")} />
+                )}
                 {typeof item.badge === "number" && item.badge > 0 && (
                   <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[9px] font-bold text-white">
                     {item.badge}

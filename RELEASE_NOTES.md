@@ -26,3 +26,5 @@
 - Notices the app writes itself, such as rent reminders and a tenant marking rent as sent, now read in Bangla when Bangla is on. Notices you type yourself are shown exactly as you wrote them.
 - New accounts start with a clean Notices inbox. You now see notices published from the day your account was created onwards, not the whole history from before you joined.
 - On a computer, the light/dark and language buttons have moved out of the side menu to the top right of the screen, where they are always in reach.
+- Staff and Accounts now carry a crown in the menu until you unlock them, so you can tell at a glance which parts of the app are paid add-ons. The crown disappears once the add-on is switched on for you.
+- The Contact us buttons on the Plan, Staff and Accounts screens now use the customer service icon.

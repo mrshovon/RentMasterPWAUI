@@ -245,6 +245,9 @@ export const bn: Record<string, string> = {
   System: "সিস্টেম",
   Tenant: "ভাড়াটিয়া",
   You: "আপনি",
+
+  // Screen-reader label on the crown marking a locked add-on in the nav.
+  "Paid add-on": "পেইড অ্যাড-অন",
   "Your residence": "আপনার বাসস্থান",
   "Rent terms": "ভাড়ার শর্ত",
   "Your details": "আপনার তথ্য",

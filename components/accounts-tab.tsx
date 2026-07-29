@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Plus, Pencil, Trash2, Lock, Sparkles, Wallet, Landmark, Banknote, Smartphone,
+  Plus, Pencil, Trash2, Crown, Wallet, Landmark, Banknote, Smartphone,
   Star, ArrowRightLeft, TrendingUp, TrendingDown, Scale, Building2, BadgeCheck,
   Power, Filter, CircleDollarSign,
 } from "lucide-react";
@@ -15,7 +15,7 @@ import type {
 } from "../types/api";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
-  PageHeader, EmptyState, Spinner,
+  PageHeader, EmptyState, Spinner, ContactIcon,
 } from "./ui";
 
 // =============================================================================
@@ -372,8 +372,9 @@ function AccountsLocked({ onContact }: { onContact: () => void }) {
       <PageHeader title="Accounts" subtitle="Track your building's money — balances, income and expenses." />
       <Card className="overflow-hidden">
         <div className="border-b border-line/[0.06] bg-gradient-to-r from-accent/10 to-success/5 px-6 py-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-line/[0.08] bg-overlay/[0.03] text-accent">
-            <Lock className="h-6 w-6" />
+          {/* Crown, not a padlock: this is a feature to buy, not a door that's been shut. */}
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-line/[0.08] bg-overlay/[0.03] text-warning">
+            <Crown className="h-6 w-6" />
           </div>
           <h2 className="text-xl font-extrabold tracking-tight text-heading">Accounts is an add-on</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
@@ -399,7 +400,7 @@ function AccountsLocked({ onContact }: { onContact: () => void }) {
             Included with the <span className="font-semibold text-fg">Whole Building</span> plan,
             or available as a paid add-on to your current plan.
           </div>
-          <Button icon={Sparkles} className="w-full" onClick={onContact}>
+          <Button icon={ContactIcon} className="w-full" onClick={onContact}>
             Contact us to enable Accounts
           </Button>
         </div>

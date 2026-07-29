@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, useState, type CSSProperties } from "react";
+import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, useState, type CSSProperties, type ComponentType } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Search, Eye, EyeOff, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
@@ -16,6 +16,27 @@ import { useT } from "../lib/i18n";
 // -----------------------------------------------------------------------------
 export function Spinner({ className }: { className?: string }) {
   return <Loader2 className={cn("h-4 w-4 animate-spin", className)} />;
+}
+
+// -----------------------------------------------------------------------------
+// ContactIcon — the customer-service brand glyph, for "Contact us" actions.
+// -----------------------------------------------------------------------------
+// A PNG rather than a lucide icon, so it goes through a CSS mask (see .mask-icon in
+// globals.css): the source is a black glyph on transparency, and masking paints it in the
+// CURRENT text colour. That means one asset works on a primary button in both themes — white
+// in light mode, dark ink in dark mode, where --btn-ink is near-black on bright teal. A plain
+// <img> would be stuck at one colour and clash with the label beside it.
+//
+// Shaped like a lucide icon (a component taking className) so it drops into Button's `icon`.
+// The folder is `brandImages` with a capital I — Vercel's filesystem is case-sensitive.
+export function ContactIcon({ className }: { className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn("mask-icon shrink-0 bg-current", className ?? "h-4 w-4")}
+      style={{ "--mask-src": "url(/brandImages/customer-service.png)" } as CSSProperties}
+    />
+  );
 }
 
 export function FullScreenLoader({ label, sub }: { label: string; sub?: string }) {
@@ -76,7 +97,8 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "ghost" | "danger" | "success";
   size?: "sm" | "md";
   loading?: boolean;
-  icon?: LucideIcon;
+  /** A lucide icon, or anything else that renders from a className — e.g. ContactIcon. */
+  icon?: LucideIcon | ComponentType<{ className?: string }>;
 };
 
 export function Button({
