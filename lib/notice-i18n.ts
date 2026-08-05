@@ -5,7 +5,7 @@
 // but only SOME of it is actually free. Two sources write into `notices`:
 //
 //   1. The owner (or super-admin), typing whatever they want. Untranslatable, and left alone.
-//   2. RentMaster's own backend, emitting a fixed set of strings — 'Rent reminder' when a
+//   2. Bari360's own backend, emitting a fixed set of strings — 'Rent reminder' when a
 //      scheduled reminder fires (rent-master-pwa/lib/reminders.ts) and 'Rent payment marked as
 //      sent' when a tenant flags an invoice (app/api/admin/billing/[id]/route.ts).
 //

@@ -9,7 +9,7 @@ const APK_VERSION = JSON.parse(
 ).version;
 
 // =============================================================================
-// Capacitor config — RentMaster Android app.
+// Capacitor config — Bari360 Android app.
 //
 // This is CommonJS (module.exports), NOT a .ts config, on purpose: the Capacitor CLI
 // loads a .ts config through a transpile-and-require path that newer Node versions
@@ -22,15 +22,17 @@ const APK_VERSION = JSON.parse(
 // native changes (icons, permissions, plugins) and to let users pull the newest shell.
 //
 // ⚠️ appId is PERMANENT once published to the Play Store — confirm before first upload.
-// ⚠️ Set NEXT_PUBLIC_APP_URL (or edit PROD_URL) to your real Vercel domain before building.
+//    It stays com.rentmaster.app after the Bari360 rename on purpose: changing it makes every
+//    installed app a different app, so nobody would receive the update.
+// ⚠️ NEXT_PUBLIC_APP_URL (GitHub secret, read by the release workflow) overrides PROD_URL.
 // =============================================================================
 
-const PROD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://rent-master-pwa-ui.vercel.app";
+const PROD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://www.bari360.space";
 
 /** @type {import('@capacitor/cli').CapacitorConfig} */
 const config = {
   appId: "com.rentmaster.app",
-  appName: "RentMaster",
+  appName: "Bari360",
   // webDir must exist for `cap sync`, but with server.url set its contents are only a
   // fallback (a tiny loader). The real UI is loaded from PROD_URL.
   webDir: "capacitor-www",
@@ -41,6 +43,10 @@ const config = {
   android: {
     // Distinguishes our WebView from a plain browser for lib/platform.ts, AND carries the
     // installed APK's version to the web bundle without needing the plugin bridge.
+    // Deliberately still "RentMasterApp" after the Bari360 rename: every already-installed
+    // shell sends this token, and lib/platform.ts + lib/updates.ts match on it. Renaming it
+    // would make existing installs look like plain browsers until they updated — which is
+    // exactly when they most need the update prompt to work.
     appendUserAgent: `RentMasterApp/${APK_VERSION}`,
   },
   plugins: {

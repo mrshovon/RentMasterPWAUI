@@ -12,8 +12,9 @@ import { formatCurrency, formatDate } from "../lib/format";
 import type { Property, Staff, StaffPayment, StaffPaymentMethod } from "../types/api";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
-  PageHeader, EmptyState, SearchInput, Spinner, ContactIcon,
+  PageHeader, EmptyState, SearchInput, Spinner, ContactIcon, PhoneField,
 } from "./ui";
+import { validatePhone } from "../lib/validate";
 
 // =============================================================================
 // STAFF — owner module (paid add-on).
@@ -416,9 +417,11 @@ function StaffModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) { toast.error("A name is required."); return; }
+    const parsedPhone = validatePhone(phone);
+    if (!parsedPhone.ok) { toast.error(parsedPhone.error); return; }
     const payload = {
       name: name.trim(),
-      phone: phone.trim(),
+      phone: parsedPhone.value,
       designation: designation.trim(),
       propertyId,               // "" clears the assignment
       monthlySalary: Number(salary) || 0,
@@ -460,9 +463,7 @@ function StaffModal({
           <Field label="Name" required>
             <TextInput required value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" />
           </Field>
-          <Field label="Phone">
-            <TextInput value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01712345678" />
-          </Field>
+          <PhoneField label="Phone" value={phone} onChange={setPhone} />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">

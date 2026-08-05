@@ -8,7 +8,8 @@ import {
   Receipt, PenLine, Gem, Crown, Sparkles, ArrowUpCircle, Infinity as InfinityIcon, CalendarClock, Copy, RotateCcw,
   LifeBuoy, MessageSquare, Lock, Settings, MessageCircle, HardHat, Wallet,
 } from "lucide-react";
-import { rentMasterFetch, uploadFile, DEMO_OWNER_ID } from "../../lib/api-service";
+import { rentMasterFetch, uploadFile } from "../../lib/api-service";
+import { validateEmail, validatePhone } from "../../lib/validate";
 import { toast } from "../../components/toast";
 import { confirmDialog } from "../../components/confirm";
 import { buildReceiptHtml } from "../../lib/receipt";
@@ -38,7 +39,7 @@ import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner, PasswordInput,
-  ContactIcon,
+  ContactIcon, EmailField, PhoneField,
 } from "../../components/ui";
 
 const priorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
@@ -981,7 +982,10 @@ function PaymentModal({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!senderMsisdn.trim()) { toast.error("Enter the mobile number you paid from."); return; }
+    // The admin reconciles this against the bKash statement by number, so a typo here means a
+    // payment that can't be matched and a plan that never activates.
+    const parsedMsisdn = validatePhone(senderMsisdn, { required: true });
+    if (!parsedMsisdn.ok) { toast.error(parsedMsisdn.error); return; }
     if (!txnId.trim()) { toast.error("Enter the bKash transaction id."); return; }
     try {
       setSending(true);
@@ -990,7 +994,7 @@ function PaymentModal({
         body: JSON.stringify({
           tierId: tier?.id,
           amount: amount ? Number(amount) : undefined,
-          senderMsisdn: senderMsisdn.trim(),
+          senderMsisdn: parsedMsisdn.value,
           txnId: txnId.trim(),
         }),
       });
@@ -1055,9 +1059,8 @@ function PaymentModal({
         <form onSubmit={submit} className="space-y-4">
           <p className="text-xs text-muted">After paying, enter your payment details below so we can verify and activate your plan.</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Mobile number you paid from" required>
-              <TextInput value={senderMsisdn} onChange={(e) => setSenderMsisdn(e.target.value)} placeholder="01712345678" required />
-            </Field>
+            <PhoneField label="Mobile number you paid from" required
+              value={senderMsisdn} onChange={setSenderMsisdn} />
             <Field label="Amount (৳)">
               <TextInput type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={String(tier?.price ?? "")} />
             </Field>
@@ -1105,12 +1108,17 @@ function ContactModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!message.trim()) { toast.error("Please add a message."); return; }
+    // Both optional — but this is how the team replies, so anything supplied must be reachable.
+    const parsedEmail = validateEmail(email);
+    if (!parsedEmail.ok) { toast.error(parsedEmail.error); return; }
+    const parsedPhone = validatePhone(phone);
+    if (!parsedPhone.ok) { toast.error(parsedPhone.error); return; }
     try {
       setSending(true);
       await rentMasterFetch("/api/admin/contact-messages", {
         method: "POST", role: "owner",
         body: JSON.stringify({
-          name: name.trim(), email: email.trim(), phone: phone.trim(),
+          name: name.trim(), email: parsedEmail.value, phone: parsedPhone.value,
           tierId: tier?.id, message: message.trim(),
         }),
       });
@@ -1128,13 +1136,9 @@ function ContactModal({
           <Field label="Your name">
             <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
           </Field>
-          <Field label="Phone">
-            <TextInput value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01712345678" />
-          </Field>
+          <PhoneField label="Phone" value={phone} onChange={setPhone} />
         </div>
-        <Field label="Email">
-          <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-        </Field>
+        <EmailField label="Email" value={email} onChange={setEmail} />
         <Field label="Message" required>
           <TextArea rows={4} required value={message} onChange={(e) => setMessage(e.target.value)}
             placeholder="Tell us about your building and what you need…" />
@@ -1728,7 +1732,7 @@ function SupportTab({ tickets, onCreate }: { tickets: SupportTicket[]; onCreate:
     <div className="space-y-6">
       <PageHeader
         title="Support"
-        subtitle="Raise an issue or a question with the RentMaster admin team."
+        subtitle="Raise an issue or a question with the Bari360 admin team."
         action={<Button icon={Plus} onClick={onCreate}>Raise a ticket</Button>}
       />
       {tickets.length === 0 ? (
@@ -1830,7 +1834,7 @@ function RaiseTicketModal({
   }
 
   return (
-    <Modal open={open} onClose={() => { reset(); onClose(); }} title="Raise a ticket" subtitle="The RentMaster admin team will be notified.">
+    <Modal open={open} onClose={() => { reset(); onClose(); }} title="Raise a ticket" subtitle="The Bari360 admin team will be notified.">
       <form onSubmit={submit} className="space-y-4">
         <Field label="Subject" required>
           <TextInput required placeholder="e.g. Locked out after renewing my plan" value={form.subject}
@@ -1988,12 +1992,16 @@ function TenantModal({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    // The tenant signs in with this number, so an unusable one onboards someone who can never
+    // log in — and the owner only finds out when the tenant tells them.
+    const parsedPhone = validatePhone(form.phone, { required: true });
+    if (!parsedPhone.ok) { toast.error(parsedPhone.error); return; }
     try {
       setSaving(true);
       const res = await rentMasterFetch("/api/admin/tenants", {
         method: "POST", role: "owner",
         body: JSON.stringify({
-          propertyId: form.propertyId, name: form.name, phone: form.phone,
+          propertyId: form.propertyId, name: form.name, phone: parsedPhone.value,
           familyMembers: Number(form.familyMembers) || 1, nid: form.nid || "",
           monthlyRent: form.monthlyRent, dueDate: form.dueDate,
           rentedDate: form.rentedDate || null,
@@ -2023,10 +2031,8 @@ function TenantModal({
             <TextInput required placeholder="Shovon Rahman" value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
-          <Field label="Phone" required>
-            <TextInput required placeholder="01712345678" value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </Field>
+          <PhoneField label="Phone" required value={form.phone}
+            onChange={(v) => setForm({ ...form, phone: v })} />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Monthly rent (৳)" required>
@@ -2863,12 +2869,15 @@ function EditTenantModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!tenant) return;
+    // Editing the phone changes the tenant's login identity, so it has to stay valid.
+    const parsedPhone = validatePhone(form.phone, { required: true });
+    if (!parsedPhone.ok) { toast.error(parsedPhone.error); return; }
     try {
       setSaving(true);
       const res = await rentMasterFetch(`/api/admin/tenants/${tenant.id}`, {
         method: "PATCH", role: "owner",
         body: JSON.stringify({
-          name: form.name, phone: form.phone,
+          name: form.name, phone: parsedPhone.value,
           monthlyRent: form.monthlyRent, serviceCharge: form.serviceCharge,
           advanceAmount: form.advanceAmount, dueDate: form.dueDate, familyMembers: form.familyMembers,
           propertyId: form.propertyId || null,
@@ -2906,9 +2915,8 @@ function EditTenantModal({
           <Field label="Full name" required>
             <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
-          <Field label="Phone" required>
-            <TextInput required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </Field>
+          <PhoneField label="Phone" required value={form.phone}
+            onChange={(v) => setForm({ ...form, phone: v })} />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Monthly rent (৳)" required>

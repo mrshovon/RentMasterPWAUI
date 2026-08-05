@@ -1,22 +1,32 @@
 // Helpers for sharing a rent receipt over WhatsApp.
 
-// Default country calling code for local numbers with no prefix. This build targets Bangladesh
-// (৳ currency, "01XXXXXXXXX" mobile numbers), so a bare 11-digit "0…" number maps to +880.
-const DEFAULT_CC = "880";
+import { BD_COUNTRY_CODE, BD_PHONE_LEN, validatePhone } from "./validate";
 
 // Turn a stored phone into the digits-only, country-coded form wa.me expects (no "+", no spaces).
-// Returns null when there aren't enough digits to be a real number.
+// Returns null when the number isn't one WhatsApp could reach.
+//
+// The parsing lives in lib/validate.ts so this and the input validation can never disagree about
+// what "01712345678" means. Rows written before that validation existed may be in any shape, so
+// a number that won't parse still gets the old lenient digits-only treatment rather than
+// silently losing the owner their share button.
 export function normalizeWhatsappPhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
+
+  const parsed = validatePhone(phone);
+  if (parsed.ok && parsed.value) {
+    // Local BD form -> country code + national number. International is already "+<digits>".
+    return parsed.value.startsWith("0") && parsed.value.length === BD_PHONE_LEN
+      ? BD_COUNTRY_CODE + parsed.value.slice(1)
+      : parsed.value.replace(/\D/g, "");
+  }
+
+  // Legacy fallback for pre-validation rows.
   let digits = String(phone).replace(/\D/g, "");
   if (!digits) return null;
-
-  // 00-prefixed international form -> drop the 00.
   if (digits.startsWith("00")) digits = digits.slice(2);
-  // Local BD mobile "01XXXXXXXXX" (11 digits, leading 0) -> replace the 0 with the country code.
-  else if (digits.startsWith("0") && digits.length === 11) digits = DEFAULT_CC + digits.slice(1);
-  // Already country-coded (e.g. 8801XXXXXXXXX) or another international number -> leave as-is.
-
+  else if (digits.startsWith("0") && digits.length === BD_PHONE_LEN) {
+    digits = BD_COUNTRY_CODE + digits.slice(1);
+  }
   return digits.length >= 10 ? digits : null;
 }
 

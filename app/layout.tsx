@@ -7,14 +7,14 @@ import { MaintenanceGate } from "../components/maintenance-gate";
 import { LanguageProvider } from "../lib/i18n";
 
 export const metadata: Metadata = {
-  title: "RentMaster — Property Management",
+  title: "Bari360 — Property Management",
   description: "Next-generation multi-tenant property management ecosystem.",
   manifest: "/manifest.json",
-  applicationName: "RentMaster",
+  applicationName: "Bari360",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "RentMaster",
+    title: "Bari360",
   },
   // All generated from the brand logo by `npm run gen-icons`.
   icons: {

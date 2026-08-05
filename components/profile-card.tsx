@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { UserRound, Mail, Phone } from "lucide-react";
-import { Card, Button, Field, TextInput } from "./ui";
+import { Card, Button, Field, TextInput, PhoneField } from "./ui";
+import { validatePhone } from "../lib/validate";
 import { toast } from "./toast";
 import { rentMasterFetch, getStoredSession, setStoredSession } from "../lib/api-service";
 import type { AccountProfile, TenantProfile } from "../types/api";
@@ -76,11 +77,15 @@ export function OwnerProfileCard() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) { toast.error("Name cannot be empty."); return; }
+    // This number goes on receipts and is how tenants call the owner, so a broken one is worse
+    // than a blank one.
+    const parsedPhone = validatePhone(phone);
+    if (!parsedPhone.ok) { toast.error(parsedPhone.error); return; }
     try {
       setSaving(true);
       const res = await rentMasterFetch<{ data: AccountProfile }>("/api/admin/owner/profile", {
         method: "PATCH", role: apiRole,
-        body: JSON.stringify({ name: name.trim(), phone: phone.trim() }),
+        body: JSON.stringify({ name: name.trim(), phone: parsedPhone.value }),
       });
       setProfile(res.data);
       syncSessionName(res.data.name ?? name.trim());
@@ -110,9 +115,8 @@ export function OwnerProfileCard() {
           <Field label="Full name" required>
             <TextInput required value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
           </Field>
-          <Field label="Phone" hint="Used on receipts and for tenants to reach you.">
-            <TextInput value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="01XXXXXXXXX" />
-          </Field>
+          <PhoneField label="Phone" hint="Used on receipts and for tenants to reach you."
+            value={phone} onChange={setPhone} />
           <Button type="submit" loading={saving}>{t("Save profile")}</Button>
         </form>
       )}

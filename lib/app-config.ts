@@ -22,7 +22,9 @@ export const LATEST_RELEASE_API = `https://api.github.com/repos/${GITHUB_OWNER}/
 export const RELEASES_PAGE = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`;
 
 // Name of the APK asset the release workflow uploads (see .github/workflows/android-release.yml).
-export const APK_ASSET_NAME = "app-release.apk";
+// Changing this REQUIRES the workflow to upload an asset with the same name in the same push —
+// the download URL below is built from it verbatim.
+export const APK_ASSET_NAME = "Bari360.apk";
 
 // Direct download of the newest APK. GitHub redirects this to the current release's asset,
 // so it needs NO API call — which matters: the releases API is 60 requests/hour PER IP for
@@ -32,6 +34,6 @@ export const APK_ASSET_NAME = "app-release.apk";
 export const LATEST_APK_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest/download/${APK_ASSET_NAME}`;
 
 // Production web URL the Android shell loads (Capacitor server.url). Overridable at
-// build time via NEXT_PUBLIC_APP_URL. ⚠️ REPLACE the fallback with your real Vercel domain.
+// build time via NEXT_PUBLIC_APP_URL. Keep this in sync with capacitor.config.js's PROD_URL.
 export const PROD_WEB_URL =
-  process.env.NEXT_PUBLIC_APP_URL || "https://rent-master-pwa-ui.vercel.app";
+  process.env.NEXT_PUBLIC_APP_URL || "https://www.bari360.space";

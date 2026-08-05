@@ -80,11 +80,11 @@ export function DashboardShell({
         {/* Top band — brand + optional slot. Fixed height. */}
         <div className="shrink-0 space-y-6">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="RentMaster"
+            <img src="/logo.png" alt="Bari360"
               className="h-9 w-9 rounded-xl object-cover shadow-lg shadow-primary/20" />
             <div>
               <div className={cn("bg-gradient-to-r bg-clip-text text-sm font-black tracking-widest text-transparent", accent)}>
-                RENTMASTER
+                BARI360
               </div>
               <div className="text-[10px] uppercase tracking-widest text-subtle">
                 {roleLabel}
@@ -157,9 +157,9 @@ export function DashboardShell({
             bar exists to keep theme/language reachable without opening a menu. */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line/[0.08] bg-surface/80 px-4 py-3 backdrop-blur-xl md:px-8 lg:px-10">
           <div className="flex items-center gap-2 md:hidden">
-            <img src="/logo.png" alt="RentMaster" className="h-8 w-8 rounded-lg object-cover" />
+            <img src="/logo.png" alt="Bari360" className="h-8 w-8 rounded-lg object-cover" />
             <span className="text-sm font-bold text-fg">
-              {activeTab?.label ?? "RentMaster"}
+              {activeTab?.label ?? "Bari360"}
             </span>
           </div>
           {/* Desktop: name the current section, so the bar isn't a lone cluster of buttons. */}

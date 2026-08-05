@@ -7,51 +7,113 @@ import { apiResetComplete } from "../../lib/api-service";
 import { Button, PasswordInput } from "../../components/ui";
 import { ThemeToggle } from "../../components/theme-toggle";
 
-// Landing page for the password-recovery email link. Supabase drops a recovery session into the
-// URL hash; the browser client (detectSessionInUrl) turns it into a live session on mount. We then
-// let the owner pick a new password, apply it via updateUser, log it, and send them to sign in.
+// Landing page for the password-recovery email link.
+//
+// Supabase has three ways of handing over a recovery session, and which one arrives depends on
+// dashboard settings this codebase does not control (the project's flow type and whether the
+// email template was customised). Handling only one of them means the page silently shows
+// "link expired" for a link that is perfectly valid:
+//
+//   1. #access_token=…&type=recovery   — implicit flow, consumed by detectSessionInUrl
+//   2. ?code=…                          — PKCE flow, needs exchangeCodeForSession
+//   3. ?token_hash=…&type=recovery      — custom {{ .TokenHash }} template, needs verifyOtp
+//
+// Then the owner picks a new password, we apply it via updateUser, log it for the audit trail,
+// and send them to sign in.
 type Phase = "checking" | "ready" | "invalid" | "saving" | "done";
+
+// "invalid" covers two very different situations that used to be indistinguishable: a genuinely
+// dead link, and this app not being configured to talk to Supabase at all. The second is a
+// deployment fault, and telling an owner their link expired sends everyone hunting in the wrong
+// place — so it gets its own message.
+type FailureKind = "link" | "config";
 
 const MIN_LEN = 8;
 
+// How long to wait for a session to materialise before calling the link dead. The old 1500 ms
+// was a race: on a cold, service-worker-cached load over a slow connection the token exchange
+// can lose to the timer, and a valid link renders as expired.
+const SESSION_WAIT_MS = 8000;
+
 export default function ResetPasswordPage() {
   const [phase, setPhase] = useState<Phase>("checking");
+  const [failure, setFailure] = useState<FailureKind>("link");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
 
-  // On mount, wait for the recovery session to materialise from the URL hash.
+  // On mount, turn whichever link shape we were given into a live recovery session.
   useEffect(() => {
     let cancelled = false;
-    let supabase;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    let supabase: ReturnType<typeof getSupabaseBrowser>;
     try {
       supabase = getSupabaseBrowser();
     } catch (e: any) {
       setError(e.message);
+      setFailure("config");
       setPhase("invalid");
       return;
     }
 
-    // A PASSWORD_RECOVERY event fires when the hash is parsed; also check for an existing session
-    // in case the event already fired before this listener attached.
+    const succeed = () => {
+      if (cancelled) return;
+      if (timer) clearTimeout(timer);
+      setPhase("ready");
+    };
+
+    // A PASSWORD_RECOVERY (or SIGNED_IN) event fires once any of the three exchanges lands.
+    // Subscribed before we start, so an exchange that completes immediately isn't missed.
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (cancelled) return;
-      if (session || event === "PASSWORD_RECOVERY") setPhase("ready");
+      if (session || event === "PASSWORD_RECOVERY") succeed();
     });
 
-    supabase.auth.getSession().then(({ data }) => {
+    (async () => {
+      // Already have a session? (detectSessionInUrl consumes the hash as the client is built.)
+      const { data: existing } = await supabase.auth.getSession();
       if (cancelled) return;
-      if (data.session) setPhase("ready");
-      else {
-        // Give the hash a beat to parse, then decide it's an invalid/expired link.
-        setTimeout(() => {
-          if (cancelled) return;
-          setPhase((p) => (p === "checking" ? "invalid" : p));
-        }, 1500);
+      if (existing.session) { succeed(); return; }
+
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const tokenHash = params.get("token_hash");
+      const type = params.get("type");
+
+      try {
+        if (code) {
+          const { error: exErr } = await supabase.auth.exchangeCodeForSession(code);
+          if (exErr) throw exErr;
+        } else if (tokenHash) {
+          const { error: otpErr } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: (type as "recovery") || "recovery",
+          });
+          if (otpErr) throw otpErr;
+        }
+      } catch (e: any) {
+        if (cancelled) return;
+        setError(e.message || "");
+        setFailure("link");
+        setPhase("invalid");
+        return;
       }
-    });
 
-    return () => { cancelled = true; sub.subscription.unsubscribe(); };
+      if (cancelled) return;
+      // Either an exchange just succeeded (the auth listener above will flip us to "ready"), or
+      // the URL carried nothing we recognise. Either way, give it a bounded wait.
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        setFailure("link");
+        setPhase((p) => (p === "checking" ? "invalid" : p));
+      }, SESSION_WAIT_MS);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -90,8 +152,8 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="flex items-center justify-center gap-3">
-          <img src="/logo.png" alt="RentMaster" className="h-9 w-9 rounded-xl object-cover" />
-          <span className="text-sm font-black uppercase tracking-widest text-fg">RentMaster</span>
+          <img src="/logo.png" alt="Bari360" className="h-9 w-9 rounded-xl object-cover" />
+          <span className="text-sm font-black uppercase tracking-widest text-fg">Bari360</span>
         </div>
 
         <div className="rounded-2xl border border-line/[0.06] bg-surface/40 p-6 backdrop-blur-xl sm:p-8">
@@ -102,10 +164,20 @@ export default function ResetPasswordPage() {
           {phase === "invalid" && (
             <div className="space-y-4 text-center">
               <TriangleAlert className="mx-auto h-8 w-8 text-danger" />
-              <h2 className="text-xl font-extrabold text-heading">Link expired or invalid</h2>
+              <h2 className="text-xl font-extrabold text-heading">
+                {failure === "config" ? "Password reset is unavailable" : "Link expired or invalid"}
+              </h2>
               <p className="text-sm text-muted">
-                {error || "This password reset link is no longer valid. Request a new one from the sign-in page."}
+                {failure === "config"
+                  ? "This app isn't configured to complete password resets. Please contact support — your link is probably fine."
+                  : "This password reset link is no longer valid. Request a new one from the sign-in page."}
               </p>
+              {/* The underlying message is shown only for a config fault, where it names the
+                  missing variable and is the whole point. For a dead link it would just be
+                  Supabase's wording of what we already said. */}
+              {failure === "config" && error && (
+                <p className="text-[11px] text-subtle">{error}</p>
+              )}
               <Button className="w-full" onClick={() => window.location.replace("/")} icon={ArrowRight}>
                 Back to sign in
               </Button>

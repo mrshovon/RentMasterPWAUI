@@ -28,7 +28,9 @@ import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
+  EmailField, PhoneField,
 } from "../../components/ui";
+import { validateEmail, validatePhone } from "../../lib/validate";
 
 const ticketStatusTone: Record<TicketStatus, "slate" | "indigo" | "cyan" | "emerald"> = {
   submitted: "slate", assigned: "indigo", in_progress: "cyan", done: "emerald",
@@ -1026,10 +1028,15 @@ function PaymentSetupTab() {
   }
 
   async function save() {
+    // Every owner who upgrades sends money to this number. A typo here doesn't fail loudly —
+    // it silently routes real payments to a stranger.
+    const parsedWallet = validatePhone(config.walletNumber, { required: true });
+    if (!parsedWallet.ok) { toast.error(parsedWallet.error); return; }
     try {
       setSaving(true);
       const res = await rentMasterFetch<{ data: PaymentConfig }>("/api/super-admin/payment-config", {
-        method: "PUT", role: "admin", body: JSON.stringify(config),
+        method: "PUT", role: "admin",
+        body: JSON.stringify({ ...config, walletNumber: parsedWallet.value }),
       });
       if (res.data) setConfig(res.data);
       toast.success("Payment setup saved.");
@@ -1056,10 +1063,10 @@ function PaymentSetupTab() {
                 placeholder="e.g. SureCash" />
             </Field>
           )}
-          <Field label={`${config.provider || "MFS"} number`} hint="The personal number owners send money to.">
-            <TextInput value={config.walletNumber} onChange={(e) => setConfig((c) => ({ ...c, walletNumber: e.target.value }))}
-              placeholder="01XXXXXXXXX" />
-          </Field>
+          <PhoneField label={`${config.provider || "MFS"} number`} required
+            hint="The personal number owners send money to."
+            value={config.walletNumber}
+            onChange={(v) => setConfig((c) => ({ ...c, walletNumber: v }))} />
           <Field label="Instructions" hint="Steps shown to the owner on the payment screen.">
             <TextArea rows={5} value={config.instructions} onChange={(e) => setConfig((c) => ({ ...c, instructions: e.target.value }))}
               placeholder={"1. Open bKash and choose Send Money\n2. Send the plan amount to the number above\n3. Enter the transaction id below"} />
@@ -1624,10 +1631,18 @@ function CreateOwnerModal({ open, onClose, onCreated }: { open: boolean; onClose
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const parsedEmail = validateEmail(form.email, { required: true });
+    if (!parsedEmail.ok) { toast.error(parsedEmail.error); return; }
+    const parsedPhone = validatePhone(form.phone);
+    if (!parsedPhone.ok) { toast.error(parsedPhone.error); return; }
+    // Same floor the public signup enforces. This path used to accept any password at all,
+    // which meant the weakest accounts in the system were the ones an admin created.
+    if (form.pass.length < 8) { toast.error("Password must be at least 8 characters."); return; }
     try {
       setSaving(true);
       const res = await rentMasterFetch("/api/super-admin/owners", {
-        method: "POST", role: "admin", body: JSON.stringify(form),
+        method: "POST", role: "admin",
+        body: JSON.stringify({ ...form, email: parsedEmail.value, phone: parsedPhone.value }),
       });
       if (res.success) { setForm(empty); onCreated(); onClose(); toast.success("Owner account created."); }
     } catch (e: any) { toast.error(e.message); }
@@ -1641,16 +1656,14 @@ function CreateOwnerModal({ open, onClose, onCreated }: { open: boolean; onClose
           <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </Field>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Email" required>
-            <TextInput required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          </Field>
-          <Field label="Phone">
-            <TextInput value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-          </Field>
+          <EmailField label="Email" required value={form.email}
+            onChange={(v) => setForm({ ...form, email: v })} />
+          <PhoneField label="Phone" value={form.phone}
+            onChange={(v) => setForm({ ...form, phone: v })} />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Temporary password" required>
-            <TextInput required value={form.pass} onChange={(e) => setForm({ ...form, pass: e.target.value })} />
+          <Field label="Temporary password" required hint="At least 8 characters.">
+            <TextInput required minLength={8} value={form.pass} onChange={(e) => setForm({ ...form, pass: e.target.value })} />
           </Field>
           <Field label="Role">
             <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
@@ -1748,9 +1761,13 @@ function OwnerDetailModal({
           <Section title="Details">
             <div className="grid grid-cols-2 gap-3">
               <Field label="Name"><TextInput value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></Field>
-              <Field label="Phone"><TextInput value={edit.phone} onChange={(e) => setEdit({ ...edit, phone: e.target.value })} /></Field>
+              <PhoneField label="Phone" value={edit.phone} onChange={(v) => setEdit({ ...edit, phone: v })} />
             </div>
-            <Button size="sm" variant="secondary" loading={busy} onClick={() => patch({ name: edit.name, phone: edit.phone })}>Save details</Button>
+            <Button size="sm" variant="secondary" loading={busy} onClick={() => {
+              const parsed = validatePhone(edit.phone);
+              if (!parsed.ok) { toast.error(parsed.error); return; }
+              patch({ name: edit.name, phone: parsed.value });
+            }}>Save details</Button>
           </Section>
 
           {/* Subscription */}

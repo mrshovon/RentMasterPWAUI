@@ -44,7 +44,7 @@ export const bn: Record<string, string> = {
   "Enter your name.": "আপনার নাম লিখুন।",
   "Enter a valid email.": "একটি সঠিক ইমেইল দিন।",
   "Password must be at least 8 characters.": "পাসওয়ার্ড কমপক্ষে ৮টি অক্ষরের হতে হবে।",
-  "Welcome to RentMaster!": "রেন্টমাস্টারে স্বাগতম!",
+  "Welcome to Bari360!": "Bari360-এ স্বাগতম!",
   "Reset your password": "পাসওয়ার্ড রিসেট করুন",
   "We'll email you a secure link to set a new password.":
     "নতুন পাসওয়ার্ড তৈরি করার জন্য আমরা আপনাকে একটি নিরাপদ লিংক ইমেইল করব।",
@@ -227,7 +227,7 @@ export const bn: Record<string, string> = {
     "ভবনের খবর ও রিমাইন্ডার এখানে দেখতে পাবেন।",
 
   // ---------------------------------------------------------------- notices
-  // A notice's title/content is free text, so only the strings RentMaster's OWN backend writes
+  // A notice's title/content is free text, so only the strings Bari360's OWN backend writes
   // can be translated — see lib/notice-i18n.ts. These must match the backend byte for byte:
   // 'Rent reminder' comes from rent-master-pwa/lib/reminders.ts, the other two from
   // rent-master-pwa/app/api/admin/billing/[id]/route.ts. An owner's typed prose is left as-is.

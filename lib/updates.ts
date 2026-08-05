@@ -192,7 +192,7 @@ export async function startUpgrade(
 
     const result = await Filesystem.downloadFile({
       url: apkUrl,
-      path: `rentmaster-${release?.version || "latest"}.apk`,
+      path: `bari360-${release?.version || "latest"}.apk`,
       directory: Directory.Cache,
       progress: !!onProgress,
     });

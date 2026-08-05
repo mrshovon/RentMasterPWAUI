@@ -255,19 +255,37 @@ jobs:
 
       # Built from what's actually on disk, so the optional .aab never turns into a
       # "file not found" that fails an otherwise perfect release.
+      #
+      # Gradle names its output app-release.apk (archivesBaseName is unset). We rename here
+      # rather than in build.gradle: a plain `cp` yields exactly "Bari360.apk", whereas
+      # archivesBaseName would yield "Bari360-release.apk" and drag the Gradle config into it.
+      #
+      # LEGACY COPY: lib/app-config.ts builds the permanent
+      # /releases/latest/download/<name> URL from APK_ASSET_NAME. The web bundle updates the
+      # instant Vercel deploys, but this release takes several minutes — and every OLDER
+      # release only holds app-release.apk. Shipping both names means the download link is
+      # never briefly 404. Drop the legacy copy once a release carrying Bari360.apk is live.
       - name: Collect release assets
         id: assets
         run: |
-          APK=android/app/build/outputs/apk/release/app-release.apk
-          AAB=android/app/build/outputs/bundle/release/app-release.aab
-          if [ ! -f "$APK" ]; then
-            echo "::error::Gradle succeeded but $APK is missing."
+          OUT=android/app/build/outputs/apk/release
+          BUILT="$OUT/app-release.apk"
+          if [ ! -f "$BUILT" ]; then
+            echo "::error::Gradle succeeded but $BUILT is missing."
             exit 1
           fi
+          cp "$BUILT" "$OUT/Bari360.apk"
+
+          AAB_OUT=android/app/build/outputs/bundle/release
+          if [ -f "$AAB_OUT/app-release.aab" ]; then
+            cp "$AAB_OUT/app-release.aab" "$AAB_OUT/Bari360.aab"
+          fi
+
           {
             echo 'list<<ASSETS_EOF'
-            echo "$APK"
-            if [ -f "$AAB" ]; then echo "$AAB"; fi
+            echo "$OUT/Bari360.apk"
+            echo "$BUILT"
+            if [ -f "$AAB_OUT/Bari360.aab" ]; then echo "$AAB_OUT/Bari360.aab"; fi
             echo 'ASSETS_EOF'
           } >> "$GITHUB_OUTPUT"
 
@@ -301,6 +319,7 @@ jobs:
           # body collapses to a bare "Full Changelog" link — which is exactly what the update
           # popup then showed instead of bullets. Keep this as body_path.
           body_path: RELEASE_NOTES.md
-          # Keep the app-release.apk filename: lib/app-config.ts builds the permanent
-          # /releases/latest/download/app-release.apk URL from it.
+          # Asset filenames come from the "Collect release assets" step above and must stay in
+          # sync with APK_ASSET_NAME in lib/app-config.ts, which builds the permanent
+          # /releases/latest/download/<name> URL from it.
           files: ${{ steps.assets.outputs.list }}

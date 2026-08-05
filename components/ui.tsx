@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X, Loader2, Search, Eye, EyeOff, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
 import { useT } from "../lib/i18n";
+import { validateEmail, validatePhone, MAX_EMAIL_LEN } from "../lib/validate";
 
 // NOTE ON TRANSLATION: the primitives below take their text as plain string props, so they
 // translate it themselves. That is what makes the dashboards translatable without editing every
@@ -401,11 +402,15 @@ export function Field({
   hint,
   children,
   required,
+  error,
 }: {
   label: string;
   hint?: string;
   children: ReactNode;
   required?: boolean;
+  /** Validation message. Replaces the hint while set — two lines of guidance under one box
+   *  competing for attention is worse than one, and the error is the urgent one. */
+  error?: string;
 }) {
   const t = useT();
   return (
@@ -423,13 +428,121 @@ export function Field({
         )}
       </span>
       {children}
-      {hint && <span className="block text-[11px] text-subtle">{t(hint)}</span>}
+      {error ? (
+        // role="alert" so a screen reader announces it when it appears, rather than only on the
+        // next time focus happens to pass through the field.
+        <span role="alert" className="block text-[11px] font-medium text-danger">{t(error)}</span>
+      ) : (
+        hint && <span className="block text-[11px] text-subtle">{t(hint)}</span>
+      )}
     </label>
   );
 }
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn("field-input", props.className)} />;
+}
+
+// -----------------------------------------------------------------------------
+// Validated fields
+//
+// Label + input + inline error in one component, because every email/phone box in the app wants
+// exactly the same three things and had none of them.
+//
+// The error appears on BLUR, not on every keystroke: complaining that "j" is not an email while
+// someone is still typing "jane@…" trains people to ignore the message. Once a field has been
+// marked wrong it re-checks as they type, so the error clears the moment it is fixed rather
+// than making them tab away to find out.
+//
+// These are an affordance, not a gate. Submit handlers must still call validateEmail /
+// validatePhone from lib/validate, and the API validates again — a determined caller never
+// touches this code at all.
+// -----------------------------------------------------------------------------
+
+interface ValidatedFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  hint?: string;
+  placeholder?: string;
+  /** Error forced by the parent (e.g. after a failed submit), shown even before first blur. */
+  error?: string;
+  className?: string;
+  autoFocus?: boolean;
+  disabled?: boolean;
+}
+
+function useBlurValidation(
+  value: string,
+  validate: (v: string, opts: { required?: boolean }) => { ok: boolean; error: string },
+  required?: boolean,
+) {
+  const [touched, setTouched] = useState(false);
+  // Recomputed every render, so once `touched` is set the message follows the value live and
+  // disappears the instant the input becomes valid.
+  const result = validate(value, { required });
+  return {
+    error: touched && !result.ok ? result.error : "",
+    onBlur: () => setTouched(true),
+  };
+}
+
+export function EmailField({
+  label, value, onChange, required, hint, placeholder = "you@example.com",
+  error, className, autoFocus, disabled,
+}: ValidatedFieldProps) {
+  const v = useBlurValidation(value, validateEmail, required);
+  const shown = error || v.error;
+  return (
+    <Field label={label} required={required} hint={hint} error={shown}>
+      <input
+        type="email"
+        inputMode="email"
+        autoComplete="email"
+        autoCapitalize="none"
+        spellCheck={false}
+        maxLength={MAX_EMAIL_LEN}
+        placeholder={placeholder}
+        value={value}
+        autoFocus={autoFocus}
+        disabled={disabled}
+        aria-invalid={!!shown}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={v.onBlur}
+        className={cn("field-input", shown && "border-danger/50", className)}
+      />
+    </Field>
+  );
+}
+
+export function PhoneField({
+  label, value, onChange, required, hint, placeholder = "01712345678",
+  error, className, autoFocus, disabled,
+}: ValidatedFieldProps) {
+  const v = useBlurValidation(value, validatePhone, required);
+  const shown = error || v.error;
+  return (
+    <Field label={label} required={required} hint={hint} error={shown}>
+      <input
+        type="tel"
+        // "tel" rather than "numeric" so the + for international numbers is reachable on a phone
+        // keypad — the app accepts them, so the keyboard has to be able to type them.
+        inputMode="tel"
+        autoComplete="tel"
+        // 15 E.164 digits + a leading "+", with room for the spaces and dashes people type.
+        maxLength={20}
+        placeholder={placeholder}
+        value={value}
+        autoFocus={autoFocus}
+        disabled={disabled}
+        aria-invalid={!!shown}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={v.onBlur}
+        className={cn("field-input font-mono", shown && "border-danger/50", className)}
+      />
+    </Field>
+  );
 }
 
 /**

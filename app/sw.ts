@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-// RentMaster service worker (Serwist injectManifest source).
+// Bari360 service worker (Serwist injectManifest source).
 // Single SW per scope: it does BOTH offline precaching/runtime caching AND Web Push
 // (VAPID) handling — Phase B wires the client subscribe flow to these push listeners.
 // This file is compiled by @serwist/next's own build; it is excluded from the main
@@ -51,7 +51,7 @@ self.addEventListener("push", (event) => {
     payload = { body: event.data?.text() };
   }
 
-  const title = payload.title || "RentMaster";
+  const title = payload.title || "Bari360";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: payload.body || "",

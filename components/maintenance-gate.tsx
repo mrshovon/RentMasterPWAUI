@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Wrench, LogOut } from "lucide-react";
 import { Modal, Button } from "./ui";
-import { BACKEND_API_BASE, clearSession, getStoredSession } from "../lib/api-service";
+import { BACKEND_API_BASE, getStoredSession } from "../lib/api-service";
+import { hardSignOut } from "../lib/use-session";
 import { formatDateTime } from "../lib/format";
 
 // =============================================================================
@@ -32,7 +33,7 @@ interface MaintenanceMode {
 const RECHECK_THROTTLE_MS = 30_000;
 
 const DEFAULT_MESSAGE =
-  "RentMaster is temporarily unavailable while we carry out scheduled maintenance. " +
+  "Bari360 is temporarily unavailable while we carry out scheduled maintenance. " +
   "Please try again after the window below.";
 
 export function MaintenanceGate() {
@@ -98,7 +99,11 @@ export function MaintenanceGate() {
   if (role === "admin") return null; // the admin must always be able to turn this off
 
   // On the login screen this is a heads-up, not a wall: the admin signs in from here.
-  const onLoginPage = typeof window !== "undefined" && window.location.pathname === "/";
+  // /reset-password gets the same treatment — someone following a recovery link has a link that
+  // expires, and an undismissable wall during a maintenance window would burn it. They are
+  // signed out by definition, so there is nothing for the gate to protect there anyway.
+  const path = typeof window !== "undefined" ? window.location.pathname : "";
+  const onLoginPage = path === "/" || path.startsWith("/reset-password");
   if (onLoginPage && dismissed) return null;
 
   const window_ =
@@ -142,7 +147,7 @@ export function MaintenanceGate() {
             variant="secondary"
             icon={LogOut}
             className="w-full"
-            onClick={() => { clearSession(); window.location.href = "/"; }}
+            onClick={hardSignOut}
           >
             Sign out
           </Button>

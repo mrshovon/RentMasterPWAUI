@@ -1,30 +1,9 @@
-- Fixed adding a new tenant failing with a database error when a National ID was entered.
-- Every field now says whether it is needed: required ones are marked with a red star, and the rest are labelled optional in small grey text.
-- Password boxes have an eye button that shows what you have typed, on sign-in, password reset, sign-up and when changing your password.
-- You can now edit a tenant's National ID and their move-in date after onboarding. The NID is shown as you typed it so you can check or correct it, and only you can see it.
-- Tenant documents can now be PDFs, not just photos. Deeds and agreements upload the way they arrive.
-- Each property can carry its own name for receipts. Set it when adding or editing a property, and that property's receipts print it instead of your account name. Leave it blank to keep using your account name.
-- The signature block on the receipt no longer prints a name above the line, just the signature and the caption.
-- Rent can now be paid in parts. Tap the green tick, enter how much came in and when, and the invoice shows as partly paid with the balance still owed. Record the rest whenever it arrives.
-- When rent is paid in more than one go, the receipt lists each payment with its own date and amount, and shows the balance still due. Anything paid after the due date is printed in red. Rent settled in a single payment keeps the plain receipt.
-- An invoice that is partly paid past its due date is marked PARTIAL LATE, so a half-paid month no longer looks settled.
-- A payments list on each invoice lets you review what was received and delete anything entered by mistake. Deleting a payment moves the invoice back to partly paid or unpaid on its own.
-- Outstanding and Collected now count part payments properly, instead of treating a half-paid invoice as fully unpaid.
-- Tenants can see what they have paid so far, what is left, and can download a receipt for a part payment.
-- When you mark rent as received, you now choose the date it was actually paid. It opens on today's date, so nothing changes if the tenant just paid — but you can set an earlier date when you are entering an older month.
-- Recording rent for a past month no longer prints LATE on the receipt. The receipt now checks the date you entered against that month's due date, so a tenant who paid on time is shown as having paid on time.
-- You can correct a payment date afterwards. Tap the green tick on a bill that is already marked paid, change the date, and the receipt updates. The tenant is not notified a second time.
-- Paying on the due date itself now counts as on time, which is what the note at the bottom of the receipt has always promised.
-- The billing list now shows the date each payment was received, under the Paid label.
-- You can switch between light and dark before signing in. The button sits next to the language switch on the sign-in screen, and on the password-reset screen too.
-- Downloading and printing a rent receipt now works inside the Android app. Tapping Download or Print saves the receipt as an image and opens it, and the viewer's own menu lets you share or print it.
-- The app is now available in Bangla. Use the language button next to the light/dark switch — on the sign-in screen too — and your choice is remembered on that device.
-- The sign-in page now opens on the Owner portal by default.
-- A window no longer closes when you tap beside it. Only the X button closes it, so a form you are halfway through filling in cannot be lost by a stray tap.
-- The Notices count in the menu now shows only what is new. It clears when you open Notices, and comes back when a new notice arrives, instead of always showing the running total.
-- Owners now get a Notices count too, so a tenant marking rent as sent is easy to spot.
-- Notices the app writes itself, such as rent reminders and a tenant marking rent as sent, now read in Bangla when Bangla is on. Notices you type yourself are shown exactly as you wrote them.
-- New accounts start with a clean Notices inbox. You now see notices published from the day your account was created onwards, not the whole history from before you joined.
-- On a computer, the light/dark and language buttons have moved out of the side menu to the top right of the screen, where they are always in reach.
-- Staff and Accounts now carry a crown in the menu until you unlock them, so you can tell at a glance which parts of the app are paid add-ons. The crown disappears once the add-on is switched on for you.
-- The Contact us buttons on the Plan, Staff and Accounts screens now use the customer service icon.
+- The app is now called Bari360. Only the name and the web address have changed — your account, your properties, your tenants and all your records are exactly as you left them.
+- The app now lives at www.bari360.space. The old address still opens the app, but this is the one to save.
+- Signing out now really signs you out. Pressing the browser back button after signing out no longer brings the dashboard back, and signing out on one tab signs you out everywhere.
+- Email and phone boxes now check what you type before you save. A phone number is checked as a real Bangladeshi mobile number, and numbers written as +8801712345678 or 8801712345678 are accepted and stored the usual way. Numbers from other countries are accepted when you include the country code.
+- Tenants can now sign in whether they type their number as 01712345678 or +8801712345678.
+- The forgot password link in the email now opens the page where you set your new password. It used to lead nowhere.
+- The password reset page now tells you the difference between a link that has expired and a problem at our end, so you know whether to request a new link.
+- You can still reset your password while the app is down for maintenance, instead of being blocked by the maintenance notice.
+- The number an owner pays into and the number a payment was sent from are both checked now, so an upgrade payment can no longer go astray because of a typo.

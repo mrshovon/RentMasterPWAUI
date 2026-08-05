@@ -6,13 +6,28 @@ import {
   apiLogin, apiForgotPassword, apiSignup,
   getStoredSession, setStoredSession, clearSession, ensureValidToken,
 } from "../lib/api-service";
-import { Button, Modal, Field, TextInput, PasswordInput } from "../components/ui";
+import { Button, Modal, Field, TextInput, PasswordInput, EmailField, PhoneField } from "../components/ui";
+import { validateEmail, validatePhone } from "../lib/validate";
 import { toast } from "../components/toast";
 import { DownloadAndroid } from "../components/download-android";
 import { LanguageToggle } from "../components/language-toggle";
 import { ThemeToggle } from "../components/theme-toggle";
 import { APP_VERSION } from "../lib/app-config";
 import { useT } from "../lib/i18n";
+
+// True when the current URL carries a Supabase password-recovery token in any of its three
+// shapes (implicit hash, PKCE ?code, or a {{ .TokenHash }} template link).
+function hasRecoveryToken(): boolean {
+  if (typeof window === "undefined") return false;
+  const { search, hash } = window.location;
+  const both = search + hash;
+  return (
+    /[?&#]code=/.test(both) ||
+    /[?&#]token_hash=/.test(both) ||
+    /type=recovery/.test(both) ||
+    /[?&#]access_token=/.test(hash)
+  );
+}
 
 export default function EntryGatewayPage() {
   const t = useT();
@@ -30,9 +45,27 @@ export default function EntryGatewayPage() {
   // already-logged-in user (the PWA start_url is "/", so every launch lands here first).
   const [checking, setChecking] = useState(true);
 
+  // A password-recovery link that lands HERE instead of /reset-password is forwarded, carrying
+  // its query and hash intact.
+  //
+  // Supabase silently ignores a redirectTo that isn't on its Redirect URLs allow-list and
+  // substitutes the project's Site URL — which is this page. The recovery token then arrives
+  // attached to a screen that has no idea what to do with it, so the user clicks their link and
+  // sees a plain login form: the exact "the email arrives but nothing happens" report. Rather
+  // than depend on that dashboard setting being right, recognise the token and route it.
+  useEffect(() => {
+    if (!hasRecoveryToken()) return;
+    const { search, hash } = window.location;
+    window.location.replace(`/reset-password${search}${hash}`);
+  }, []);
+
   // On open: if a session already exists, refresh its token if needed and forward to the
   // dashboard. Only fall back to the login form when there's no session (or the refresh failed).
   useEffect(() => {
+    // Deferred to the redirect above. Both effects run before either navigation commits, so
+    // without this an owner who is still signed in elsewhere gets sent to their dashboard and
+    // the recovery token is thrown away.
+    if (hasRecoveryToken()) return;
     const session = getStoredSession();
     if (!session) { setChecking(false); return; }
     (async () => {
@@ -63,10 +96,16 @@ export default function EntryGatewayPage() {
   async function loginTenant(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!phone.trim() || !pass.trim()) return;
+    // Catch a mistyped number here rather than spending a login attempt (and a slot in the
+    // per-identifier throttle) on something that cannot match any row.
+    const parsedPhone = validatePhone(phone, { required: true });
+    if (!parsedPhone.ok) { setError(parsedPhone.error); return; }
+    if (!pass.trim()) { setError("Enter your passcode."); return; }
     try {
       setLoading(true);
-      const r = await apiLogin({ mode: "tenant", phone: phone.trim(), passcode: pass.trim() });
+      // Send the canonical form; the backend also tries the other spellings a row might be
+      // stored under, so an old record still matches.
+      const r = await apiLogin({ mode: "tenant", phone: parsedPhone.value, passcode: pass.trim() });
       persist("tenant", r.id, r.name, r.token);
     } catch (err: any) {
       setError(err.message);
@@ -77,10 +116,12 @@ export default function EntryGatewayPage() {
   async function loginOwner(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!email.trim() || !ownerPass.trim()) return;
+    const parsedEmail = validateEmail(email, { required: true });
+    if (!parsedEmail.ok) { setError(parsedEmail.error); return; }
+    if (!ownerPass.trim()) { setError("Enter your password."); return; }
     try {
       setLoading(true);
-      const r = await apiLogin({ mode: "owner", email: email.trim(), password: ownerPass });
+      const r = await apiLogin({ mode: "owner", email: parsedEmail.value, password: ownerPass });
       persist(r.role === "admin" ? "admin" : "owner", r.id, r.name, r.token, r.refreshToken, r.expiresAt);
     } catch (err: any) {
       setError(err.message);
@@ -106,9 +147,9 @@ export default function EntryGatewayPage() {
         {/* Brand panel */}
         <div className="hidden flex-col justify-between border-r border-line/[0.06] p-12 lg:flex">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="RentMaster" className="h-9 w-9 rounded-xl object-cover" />
+            <img src="/logo.png" alt="Bari360" className="h-9 w-9 rounded-xl object-cover" />
             <span className="text-sm font-black uppercase tracking-widest text-fg">
-              RentMaster
+              Bari360
             </span>
           </div>
 
@@ -125,7 +166,7 @@ export default function EntryGatewayPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="font-mono text-xs text-faint">RentMaster · v{APP_VERSION}</span>
+            <span className="font-mono text-xs text-faint">Bari360 · v{APP_VERSION}</span>
             <DownloadAndroid variant="link" />
           </div>
         </div>
@@ -179,6 +220,10 @@ export default function EntryGatewayPage() {
                       <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
                       <input
                         type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        maxLength={20}
+                        required
                         placeholder="01712345678"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
@@ -214,7 +259,9 @@ export default function EntryGatewayPage() {
                     </label>
                     <div className="relative">
                       <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-                      <input type="email" placeholder="owner@example.com" value={email}
+                      <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none"
+                        spellCheck={false} maxLength={254} required
+                        placeholder="owner@example.com" value={email}
                         onChange={(e) => setEmail(e.target.value)} className="field-input pl-10" />
                     </div>
                   </div>
@@ -277,12 +324,19 @@ function SignupModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) { toast.error(t("Enter your name.")); return; }
-    if (!email.trim() || !email.includes("@")) { toast.error(t("Enter a valid email.")); return; }
+    const parsedEmail = validateEmail(email, { required: true });
+    if (!parsedEmail.ok) { toast.error(t(parsedEmail.error)); return; }
+    // Optional field, but a number that IS given has to be usable — the account's phone is how
+    // rent reminders and receipts reach the owner.
+    const parsedPhone = validatePhone(phone);
+    if (!parsedPhone.ok) { toast.error(t(parsedPhone.error)); return; }
     if (password.length < 8) { toast.error(t("Password must be at least 8 characters.")); return; }
     try {
       setSubmitting(true);
-      const r = await apiSignup({ name: name.trim(), email: email.trim(), phone: phone.trim(), password });
-      toast.success(t("Welcome to RentMaster!"));
+      const r = await apiSignup({
+        name: name.trim(), email: parsedEmail.value, phone: parsedPhone.value, password,
+      });
+      toast.success(t("Welcome to Bari360!"));
       onSuccess(r.id, r.name, r.token, r.refreshToken, r.expiresAt);
     } catch (err: any) {
       toast.error(err.message);
@@ -298,12 +352,8 @@ function SignupModal({
           <TextInput required placeholder="Jane Landlord" value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("Email")} required>
-            <TextInput type="email" required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </Field>
-          <Field label={t("Phone")}>
-            <TextInput placeholder="01712345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
-          </Field>
+          <EmailField label={t("Email")} required value={email} onChange={setEmail} />
+          <PhoneField label={t("Phone")} value={phone} onChange={setPhone} />
         </div>
         <Field label={t("Password")} required hint={t("At least 8 characters.")}>
           <PasswordInput required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -330,10 +380,11 @@ function ForgotPasswordModal({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !email.includes("@")) { toast.error(t("Enter a valid email.")); return; }
+    const parsed = validateEmail(email, { required: true });
+    if (!parsed.ok) { toast.error(t(parsed.error)); return; }
     try {
       setSending(true);
-      await apiForgotPassword(email.trim());
+      await apiForgotPassword(parsed.value);
       setSent(true);
     } catch (err: any) {
       toast.error(err.message);
@@ -357,10 +408,8 @@ function ForgotPasswordModal({
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
-          <Field label={t("Account email")} required>
-            <TextInput type="email" required placeholder="owner@example.com" value={email}
-              onChange={(e) => setEmail(e.target.value)} />
-          </Field>
+          <EmailField label={t("Account email")} required placeholder="owner@example.com"
+            value={email} onChange={setEmail} />
           <Button type="submit" loading={sending} className="w-full" icon={ArrowRight}>
             {t("Send reset link")}
           </Button>

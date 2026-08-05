@@ -1,16 +1,19 @@
 // =============================================================================
-// Centralized fetch engine that talks to the RentMaster backend (rent-master-pwa).
+// Centralized fetch engine that talks to the Bari360 backend (rent-master-pwa).
 // The backend runs on :3000, this UI on :3001. CORS + header-based identity
 // injection is handled by the backend middleware.
+//
+// There is NO unauthenticated fallback identity. An earlier revision sent hardcoded demo UUIDs
+// in x-rentmaster-uid / x-rentmaster-tenant-id whenever no token was present, pairing with the
+// backend's BYPASS_FOR_TESTING switch. That switch is off and the middleware strips
+// client-supplied identity headers, so the fallback could never actually authenticate — but it
+// did mean a signed-out client kept firing requests that merely 401'd instead of failing
+// loudly, which is part of how a logged-out dashboard came to look alive. No token now means no
+// request: see requireToken() below.
 // =============================================================================
 
 export const BACKEND_API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
-
-// Demo identities (backend middleware currently runs in BYPASS_FOR_TESTING mode
-// and expects these header-injected UUIDs).
-export const DEMO_OWNER_ID = "0fc9f350-95ca-4a38-8d2b-56eb5c761bb8";
-export const DEMO_TENANT_ID = "1b2a02cb-c78f-49a6-8b49-c1a211efbb59";
 
 interface FetchOptions extends RequestInit {
   role?: "owner" | "tenant" | "admin";
@@ -58,14 +61,46 @@ export function setStoredSession(session: StoredSession): void {
   try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch { /* ignore */ }
 }
 
+// Kept in sync with the cacheName in app/sw.ts. Not renamed with the Bari360 rebrand: it names
+// a cache bucket already sitting in every existing user's browser, and changing it would orphan
+// those rather than clear them.
+const API_CACHE_NAME = "rentmaster-api-get";
+
+// The service worker keeps a network-first cache of every API GET (see app/sw.ts). It is keyed
+// on URL alone with no notion of who asked, so leaving it in place after sign-out lets the next
+// person on the device read the previous user's data whenever the network is slow or offline.
+// Best-effort: no SW in dev, and an older browser without Cache Storage simply skips this.
+export async function purgeApiCache(): Promise<void> {
+  if (typeof caches === "undefined") return;
+  try { await caches.delete(API_CACHE_NAME); } catch { /* ignore */ }
+}
+
 export function clearSession(): void {
   if (typeof window === "undefined") return;
   try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+  void purgeApiCache();
+}
+
+// Bounce to the sign-in screen. `replace` so the dashboard we are leaving cannot be reached
+// again with Back — the whole point of this module's session handling.
+export function redirectToLogin(): void {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname !== "/") window.location.replace("/");
 }
 
 // Reads the real access token (if the user logged in) from localStorage.
 export function getSessionToken(): string | null {
   return getStoredSession()?.token || null;
+}
+
+// Asserts a token exists before a request goes out. Called when we have already tried to
+// refresh, so reaching here means the session is genuinely gone: tear down what is left and
+// bounce, rather than sending an anonymous request that would only 401.
+function requireToken(token: string | null): string {
+  if (token) return token;
+  clearSession();
+  redirectToLogin();
+  throw new ApiError("Your session has expired. Please sign in again.", 401);
 }
 
 // Single-flight refresh: concurrent callers share one in-flight request so we never send the
@@ -163,6 +198,25 @@ export async function apiSignup(payload: {
   return json;
 }
 
+// Tell the backend to revoke the session server-side. Without this, signing out only forgets
+// the tokens locally — a refresh token copied out of localStorage beforehand would keep working
+// until it expired. Best-effort and deliberately un-awaited by callers: a failed or slow call
+// must never stop someone signing out.
+export async function apiLogout(): Promise<void> {
+  const session = getStoredSession();
+  if (!session?.token) return;
+  try {
+    await fetch(`${BACKEND_API_BASE}/api/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken: session.token, refreshToken: session.refreshToken }),
+      keepalive: true, // survives the navigation away that follows immediately
+    });
+  } catch {
+    /* offline or backend down — the local session is cleared regardless */
+  }
+}
+
 // Request a password-reset email (owner self-service). The backend always returns a generic
 // success even if the email doesn't exist, so this never reveals whether an account is present.
 export async function apiForgotPassword(email: string): Promise<void> {
@@ -197,19 +251,18 @@ export async function uploadFile(
   file: File,
   opts: { role?: "owner" | "tenant"; folder?: string } = {}
 ): Promise<string> {
-  const { role = "owner", folder } = opts;
+  // `role` is accepted for call-site symmetry with rentMasterFetch but no longer read: the
+  // backend derives identity from the bearer token, never from a caller-supplied role.
+  const { folder } = opts;
 
   const form = new FormData();
   form.append("file", file);
   if (folder) form.append("folder", folder);
 
-  // Real token if logged in; else demo identity header. Let the browser set the
-  // multipart Content-Type/boundary.
+  // Refresh first if the token is stale, then require one. Let the browser set the multipart
+  // Content-Type/boundary itself — setting it by hand drops the boundary and the upload fails.
   const headers = new Headers();
-  const token = getSessionToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  else if (role === "tenant") headers.set("x-rentmaster-tenant-id", DEMO_TENANT_ID);
-  else headers.set("x-rentmaster-uid", DEMO_OWNER_ID);
+  headers.set("Authorization", `Bearer ${requireToken(await ensureValidToken())}`);
 
   let response: Response;
   try {
@@ -225,6 +278,14 @@ export async function uploadFile(
     );
   }
 
+  // Same treatment as rentMasterFetch: a 401 here means the session died mid-upload, so end it
+  // rather than leaving the user on a dashboard that can no longer do anything.
+  if (response.status === 401) {
+    clearSession();
+    redirectToLogin();
+    throw new ApiError("Your session has expired. Please sign in again.", 401);
+  }
+
   const json = await response.json().catch(() => ({}));
   if (!response.ok || !json.success) {
     throw new Error(json.error || `Upload failed (${response.status}).`);
@@ -236,42 +297,43 @@ export async function rentMasterFetch<T = any>(
   endpoint: string,
   options: FetchOptions = {}
 ): Promise<T> {
-  const { role = "owner", ...nativeOptions } = options;
+  // `role` is no longer read — identity comes from the bearer token alone. Kept in the options
+  // type so the ~200 existing call sites that pass it still typecheck.
+  const { role: _role, ...nativeOptions } = options;
   const targetUrl = `${BACKEND_API_BASE}${endpoint}`;
 
-  // Builds headers for one attempt, using the given bearer token (or demo identity fallback).
-  function buildHeaders(bearer: string | null): Headers {
+  function buildHeaders(bearer: string): Headers {
     const headers = new Headers(nativeOptions.headers);
     headers.set("Content-Type", "application/json");
-    if (bearer) {
-      headers.set("Authorization", `Bearer ${bearer}`);
-    } else if (role === "tenant") {
-      headers.set("x-rentmaster-tenant-id", DEMO_TENANT_ID);
-    } else {
-      headers.set("x-rentmaster-uid", DEMO_OWNER_ID);
-    }
+    headers.set("Authorization", `Bearer ${bearer}`);
     return headers;
   }
 
-  async function attempt(bearer: string | null): Promise<Response> {
+  async function attempt(bearer: string): Promise<Response> {
     return fetch(targetUrl, { ...nativeOptions, headers: buildHeaders(bearer), cache: "no-store" });
   }
 
   try {
-    let response = await attempt(getSessionToken());
+    // Throws (and bounces) when there is no session at all, so a signed-out page can never sit
+    // there quietly firing anonymous requests.
+    let response = await attempt(requireToken(await ensureValidToken()));
 
-    // Access token expired: try one silent refresh, then retry the request. If refresh fails,
-    // the session is dead — clear it and bounce to login (owner/admin only; tenants have no
-    // refresh token so this is skipped).
-    if (response.status === 401 && getStoredSession()?.refreshToken) {
-      const fresh = await refreshAccessToken();
+    // 401 after a valid-looking token: try one silent refresh and retry.
+    //
+    // The refresh attempt used to be gated on `getStoredSession()?.refreshToken`, which meant
+    // the whole branch — including the bounce to login — was skipped for tenants (who have no
+    // refresh token) and for anyone already signed out. They stayed on a dead dashboard
+    // collecting error toasts. Now the 401 always ends the session; only the refresh attempt
+    // itself is conditional.
+    if (response.status === 401) {
+      const fresh = getStoredSession()?.refreshToken ? await refreshAccessToken() : null;
       if (fresh) {
         response = await attempt(fresh);
-      } else {
+      }
+      if (response.status === 401) {
         clearSession();
-        if (typeof window !== "undefined" && window.location.pathname !== "/") {
-          window.location.replace("/");
-        }
+        redirectToLogin();
+        throw new ApiError("Your session has expired. Please sign in again.", 401);
       }
     }
 
