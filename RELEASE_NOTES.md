@@ -2,6 +2,7 @@
 - Plans can now run for any number of days, so a seven day or ninety day plan is possible alongside the usual monthly and yearly ones.
 - A plan can now include add-on modules such as Staff management or Accounts and bookkeeping. Where a plan includes them, the plan card says so and you get them straight away without buying them separately.
 - A plan arranged just for your account now appears in your plan list marked as arranged for you, so you can see what you are on and renew it yourself instead of asking us to set it up again.
+- Trial plans can now be offered. A trial is marked as one time on the plan card, and when it ends you move to the free plan and choose whichever plan suits you, rather than losing access.
 - Discounts on a plan are now shown to you as well as to the administrator. You see the reduced price, the original price crossed out, and how much you save, and the reduced price is what you are asked to pay.
 - Notices published before you joined no longer appear in your list. Your notices now start from the day your account was created.
 - The Download Android app link is now a small phone button. Rest on it or move to it with the keyboard to see the version and download size.

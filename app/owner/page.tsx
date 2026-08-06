@@ -6,7 +6,7 @@ import {
   Plus, MapPin, KeyRound, Phone, CircleDollarSign, Home, TriangleAlert,
   CheckCircle2, Send, Circle, Inbox, Pencil, DoorOpen, FileText, Trash2, Upload, Download, X, History,
   Receipt, PenLine, Gem, Crown, Sparkles, ArrowUpCircle, Infinity as InfinityIcon, CalendarClock, Copy, RotateCcw,
-  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle, HardHat, Wallet,
+  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle, HardHat, Wallet, Info,
 } from "lucide-react";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
 import { validateEmail, validatePhone } from "../../lib/validate";
@@ -945,6 +945,12 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                           <CheckCircle2 className="h-4 w-4 text-success" />{a.label} included
                         </li>
                       ))}
+                      {/* A trial: say so up front, not only once the button is greyed out. */}
+                      {tier.is_recurring === false && (
+                        <li className="flex items-center gap-2 text-muted">
+                          <Info className="h-4 w-4 text-subtle" />One-time plan — can&apos;t be renewed
+                        </li>
+                      )}
                     </>
                   )}
                 </ul>
@@ -955,6 +961,20 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                     </Button>
                   ) : isCurrent && s.isFree ? (
                     <Button variant="secondary" className="w-full" disabled>Current plan</Button>
+                  ) : tier.oneTimeUsed ? (
+                    /* A one-time plan they've already had. While they're still on it that means
+                       "Current plan" with no Renew; once it has lapsed, it stays listed but
+                       greyed so they can see why it isn't on offer. */
+                    <>
+                      <Button variant="secondary" className="w-full" disabled>
+                        {isCurrent ? "Current plan" : "Already used"}
+                      </Button>
+                      <p className="mt-2 text-xs text-subtle">
+                        {isCurrent
+                          ? "This is a one-time plan. When it ends you'll move to the free plan — pick another plan to carry on."
+                          : "You've already used this one-time plan."}
+                      </p>
+                    </>
                   ) : blockedDowngrade ? (
                     <>
                       <Button variant="secondary" className="w-full" disabled>Downgrade blocked</Button>
@@ -978,7 +998,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
             );
           })}
         </div>
-        <p className="text-xs text-subtle">Paid plans are activated after our team confirms your bKash payment. The free plan never expires; paid plans renew on their billing interval and get a {`10`}-day grace period after expiry.</p>
+        <p className="text-xs text-subtle">Paid plans are activated after our team confirms your bKash payment. The free plan never expires; paid plans renew on their billing interval and get a {`10`}-day grace period after expiry. A one-time plan can only be taken once — when it ends you move to the free plan and choose again.</p>
       </div>
 
       <ContactModal open={!!contactTier} tier={contactTier} ownerName={ownerName} onClose={() => setContactTier(null)} />

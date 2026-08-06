@@ -252,6 +252,13 @@ export interface SubscriptionTier {
   // and still visible to an owner already on it so they can renew. Distinct from is_active,
   // which retires a plan for everyone. Absent on databases predating ADD_PLAN_VISIBILITY.sql.
   is_public?: boolean;
+  // False = one-time (a trial): the owner may take it once, then must choose another plan, and
+  // falls back to the free plan when it expires. Absent on databases predating
+  // ADD_PLAN_RECURRING.sql, where every plan is renewable as before.
+  is_recurring?: boolean;
+  // COMPUTED by GET /api/admin/subscription — not a database column. True when this is a
+  // one-time plan the signed-in owner has already had, so the UI can grey it and say why.
+  oneTimeUsed?: boolean;
   discount_percent?: number;
   // Whether this tier bundles the Staff module (true on the Whole Building / 'custom' tiers).
   staff_included?: boolean;

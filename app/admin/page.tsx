@@ -1637,6 +1637,7 @@ function PlansTab({
             .map((t) => {
             const inactive = t.is_active === false;
             const hidden = t.is_public === false;
+            const oneTime = t.is_recurring === false;
             const disc = Number(t.discount_percent || 0);
             const isContact = t.billing_interval === "custom";
             return (
@@ -1647,6 +1648,7 @@ function PlansTab({
                     {disc > 0 && <Badge tone="emerald"><Percent className="mr-0.5 inline h-3 w-3" />{disc}% off</Badge>}
                     {/* Hidden is orthogonal to Inactive — a plan can be live but unlisted. */}
                     {hidden && <Badge tone="amber"><EyeOff className="mr-0.5 inline h-3 w-3" />Hidden</Badge>}
+                    {oneTime && <Badge tone="cyan">One-time</Badge>}
                     <Badge tone={inactive ? "rose" : "slate"}>{inactive ? "Inactive" : "Active"}</Badge>
                   </div>
                 </div>
@@ -1721,6 +1723,8 @@ function TierModal({
   const [form, setForm] = useState(empty);
   // Listed to owners by default. Unticking keeps the plan fully usable but assign-only.
   const [isPublic, setIsPublic] = useState(true);
+  // Renewable by default. Unticking makes it one-time — a trial.
+  const [isRecurring, setIsRecurring] = useState(true);
   const [addons, setAddons] = useState<AddonKey[]>([]);
   // UI-only master switch: there is no "allows add-ons" column, and none is needed — the plan
   // simply bundles zero modules. Kept as its own bit of state so unticking it doesn't lose the
@@ -1748,11 +1752,13 @@ function TierModal({
       setAddons(current);
       setAddonsOn(current.length > 0);
       setIsPublic(t.is_public !== false);
+      setIsRecurring(t.is_recurring !== false);
     } else {
       setForm(empty);
       setAddons([]);
       setAddonsOn(false);
       setIsPublic(true);
+      setIsRecurring(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
@@ -1779,6 +1785,7 @@ function TierModal({
         maxProperties: form.maxProperties,
         maxTenants: form.maxTenants, discountPercent: form.discountPercent,
         isPublic,
+        isRecurring,
         addons: selectedAddons,
         ...(confirmAddonRemoval ? { confirmAddonRemoval: true } : {}),
       };
@@ -1868,6 +1875,18 @@ function TierModal({
             {isPublic
               ? "Owners can see this plan and choose it themselves."
               : "Hidden: owners can't see or choose this plan — you assign it from their account page. Anyone already on it keeps seeing it so they can renew."}
+          </p>
+
+          <label className="mt-3 flex cursor-pointer items-center gap-2 border-t border-line/[0.06] pt-3 text-sm font-semibold text-fg">
+            <input type="checkbox" checked={isRecurring}
+              onChange={(e) => setIsRecurring(e.target.checked)}
+              className="h-4 w-4 accent-[rgb(var(--primary))]" />
+            Owners can renew this plan
+          </label>
+          <p className="mt-1 text-xs text-subtle">
+            {isRecurring
+              ? "Owners can take this plan again whenever they like."
+              : "One-time: an owner can take this plan once — use it for a trial. When it ends they drop to the free plan and must choose a different one. You can still re-assign it yourself."}
           </p>
         </div>
 
