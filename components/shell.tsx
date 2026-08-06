@@ -138,15 +138,19 @@ export function DashboardShell({
         {/* Bottom band — always visible. Theme/language live in the top header at every
             width, so they are deliberately absent here. */}
         <div className="shrink-0 space-y-1 pt-4">
-          {/* Renders only in a browser (hidden inside the installed Android app). */}
-          <DownloadAndroid variant="sidebar" />
-          <button
-            onClick={onLogout}
-            className="flex w-full items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold text-muted transition hover:bg-danger/10 hover:text-danger"
-          >
-            <LogOut className="h-[18px] w-[18px]" />
-            {t("Sign out")}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onLogout}
+              className="flex flex-1 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold text-muted transition hover:bg-danger/10 hover:text-danger"
+            >
+              <LogOut className="h-[18px] w-[18px]" />
+              {t("Sign out")}
+            </button>
+            {/* Icon-only, with a tooltip. Sits in this action row rather than as its own nav
+                row, where a bare icon would read as an unlabelled item next to text ones.
+                Renders only in a browser (hidden inside the installed Android app). */}
+            <DownloadAndroid variant="icon" />
+          </div>
         </div>
       </aside>
 
@@ -184,7 +188,7 @@ export function DashboardShell({
             <PushToggle />
             {/* Mobile-only download affordance (desktop uses the sidebar row). Browser-only. */}
             <div className="mb-3 flex justify-end md:hidden">
-              <DownloadAndroid variant="link" />
+              <DownloadAndroid variant="icon" />
             </div>
             {children}
           </div>

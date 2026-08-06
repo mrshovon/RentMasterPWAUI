@@ -14,7 +14,7 @@ import { LATEST_APK_URL } from "../lib/app-config";
 // on the releases API — which is capped at 60 req/hour per IP and shared by everyone behind
 // the same NAT. The API is used only to enrich the label with a version and size, and the
 // button is fully functional whether or not that call succeeds.
-export function DownloadAndroid({ variant = "link" }: { variant?: "link" | "sidebar" }) {
+export function DownloadAndroid({ variant = "link" }: { variant?: "link" | "sidebar" | "icon" }) {
   const [mounted, setMounted] = useState(false);
   const [meta, setMeta] = useState<{ version: string; size: number | null } | null>(null);
 
@@ -37,6 +37,33 @@ export function DownloadAndroid({ variant = "link" }: { variant?: "link" | "side
     : sidebar
       ? "Download Android app"
       : "Download the Android app";
+
+  // Icon-only affordance. The label still has to reach the user somehow, so it becomes an
+  // accessible name plus a visible tooltip on hover AND focus — hover alone would leave the
+  // control unlabelled for keyboard and touch users. `title` is kept as the last-resort
+  // fallback for anything that renders the tooltip element oddly.
+  if (variant === "icon") {
+    const tip = meta ? `Download Android app · v${meta.version}${size}` : "Download Android app";
+    return (
+      <span className="group relative inline-flex">
+        <a
+          href={LATEST_APK_URL}
+          download
+          aria-label={tip}
+          title={tip}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted transition hover:bg-success/10 hover:text-success focus-visible:bg-success/10 focus-visible:text-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/40"
+        >
+          <Smartphone className="h-[18px] w-[18px]" />
+        </a>
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute left-1/2 top-full z-50 mt-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-heading px-2.5 py-1.5 text-xs font-semibold text-bg shadow-lg group-hover:block group-focus-within:block"
+        >
+          {tip}
+        </span>
+      </span>
+    );
+  }
 
   return (
     <a

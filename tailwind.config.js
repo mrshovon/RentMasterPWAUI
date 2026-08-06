@@ -36,6 +36,9 @@ module.exports = {
         warning: "rgb(var(--warning) / <alpha-value>)",
         danger: "rgb(var(--danger) / <alpha-value>)",
         "btn-ink": "rgb(var(--btn-ink) / <alpha-value>)",
+        // Categorical chart series, assigned in fixed order (1 = owners, 2 = tenants).
+        "chart-1": "rgb(var(--chart-1) / <alpha-value>)",
+        "chart-2": "rgb(var(--chart-2) / <alpha-value>)",
         // Back-compat alias — the brand accent now points at the primary token.
         brand: {
           DEFAULT: "rgb(var(--primary) / <alpha-value>)",

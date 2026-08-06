@@ -4,6 +4,7 @@ import { Toaster } from "../components/toast";
 import { ConfirmHost } from "../components/confirm";
 import { UpdateGate } from "../components/update-gate";
 import { MaintenanceGate } from "../components/maintenance-gate";
+import { AnalyticsGate } from "../components/analytics-gate";
 import { LanguageProvider } from "../lib/i18n";
 
 export const metadata: Metadata = {
@@ -56,6 +57,8 @@ export default function RootLayout({
           <ConfirmHost />
           <UpdateGate />
           <MaintenanceGate />
+          {/* Renders nothing — loads GA/GTM if the admin has configured and enabled it. */}
+          <AnalyticsGate />
         </LanguageProvider>
       </body>
     </html>

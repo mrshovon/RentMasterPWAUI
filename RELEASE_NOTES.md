@@ -1,9 +1,11 @@
-- The app is now called Bari360. Only the name and the web address have changed — your account, your properties, your tenants and all your records are exactly as you left them.
-- The app now lives at www.bari360.space. The old address still opens the app, but this is the one to save.
-- Signing out now really signs you out. Pressing the browser back button after signing out no longer brings the dashboard back, and signing out on one tab signs you out everywhere.
-- Email and phone boxes now check what you type before you save. A phone number is checked as a real Bangladeshi mobile number, and numbers written as +8801712345678 or 8801712345678 are accepted and stored the usual way. Numbers from other countries are accepted when you include the country code.
-- Tenants can now sign in whether they type their number as 01712345678 or +8801712345678.
-- The forgot password link in the email now opens the page where you set your new password. It used to lead nowhere.
-- The password reset page now tells you the difference between a link that has expired and a problem at our end, so you know whether to request a new link.
-- You can still reset your password while the app is down for maintenance, instead of being blocked by the maintenance notice.
-- The number an owner pays into and the number a payment was sent from are both checked now, so an upgrade payment can no longer go astray because of a typo.
+- Plan lengths were being worked out wrongly. A one year plan bought this year now ends next year instead of showing a date a hundred years away, and a plan given to you by an administrator now runs for its real length rather than always a month.
+- Plans can now run for any number of days, so a seven day or ninety day plan is possible alongside the usual monthly and yearly ones.
+- A plan can now include add-on modules such as Staff management or Accounts and bookkeeping. Where a plan includes them, the plan card says so and you get them straight away without buying them separately.
+- Discounts on a plan are now shown to you as well as to the administrator. You see the reduced price, the original price crossed out, and how much you save, and the reduced price is what you are asked to pay.
+- Notices published before you joined no longer appear in your list. Your notices now start from the day your account was created.
+- The Download Android app link is now a small phone button. Rest on it or move to it with the keyboard to see the version and download size.
+- Deleting an account from the admin panel now actually works. It used to report success while leaving everything in place. It now removes the account together with its properties, tenants, invoices and records, says exactly what will be removed before you confirm, and refuses to delete the account you are signed in with or the last administrator.
+- Administrators can see who is online right now, and when anyone was last using the app, including which devices they use.
+- A new Analytics page shows total users, who is online, active users and new signups, with a date range you can change to compare periods.
+- Administrators can send a welcome message to people who have recently joined, with their own wording. It shows how many people it will reach before sending, and never messages the same person twice.
+- Google Analytics can now be set up from the admin panel, for the website and the Android app separately, without waiting for an update.

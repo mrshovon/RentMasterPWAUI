@@ -13,6 +13,7 @@ import { toast } from "../../components/toast";
 import { buildReceiptHtml } from "../../lib/receipt";
 import { ReceiptModal } from "../../components/receipt-modal";
 import { useSessionGuard } from "../../lib/use-session";
+import { usePresenceHeartbeat } from "../../lib/presence";
 import { useTabState } from "../../lib/use-tab";
 import { BillingLedger, BillingPayment, MaintenanceLog, Notice, PaymentStatus, PriorityLevel, TenantProfile, Document, ServiceChargeBreakdown, RentRevision } from "../../types/api";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
@@ -39,6 +40,7 @@ export default function TenantDashboard() {
   const t = useT();
   const lang = useLang();
   const { session, checkingSession, logout } = useSessionGuard("tenant");
+  usePresenceHeartbeat(!checkingSession);
   // No demo fallback: useSessionGuard resolves the session in an effect, so on the first render
   // this is undefined. A placeholder id here meant the loader below fired immediately with an id
   // that isn't ours — and the backend's IDOR guard answered "You may only view your own billing

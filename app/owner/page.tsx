@@ -16,6 +16,8 @@ import { buildReceiptHtml } from "../../lib/receipt";
 import { ReceiptModal } from "../../components/receipt-modal";
 import { resolveReceiptMessage } from "../../lib/whatsapp";
 import { useSessionGuard } from "../../lib/use-session";
+import { usePresenceHeartbeat } from "../../lib/presence";
+import { PLAN_ADDONS, addonsOnTier } from "../../lib/addons";
 import { useTabState } from "../../lib/use-tab";
 import { usePendingAction } from "../../lib/use-pending";
 import {
@@ -66,6 +68,7 @@ export default function OwnerDashboard() {
   const t = useT();
   const lang = useLang();
   const { session, checkingSession, logout } = useSessionGuard("owner");
+  usePresenceHeartbeat(!checkingSession);
   const { isPending, run } = usePendingAction();
   const [tab, setTab] = useTabState("overview");
   const [loading, setLoading] = useState(true);
@@ -678,6 +681,22 @@ export default function OwnerDashboard() {
 // (no self-service price, set up by the admin after the customer gets in touch).
 const isContactTier = (t: SubscriptionTier) => t.billing_interval === "custom";
 
+// Price after the admin-set discount. Owners used to be shown the undiscounted price even
+// when a plan carried a discount — only the admin console applied it.
+const discountedPrice = (t: SubscriptionTier) => {
+  const d = Number(t.discount_percent || 0);
+  return d > 0 ? Number(t.price) * (1 - d / 100) : Number(t.price);
+};
+
+// How long the plan runs, for the "৳500 / month" suffix. A 'days' plan states its own length.
+const tenureLabel = (t: SubscriptionTier) => {
+  if (t.billing_interval === "days") {
+    const n = Number(t.duration_days || 0);
+    return n === 1 ? "day" : `${n} days`;
+  }
+  return t.billing_interval;
+};
+
 function planStatusBadge(s: PlanState): { tone: "emerald" | "amber" | "rose"; label: string } {
   if (s.status === "locked") return { tone: "rose", label: s.lockReason === "revoked" ? "Revoked" : "Lapsed" };
   if (s.status === "grace") return { tone: "amber", label: "In grace" };
@@ -890,9 +909,16 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                   {isCurrent ? <Badge tone="indigo">Current</Badge> : contact ? <Badge tone="cyan">Custom</Badge> : null}
                 </div>
                 <div className="mt-1 text-2xl font-black text-heading">
-                  {contact ? "Contact us" : tier.price > 0 ? formatCurrency(tier.price) : "Free"}
-                  {!contact && tier.price > 0 && <span className="text-sm font-medium text-muted"> / {tier.billing_interval}</span>}
+                  {contact ? "Contact us" : tier.price > 0 ? formatCurrency(discountedPrice(tier)) : "Free"}
+                  {!contact && tier.price > 0 && <span className="text-sm font-medium text-muted"> / {tenureLabel(tier)}</span>}
                 </div>
+                {/* Show the saving when the admin has put a discount on this plan. */}
+                {!contact && tier.price > 0 && Number(tier.discount_percent || 0) > 0 && (
+                  <div className="mt-1 flex items-center gap-2 text-xs">
+                    <span className="text-subtle line-through">{formatCurrency(tier.price)}</span>
+                    <Badge tone="emerald">Save {Number(tier.discount_percent)}%</Badge>
+                  </div>
+                )}
                 {tier.description && <p className="mt-2 text-xs text-muted">{tier.description}</p>}
                 <ul className="mt-4 space-y-1.5 text-sm text-fg">
                   {contact ? (
@@ -908,6 +934,12 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                         {unlimitedP ? "Unlimited properties" : `Up to ${tier.max_properties_allowed} properties`}</li>
                       <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />
                         {unlimitedT ? "Unlimited tenants" : `Up to ${tier.max_tenants_allowed} tenants`}</li>
+                      {/* Optional modules this plan bundles — no separate purchase needed. */}
+                      {PLAN_ADDONS.filter((a) => addonsOnTier(tier).includes(a.key)).map((a) => (
+                        <li key={a.key} className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-success" />{a.label} included
+                        </li>
+                      ))}
                     </>
                   )}
                 </ul>
@@ -1006,7 +1038,7 @@ function PaymentModal({
 
   return (
     <Modal open={!!tier} onClose={onClose} title="Complete your payment"
-      subtitle={tier ? `${tier.name} · ৳${tier.price} / ${tier.billing_interval}` : undefined}>
+      subtitle={tier ? `${tier.name} · ৳${discountedPrice(tier)} / ${tenureLabel(tier)}` : undefined}>
       <div className="space-y-5">
         {/* Pay-to details */}
         <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">

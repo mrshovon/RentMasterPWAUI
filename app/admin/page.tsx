@@ -6,11 +6,14 @@ import {
   Trash2, Mail, CheckCircle2, ShieldOff, ShieldCheck, Inbox, Building2, Eye,
   RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User,
   Wallet, Upload, Image as ImageIcon, X, Check, HardHat, Settings, Wrench,
+  BarChart3, Radio, Smartphone, Globe, TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
+import { cn } from "../../lib/cn";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
 import { toast } from "../../components/toast";
 import { confirmDialog } from "../../components/confirm";
 import { useSessionGuard } from "../../lib/use-session";
+import { usePresenceHeartbeat } from "../../lib/presence";
 import { useTabState } from "../../lib/use-tab";
 import { usePendingAction } from "../../lib/use-pending";
 import {
@@ -18,9 +21,9 @@ import {
   SupportTicket, TicketStatus, TicketCategory, PriorityLevel,
   PasswordResetRecord, ResetMethod, ContactMessage, ContactStatus,
   PaymentSubmission, PaymentSubmissionStatus, PaymentConfig,
-  MaintenanceMode, NoticeScope, AccountProfile,
+  MaintenanceMode, NoticeScope, AccountProfile, AnalyticsSummary, DayCount,
 } from "../../types/api";
-import { formatCurrency, formatDate } from "../../lib/format";
+import { formatCurrency, formatDate, formatDateTime } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { AppSettingsCard } from "../../components/app-settings-card";
@@ -31,6 +34,7 @@ import {
   EmailField, PhoneField,
 } from "../../components/ui";
 import { validateEmail, validatePhone } from "../../lib/validate";
+import { PLAN_ADDONS, AddonKey, addonsOnTier, FREE_TIER_ID } from "../../lib/addons";
 
 const ticketStatusTone: Record<TicketStatus, "slate" | "indigo" | "cyan" | "emerald"> = {
   submitted: "slate", assigned: "indigo", in_progress: "cyan", done: "emerald",
@@ -48,6 +52,7 @@ const ticketPriorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
 
 export default function AdminDashboard() {
   const { session, checkingSession, logout } = useSessionGuard("admin");
+  usePresenceHeartbeat(!checkingSession);
   const { isPending, run } = usePendingAction();
   const [tab, setTab] = useTabState("overview");
   const [loading, setLoading] = useState(true);
@@ -60,6 +65,9 @@ export default function AdminDashboard() {
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [payments, setPayments] = useState<PaymentSubmission[]>([]);
   const [account, setAccount] = useState<AccountProfile | null>(null);
+  // Platform-wide counts for the Overview tiles (tenants + online). The Analytics tab fetches
+  // its own copy with a date range; this one is just the default window.
+  const [stats, setStats] = useState<AnalyticsSummary | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -114,6 +122,18 @@ export default function AdminDashboard() {
     })();
   }, []);
 
+  // Platform totals + who is online, for the Overview tiles. Non-fatal: the tiles fall back
+  // to owner-only figures, and this returns zeroes anyway until ADD_PRESENCE.sql has been run.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data?: unknown } & AnalyticsSummary>(
+          "/api/super-admin/analytics", { role: "admin" });
+        setStats(res);
+      } catch { /* non-fatal */ }
+    })();
+  }, []);
+
   const metrics = {
     total: owners.length,
     active: owners.filter((o) => !o.suspended).length,
@@ -122,10 +142,14 @@ export default function AdminDashboard() {
     openTickets: tickets.filter((t) => t.status !== "done").length,
     newMessages: messages.filter((m) => m.status === "new").length,
     pendingPayments: payments.filter((p) => p.status === "pending").length,
+    // Owners/admins with the app open right now. The Analytics tab reports platform-wide
+    // online counts including tenants; this one is scoped to the accounts in this list.
+    onlineOwners: owners.filter((o) => o.online).length,
   };
 
   const nav: NavItem[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
+    { key: "analytics", label: "Analytics", icon: BarChart3 },
     { key: "owners", label: "Owners", icon: Users, badge: owners.length },
     { key: "subscriptions", label: "Plans", icon: CreditCard },
     { key: "payments", label: "Payments", icon: CircleDollarSign, badge: metrics.pendingPayments },
@@ -160,7 +184,7 @@ export default function AdminDashboard() {
       danger: true,
     }))) return;
     // Mutate + refetch is two round-trips; without a pending state the row just sits there.
-    await run(`owner:${o.id}`, async () => {
+    await run(`owner-suspend:${o.id}`, async () => {
       try {
         await rentMasterFetch(`/api/super-admin/owners/${o.id}`, {
           method: "PATCH", role: "admin", body: JSON.stringify({ action }),
@@ -172,13 +196,27 @@ export default function AdminDashboard() {
   }
 
   async function deleteOwner(o: AdminOwner) {
+    // Deleting an owner now cascades through every property, tenant and invoice they own,
+    // so say how much is about to go. The list payload carries no counts — fetch the detail
+    // first. If that lookup fails, fall back to a generic warning rather than blocking.
+    let scope = "";
+    try {
+      const res = await rentMasterFetch<{ data: AdminOwnerDetail }>(
+        `/api/super-admin/owners/${o.id}`, { role: "admin" });
+      const p = res.data?.propertyCount ?? 0;
+      const t = res.data?.tenantCount ?? 0;
+      if (p || t) {
+        scope = ` This also permanently deletes ${p} propert${p === 1 ? "y" : "ies"} and ${t} tenant${t === 1 ? "" : "s"}, with all their invoices, documents and records.`;
+      }
+    } catch { /* non-fatal — the confirm still warns, just without numbers */ }
+
     if (!(await confirmDialog({
       title: "Delete owner account?",
-      message: `Permanently delete ${o.name || o.email}? This removes their login account and cannot be undone.`,
+      message: `Permanently delete ${o.name || o.email}?${scope} This cannot be undone.`,
       confirmLabel: "Delete",
       danger: true,
     }))) return;
-    await run(`owner:${o.id}`, async () => {
+    await run(`owner-delete:${o.id}`, async () => {
       try {
         await rentMasterFetch(`/api/super-admin/owners/${o.id}`, { method: "DELETE", role: "admin" });
         await refreshOwners();
@@ -243,11 +281,21 @@ export default function AdminDashboard() {
               ? `Signed in as ${account.email} · Super Admin`
               : "Platform-wide owners and subscriptions."}
           />
+          {/* Platform-wide user counts (owners + tenants) come from the analytics endpoint —
+              the owners list alone cannot see tenants. Falls back to the owner-only figures
+              while that request is in flight or if it fails. */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+            <StatCard label="Users online now" accent="emerald" icon={Radio}
+              value={stats ? stats.onlineNow.total : metrics.onlineOwners} />
+            <StatCard label="Total platform users" accent="indigo" icon={Users}
+              value={stats ? stats.totals.allUsers : metrics.total} />
+            <StatCard label="Owner accounts" accent="amber" icon={Building2} value={metrics.total} />
+          </div>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Owner accounts" accent="amber" icon={Users} value={metrics.total} />
             <StatCard label="Active" accent="emerald" icon={CheckCircle2} value={metrics.active} />
             <StatCard label="Suspended" accent="rose" icon={Ban} value={metrics.suspended} />
             <StatCard label="On a plan" accent="indigo" icon={CreditCard} value={metrics.subscribed} />
+            <StatCard label="Tenants" accent="cyan" icon={Users} value={stats ? stats.totals.tenants : "—"} />
           </div>
           <Card className="p-6">
             <h3 className="mb-4 text-sm font-bold text-fg">Recently added owners</h3>
@@ -266,6 +314,8 @@ export default function AdminDashboard() {
           </Card>
         </div>
       )}
+
+      {tab === "analytics" && <AnalyticsTab />}
 
       {tab === "owners" && (
         <OwnersTab
@@ -330,6 +380,325 @@ export default function AdminDashboard() {
   );
 }
 
+/* ============================================================ ANALYTICS TAB */
+
+const RANGE_PRESETS = [
+  { key: "7", label: "7 days" },
+  { key: "30", label: "30 days" },
+  { key: "90", label: "90 days" },
+] as const;
+
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+const daysAgo = (n: number) => isoDay(new Date(Date.now() - n * 86400000));
+
+// Percentage change vs the previous period of equal length. Null when there is no baseline —
+// "+100%" against a zero previous period is noise, not information.
+function pctChange(current: number, previous: number): number | null {
+  if (!previous) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+function DeltaPill({ current, previous }: { current: number; previous: number }) {
+  const pct = pctChange(current, previous);
+  if (pct === null) {
+    return <span className="inline-flex items-center gap-1 text-xs text-faint"><Minus className="h-3 w-3" />no prior data</span>;
+  }
+  const Icon = pct > 0 ? TrendingUp : pct < 0 ? TrendingDown : Minus;
+  const tone = pct > 0 ? "text-success" : pct < 0 ? "text-danger" : "text-subtle";
+  return (
+    <span className={cn("inline-flex items-center gap-1 text-xs font-semibold", tone)}>
+      <Icon className="h-3 w-3" />{pct > 0 ? "+" : ""}{pct}% vs previous
+    </span>
+  );
+}
+
+/**
+ * Daily signups, owners and tenants stacked per day.
+ *
+ * Hand-rolled SVG: there is no chart library in this project and one bar chart does not
+ * justify adding ~50KB of dependency. Two series, so a legend is mandatory (identity is
+ * never carried by colour alone), each bar carries a hover tooltip, and a table view sits
+ * underneath for screen readers and for anyone who needs the actual numbers.
+ */
+function SignupChart({ ownerSeries, tenantSeries }: { ownerSeries: DayCount[]; tenantSeries: DayCount[] }) {
+  const [hover, setHover] = useState<number | null>(null);
+
+  const days = ownerSeries.map((d, i) => ({
+    date: d.date,
+    owners: d.count,
+    tenants: tenantSeries[i]?.count ?? 0,
+    total: d.count + (tenantSeries[i]?.count ?? 0),
+  }));
+  const peak = Math.max(1, ...days.map((d) => d.total));
+  const empty = days.every((d) => d.total === 0);
+
+  // Label every ~7th day so the axis never collides with itself on a 90-day range.
+  const labelEvery = Math.max(1, Math.ceil(days.length / 8));
+
+  return (
+    <Card className="p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-fg">New users per day</h3>
+        {/* Legend — always present for 2+ series. */}
+        <div className="flex items-center gap-4 text-xs font-semibold text-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-chart-1" />Owners
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-chart-2" />Tenants
+          </span>
+        </div>
+      </div>
+
+      {empty ? (
+        <p className="py-10 text-center text-sm text-subtle">No signups in this period.</p>
+      ) : (
+        <>
+          <div className="relative mt-5 overflow-x-auto">
+            <div className="flex h-48 min-w-full items-end gap-[2px]" style={{ minWidth: days.length * 10 }}>
+              {days.map((d, i) => (
+                <div
+                  key={d.date}
+                  className="group relative flex h-full flex-1 cursor-default flex-col justify-end"
+                  style={{ minWidth: 6 }}
+                  onMouseEnter={() => setHover(i)}
+                  onMouseLeave={() => setHover(null)}
+                  onFocus={() => setHover(i)}
+                  onBlur={() => setHover(null)}
+                  tabIndex={0}
+                >
+                  {/* Tenants stack on top of owners; the 2px gap between the two fills is
+                      what keeps the boundary readable without an outline. */}
+                  {d.tenants > 0 && (
+                    <div className="w-full rounded-t bg-chart-2"
+                      style={{ height: `${(d.tenants / peak) * 100}%`, marginBottom: d.owners > 0 ? 2 : 0 }} />
+                  )}
+                  {d.owners > 0 && (
+                    <div className={cn("w-full bg-chart-1", d.tenants > 0 ? "rounded-b" : "rounded-t")}
+                      style={{ height: `${(d.owners / peak) * 100}%` }} />
+                  )}
+                  {/* Zero days still need a hit target, or the tooltip skips them. */}
+                  {d.total === 0 && <div className="h-[2px] w-full rounded bg-line/[0.12]" />}
+
+                  {hover === i && (
+                    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-heading px-2.5 py-1.5 text-xs text-bg shadow-lg">
+                      <div className="font-bold">{formatDate(d.date)}</div>
+                      <div>{d.owners} owner{d.owners === 1 ? "" : "s"}</div>
+                      <div>{d.tenants} tenant{d.tenants === 1 ? "" : "s"}</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex min-w-full gap-[2px]" style={{ minWidth: days.length * 10 }}>
+              {days.map((d, i) => (
+                <div key={d.date} className="flex-1 text-center text-[9px] text-faint" style={{ minWidth: 6 }}>
+                  {i % labelEvery === 0 ? d.date.slice(5) : ""}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Table view: the numbers without relying on colour or hover. Only days with
+              activity, so a 90-day range doesn't produce 90 empty rows. */}
+          <details className="mt-4">
+            <summary className="cursor-pointer text-xs font-semibold text-muted hover:text-fg">
+              View as table
+            </summary>
+            <div className="mt-2 max-h-56 overflow-y-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="text-[10px] uppercase tracking-wider text-muted">
+                  <tr><th className="py-1">Date</th><th className="py-1">Owners</th><th className="py-1">Tenants</th></tr>
+                </thead>
+                <tbody className="divide-y divide-line/[0.04]">
+                  {days.filter((d) => d.total > 0).map((d) => (
+                    <tr key={d.date}>
+                      <td className="py-1 text-fg">{formatDate(d.date)}</td>
+                      <td className="py-1 text-fg">{d.owners}</td>
+                      <td className="py-1 text-fg">{d.tenants}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </>
+      )}
+    </Card>
+  );
+}
+
+function AnalyticsTab() {
+  const [data, setData] = useState<AnalyticsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [preset, setPreset] = useState<string>("30");
+  const [from, setFrom] = useState(daysAgo(29));
+  const [to, setTo] = useState(isoDay(new Date()));
+
+  // Presets drive the two date inputs rather than being a separate mode, so switching to a
+  // preset and then nudging one date is continuous instead of resetting.
+  function applyPreset(key: string) {
+    setPreset(key);
+    setFrom(daysAgo(Number(key) - 1));
+    setTo(isoDay(new Date()));
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await rentMasterFetch<AnalyticsSummary>(
+          `/api/super-admin/analytics?from=${from}&to=${to}`, { role: "admin" });
+        if (!cancelled) setData(res);
+      } catch (e: any) {
+        if (!cancelled) setError(e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [from, to]);
+
+  const online = data?.onlineNow;
+  const web = online?.byPlatform?.web ?? 0;
+  const android = online?.byPlatform?.android ?? 0;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Analytics" subtitle="Platform growth and activity. Compare any two dates." />
+
+      {/* Filters, in one row above the charts. */}
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex gap-1">
+            {RANGE_PRESETS.map((p) => (
+              <button key={p.key} onClick={() => applyPreset(p.key)}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
+                  preset === p.key ? "bg-primary text-btn-ink" : "bg-overlay/[0.04] text-muted hover:text-fg"
+                )}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <Field label="From">
+            <TextInput type="date" value={from} max={to}
+              onChange={(e) => { setFrom(e.target.value); setPreset("custom"); }} />
+          </Field>
+          <Field label="To">
+            <TextInput type="date" value={to} min={from} max={isoDay(new Date())}
+              onChange={(e) => { setTo(e.target.value); setPreset("custom"); }} />
+          </Field>
+        </div>
+      </Card>
+
+      {error && <Alert>{error}</Alert>}
+      {loading && !data ? (
+        <Card className="flex items-center justify-center p-12"><Spinner /></Card>
+      ) : data ? (
+        <>
+          {/* Live figures — "now", not range-dependent. */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard label="Online right now" accent="emerald" icon={Radio} value={online?.total ?? 0} />
+            <StatCard label="Total users" accent="indigo" icon={Users} value={data.totals.allUsers} />
+            <StatCard label="Owners" accent="amber" icon={Building2} value={data.totals.owners} />
+            <StatCard label="Tenants" accent="cyan" icon={Users} value={data.totals.tenants} />
+          </div>
+
+          {/* Range-dependent figures, each against the preceding period of equal length. */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="p-5">
+              <div className="text-xs font-bold uppercase tracking-wider text-muted">New users in range</div>
+              <div className="mt-1 text-3xl font-black text-heading">{data.newUsers.total}</div>
+              <div className="mt-1"><DeltaPill current={data.newUsers.total} previous={data.newUsers.previousTotal} /></div>
+              <div className="mt-2 text-xs text-subtle">
+                {data.newUsers.owners} owner{data.newUsers.owners === 1 ? "" : "s"} · {data.newUsers.tenants} tenant{data.newUsers.tenants === 1 ? "" : "s"}
+              </div>
+            </Card>
+            <Card className="p-5">
+              <div className="text-xs font-bold uppercase tracking-wider text-muted">Active users in range</div>
+              <div className="mt-1 text-3xl font-black text-heading">{data.activeUsers.current}</div>
+              <div className="mt-1"><DeltaPill current={data.activeUsers.current} previous={data.activeUsers.previous} /></div>
+              <div className="mt-2 text-xs text-subtle">Distinct accounts that opened the app</div>
+            </Card>
+          </div>
+
+          <SignupChart ownerSeries={data.newUsers.ownerSeries} tenantSeries={data.newUsers.tenantSeries} />
+
+          {/* Who is online, split by platform. */}
+          <Card className="p-5">
+            <h3 className="text-sm font-bold text-fg">Online right now, by platform</h3>
+            {(online?.total ?? 0) === 0 ? (
+              <p className="mt-3 text-sm text-subtle">
+                Nobody is online. If this never changes, check that <code className="text-xs">ADD_PRESENCE.sql</code> has been run.
+              </p>
+            ) : (
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between rounded-lg border border-line/[0.06] bg-overlay/[0.02] px-3 py-2">
+                  <span className="flex items-center gap-2 text-sm text-fg"><Globe className="h-4 w-4 text-muted" />Web</span>
+                  <span className="font-black text-heading">{web}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-line/[0.06] bg-overlay/[0.02] px-3 py-2">
+                  <span className="flex items-center gap-2 text-sm text-fg"><Smartphone className="h-4 w-4 text-muted" />Android app</span>
+                  <span className="font-black text-heading">{android}</span>
+                </div>
+              </div>
+            )}
+          </Card>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================ PRESENCE */
+
+// "3 min ago" / "2 days ago". Coarse on purpose — an exact clock time is noise when the
+// question is only ever "recently, or a while back?". Falls back to the absolute date past
+// a week, where a relative figure stops being meaningful.
+function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return "just now";
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days <= 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+  return formatDate(iso);
+}
+
+/**
+ * Online dot, or when the account was last seen.
+ *
+ * `lastSeenAt` comes from the heartbeat and is the real answer. `lastSignInAt` is Supabase's
+ * own field and only moves at login, so it is used only as a fallback for accounts that have
+ * not sent a heartbeat yet (including every account until ADD_PRESENCE.sql has been run).
+ */
+function PresenceCell({ online, lastSeenAt, lastSignInAt }: {
+  online?: boolean; lastSeenAt?: string | null; lastSignInAt?: string | null;
+}) {
+  if (online) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-success">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+        </span>
+        Online
+      </span>
+    );
+  }
+  if (lastSeenAt) return <span className="text-xs text-subtle">Last seen {timeAgo(lastSeenAt)}</span>;
+  if (lastSignInAt) return <span className="text-xs text-subtle">Signed in {timeAgo(lastSignInAt)}</span>;
+  return <span className="text-xs text-faint">Never seen</span>;
+}
+
 /* ============================================================ OWNERS TAB */
 function OwnersTab({
   owners, onAdd, onView, onToggleSuspend, onDelete, isPending,
@@ -367,6 +736,7 @@ function OwnersTab({
                 <tr>
                   <th className="p-4">Owner</th>
                   <th className="p-4">Role</th>
+                  <th className="p-4">Presence</th>
                   <th className="p-4">Status</th>
                   <th className="p-4">Plan</th>
                   <th className="p-4 text-right">Actions</th>
@@ -380,6 +750,7 @@ function OwnersTab({
                       <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {o.email}</div>
                     </td>
                     <td className="p-4"><Badge tone={o.role === "admin" ? "amber" : "slate"}>{o.role}</Badge></td>
+                    <td className="p-4"><PresenceCell online={o.online} lastSeenAt={o.last_seen_at} lastSignInAt={o.last_sign_in_at} /></td>
                     <td className="p-4">
                       <div className="flex flex-wrap gap-1">
                         <Badge tone={o.suspended ? "rose" : "emerald"}>{o.suspended ? "Suspended" : "Active"}</Badge>
@@ -394,11 +765,13 @@ function OwnersTab({
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-1">
                         <IconBtn title="View / manage" tone="indigo" icon={Eye} onClick={() => onView(o.id)} />
+                        {/* Distinct pending keys per action — both used to be `owner:${id}`,
+                            so starting either one showed a spinner on both buttons. */}
                         <IconBtn title={o.suspended ? "Reactivate" : "Suspend"} tone={o.suspended ? "emerald" : "amber"}
                           icon={o.suspended ? RotateCcw : Ban} onClick={() => onToggleSuspend(o)}
-                          loading={isPending(`owner:${o.id}`)} />
+                          loading={isPending(`owner-suspend:${o.id}`)} />
                         <IconBtn title="Delete" tone="rose" icon={Trash2} onClick={() => onDelete(o)}
-                          loading={isPending(`owner:${o.id}`)} />
+                          loading={isPending(`owner-delete:${o.id}`)} />
                       </div>
                     </td>
                   </tr>
@@ -1181,6 +1554,18 @@ function discountedPrice(t: SubscriptionTier) {
   return d > 0 ? Number(t.price) * (1 - d / 100) : Number(t.price);
 }
 
+// How long a plan runs, for the "৳500 /month" suffix. A 'days' plan states its own length;
+// 'custom' is the enterprise contact tier and has no billing period to show.
+function tenureLabel(t: SubscriptionTier) {
+  if (t.billing_interval === "days") {
+    const n = Number(t.duration_days || 0);
+    return n === 1 ? "day" : `${n} days`;
+  }
+  if (t.billing_interval === "year") return "year";
+  if (t.billing_interval === "month") return "month";
+  return t.billing_interval;
+}
+
 // Which plan new self-signed-up owners land on. Empty => free (no history row). Non-custom only.
 function DefaultSignupPlanCard({ tiers }: { tiers: SubscriptionTier[] }) {
   const [tierId, setTierId] = useState("");
@@ -1284,11 +1669,19 @@ function PlansTab({
                         ) : (
                           <span className="text-lg font-black text-warning">{formatCurrency(t.price)}</span>
                         )}
-                        <span className="text-xs text-subtle">/{t.billing_interval}</span>
+                        <span className="text-xs text-subtle">/{tenureLabel(t)}</span>
                       </>
                     )}
                   </div>
                 </div>
+                {/* Modules bundled with this plan — everyone on it gets them with no individual grant. */}
+                {addonsOnTier(t).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {PLAN_ADDONS.filter((a) => addonsOnTier(t).includes(a.key)).map((a) => (
+                      <Badge key={a.key} tone="cyan">{a.label}</Badge>
+                    ))}
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(t)} className="flex-1">Edit</Button>
                   <Button size="sm" variant="secondary" icon={Power} onClick={() => onToggle(t)} className="flex-1"
@@ -1308,16 +1701,32 @@ function PlansTab({
 }
 
 /* ============================================================ TIER MODAL */
+
+// Icons live here rather than in lib/addons.ts so that file stays free of presentation imports.
+const ADDON_ICONS: Record<AddonKey, React.ReactNode> = {
+  staff: <HardHat className="h-4 w-4 text-subtle" />,
+  accounts: <Wallet className="h-4 w-4 text-subtle" />,
+};
+
 function TierModal({
   state, onClose, onSaved,
 }: {
   state: { mode: "create" | "edit"; tier?: SubscriptionTier } | null;
   onClose: () => void; onSaved: () => void;
 }) {
-  const empty = { id: "", name: "", description: "", price: "0", billing_interval: "month", maxProperties: "-1", maxTenants: "-1", discountPercent: "0" };
+  const empty = { id: "", name: "", description: "", price: "0", billing_interval: "month", durationDays: "7", maxProperties: "-1", maxTenants: "-1", discountPercent: "0" };
   const [form, setForm] = useState(empty);
+  const [addons, setAddons] = useState<AddonKey[]>([]);
+  // UI-only master switch: there is no "allows add-ons" column, and none is needed — the plan
+  // simply bundles zero modules. Kept as its own bit of state so unticking it doesn't lose the
+  // selection while the admin is still deciding.
+  const [addonsOn, setAddonsOn] = useState(false);
   const [saving, setSaving] = useState(false);
   const isEdit = state?.mode === "edit";
+  const isCustomDays = form.billing_interval === "days";
+  // The Free baseline doubles as the fallback for owners with no plan at all, so it can never
+  // bundle a paid module. The API rejects it too — this just explains why up front.
+  const editingFreeTier = (isEdit ? state?.tier?.id : form.id.trim().toLowerCase()) === FREE_TIER_ID;
 
   useEffect(() => {
     if (!state) return;
@@ -1326,26 +1735,66 @@ function TierModal({
       setForm({
         id: t.id, name: t.name, description: t.description || "",
         price: String(t.price), billing_interval: t.billing_interval,
+        durationDays: String(t.duration_days ?? 7),
         maxProperties: String(t.max_properties_allowed), maxTenants: String(t.max_tenants_allowed),
         discountPercent: String(t.discount_percent ?? 0),
       });
-    } else setForm(empty);
+      const current = addonsOnTier(t);
+      setAddons(current);
+      setAddonsOn(current.length > 0);
+    } else {
+      setForm(empty);
+      setAddons([]);
+      setAddonsOn(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
+  const toggleAddon = (key: AddonKey) =>
+    setAddons((xs) => (xs.includes(key) ? xs.filter((k) => k !== key) : [...xs, key]));
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    try {
-      setSaving(true);
+    if (isCustomDays && !(Number(form.durationDays) > 0)) {
+      toast.error("Enter how many days a custom-length plan runs for.");
+      return;
+    }
+    // Master switch off (or the Free tier) means the plan bundles nothing, whatever is ticked.
+    const selectedAddons = addonsOn && !editingFreeTier ? addons : [];
+
+    const send = (confirmAddonRemoval = false) => {
       const payload = {
         name: form.name, description: form.description, price: form.price,
-        billing_interval: form.billing_interval, maxProperties: form.maxProperties,
+        billing_interval: form.billing_interval,
+        // The server clears duration_days for any non-'days' interval, so sending it
+        // unconditionally is safe and keeps the payload shape stable.
+        durationDays: isCustomDays ? form.durationDays : null,
+        maxProperties: form.maxProperties,
         maxTenants: form.maxTenants, discountPercent: form.discountPercent,
+        addons: selectedAddons,
+        ...(confirmAddonRemoval ? { confirmAddonRemoval: true } : {}),
       };
-      if (isEdit && state?.tier) {
-        await rentMasterFetch(`/api/super-admin/tiers/${state.tier.id}`, { method: "PATCH", role: "admin", body: JSON.stringify(payload) });
-      } else {
-        await rentMasterFetch("/api/super-admin/tiers", { method: "POST", role: "admin", body: JSON.stringify({ ...payload, id: form.id }) });
+      return isEdit && state?.tier
+        ? rentMasterFetch(`/api/super-admin/tiers/${state.tier.id}`, { method: "PATCH", role: "admin", body: JSON.stringify(payload) })
+        : rentMasterFetch("/api/super-admin/tiers", { method: "POST", role: "admin", body: JSON.stringify({ ...payload, id: form.id }) });
+    };
+
+    try {
+      setSaving(true);
+      try {
+        await send();
+      } catch (e: any) {
+        // Taking a module off a plan removes it from everyone on that plan straight away, so
+        // the server refuses once and tells us who loses access. Confirm, then repeat.
+        if (e?.code !== "ADDON_REMOVAL_AFFECTS_OWNERS") throw e;
+        const proceed = await confirmDialog({
+          title: "Remove module access?",
+          message: `${e.message} They keep access only if you have granted them the module individually.`,
+          confirmLabel: "Remove anyway",
+          danger: true,
+        });
+        if (!proceed) return;
+        await send(true);
       }
       onSaved(); onClose();
       toast.success(isEdit ? "Plan updated." : "Plan created.");
@@ -1376,10 +1825,17 @@ function TierModal({
             <Select value={form.billing_interval} onChange={(e) => setForm({ ...form, billing_interval: e.target.value })}>
               <option value="month">Monthly</option>
               <option value="year">Yearly</option>
-              <option value="custom">Custom (Contact us)</option>
+              <option value="days">Custom length (days)</option>
+              <option value="custom">Contact us (enterprise)</option>
             </Select>
           </Field>
         </div>
+        {isCustomDays && (
+          <Field label="Plan length (days)" required hint="e.g. 7 for a one-week plan. The plan expires this many days after it is activated.">
+            <TextInput required type="number" min="1" max="3650" value={form.durationDays}
+              onChange={(e) => setForm({ ...form, durationDays: e.target.value })} />
+          </Field>
+        )}
         <div className="grid grid-cols-2 gap-4">
           <Field label="Max properties" hint="-1 = unlimited">
             <TextInput type="number" value={form.maxProperties} onChange={(e) => setForm({ ...form, maxProperties: e.target.value })} />
@@ -1391,6 +1847,50 @@ function TierModal({
         <Field label="Discount (%)" hint="Applied to the displayed price when > 0.">
           <TextInput type="number" min="0" max="100" value={form.discountPercent} onChange={(e) => setForm({ ...form, discountPercent: e.target.value })} />
         </Field>
+
+        {/* Add-on modules bundled with this plan. Anyone on the plan gets them straight away,
+            with no per-owner grant needed. */}
+        <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+          {editingFreeTier ? (
+            <div className="text-sm text-muted">
+              <div className="font-semibold text-fg">Add-on modules</div>
+              <p className="mt-1 text-xs">
+                The Free plan can&apos;t include paid modules — it&apos;s also what owners with no plan
+                fall back to, so anything bundled here would reach all of them. Grant modules to
+                individual owners from their account page instead.
+              </p>
+            </div>
+          ) : (
+            <>
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-fg">
+                <input type="checkbox" checked={addonsOn}
+                  onChange={(e) => setAddonsOn(e.target.checked)}
+                  className="h-4 w-4 accent-[rgb(var(--primary))]" />
+                This plan includes add-on modules
+              </label>
+              <p className="mt-1 text-xs text-subtle">
+                Owners on this plan get these without needing an individual grant.
+              </p>
+              {addonsOn && (
+                <div className="mt-3 space-y-2 border-t border-line/[0.06] pt-3">
+                  {PLAN_ADDONS.map((a) => (
+                    <label key={a.key} className="flex cursor-pointer items-center gap-2 text-sm text-fg">
+                      <input type="checkbox" checked={addons.includes(a.key)}
+                        onChange={() => toggleAddon(a.key)}
+                        className="h-4 w-4 accent-[rgb(var(--primary))]" />
+                      {ADDON_ICONS[a.key]}
+                      {a.label}
+                    </label>
+                  ))}
+                  {addons.length === 0 && (
+                    <p className="text-xs text-warning">Pick at least one module, or untick the box above.</p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
         <Button type="submit" loading={saving} className="w-full">{isEdit ? "Save changes" : "Create plan"}</Button>
       </form>
     </Modal>
@@ -1404,8 +1904,91 @@ function AdminSettingsTab() {
       <PageHeader title="Settings" subtitle="Platform controls and this device's preferences." />
       <OwnerProfileCard />
       <MaintenanceCard />
+      <AnalyticsConfigCard />
+      {/* NB: AppSettingsCard is this DEVICE's push/update preferences — despite the name it
+          has nothing to do with the app_settings table the two cards above write to. */}
       <AppSettingsCard />
     </div>
+  );
+}
+
+/**
+ * Google Analytics wiring, so the IDs can be changed without a redeploy. The public
+ * /api/app/analytics-config route serves these to every client, and components/analytics-gate.tsx
+ * loads the Google tag when a surface is enabled.
+ *
+ * IDs only — there is deliberately no "paste your snippet" box. Arbitrary script stored here
+ * would be injected into every page of the app for whoever holds the admin account.
+ */
+function AnalyticsConfigCard() {
+  const [ga, setGa] = useState("");
+  const [gtm, setGtm] = useState("");
+  const [web, setWeb] = useState(false);
+  const [app, setApp] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: {
+          gaMeasurementId: string; gtmContainerId: string; enabledWeb: boolean; enabledApp: boolean;
+        } }>("/api/super-admin/analytics-config", { role: "admin" });
+        setGa(res.data.gaMeasurementId || "");
+        setGtm(res.data.gtmContainerId || "");
+        setWeb(!!res.data.enabledWeb);
+        setApp(!!res.data.enabledApp);
+      } catch { /* leave the defaults — the form still saves */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ message: string }>("/api/super-admin/analytics-config", {
+        method: "PUT", role: "admin",
+        body: JSON.stringify({ gaMeasurementId: ga, gtmContainerId: gtm, enabledWeb: web, enabledApp: app }),
+      });
+      toast.success(res.message);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  if (loading) return <Card className="flex items-center justify-center p-8"><Spinner /></Card>;
+
+  return (
+    <Card className="p-6">
+      <h3 className="text-sm font-bold text-fg">Google Analytics</h3>
+      <p className="mt-1 text-xs text-subtle">
+        Paste the IDs from your Google Analytics or Tag Manager account. Changes apply on the
+        next page load — no redeploy needed.
+      </p>
+      <form onSubmit={save} className="mt-4 max-w-lg space-y-4">
+        <Field label="GA4 measurement ID" hint="Looks like G-XXXXXXXXXX. Leave blank to turn GA4 off.">
+          <TextInput value={ga} placeholder="G-XXXXXXXXXX"
+            onChange={(e) => setGa(e.target.value.toUpperCase())} />
+        </Field>
+        <Field label="Tag Manager container ID" hint="Looks like GTM-XXXXXXX. Optional.">
+          <TextInput value={gtm} placeholder="GTM-XXXXXXX"
+            onChange={(e) => setGtm(e.target.value.toUpperCase())} />
+        </Field>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm text-fg">
+            <input type="checkbox" checked={web} onChange={(e) => setWeb(e.target.checked)}
+              className="h-4 w-4 accent-[rgb(var(--primary))]" />
+            Track the website / installed PWA
+          </label>
+          <label className="flex items-center gap-2 text-sm text-fg">
+            <input type="checkbox" checked={app} onChange={(e) => setApp(e.target.checked)}
+              className="h-4 w-4 accent-[rgb(var(--primary))]" />
+            Track inside the Android app
+          </label>
+        </div>
+        <Button type="submit" loading={saving} icon={BarChart3}>Save analytics settings</Button>
+      </form>
+    </Card>
   );
 }
 
@@ -1532,7 +2115,141 @@ const CIRCULATE_AUDIENCES: { scope: NoticeScope; label: string; hint: string }[]
   { scope: "individual_owner", label: "A specific owner", hint: "one owner account" },
 ];
 
+type CirculateMode = "notice" | "welcome";
+
+function CirculateModeSwitch({ mode, onChange }: { mode: CirculateMode; onChange: (m: CirculateMode) => void }) {
+  const tabs: { key: CirculateMode; label: string; hint: string }[] = [
+    { key: "notice", label: "One-off notice", hint: "Announce something to a chosen audience" },
+    { key: "welcome", label: "Welcome new users", hint: "Greet people who joined recently" },
+  ];
+  return (
+    <div className="flex flex-wrap gap-2">
+      {tabs.map((t) => (
+        <button key={t.key} onClick={() => onChange(t.key)} title={t.hint}
+          className={cn(
+            "rounded-xl px-4 py-2 text-sm font-semibold transition",
+            mode === t.key ? "bg-primary text-btn-ink" : "bg-overlay/[0.04] text-muted hover:text-fg"
+          )}>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Welcome broadcast. Manual only — the admin sends it when they choose; there is no cron.
+ *
+ * Every send is recorded server-side, so already-welcomed people are skipped and pressing
+ * Send twice does not double-message anyone. The count is fetched as a dry run first, so the
+ * blast radius is visible on the button before anything goes out.
+ */
+function WelcomePanel() {
+  const AUDIENCES = [
+    { key: "both", label: "New owners and tenants" },
+    { key: "new_owners", label: "New owners only" },
+    { key: "new_tenants", label: "New tenants only" },
+  ];
+  const WINDOWS = [
+    { key: "7", label: "Joined in the last 7 days" },
+    { key: "30", label: "Joined in the last 30 days" },
+    { key: "0", label: "Anyone never welcomed" },
+  ];
+
+  const [audience, setAudience] = useState("both");
+  const [days, setDays] = useState("7");
+  const [title, setTitle] = useState("Welcome to Bari360 👋");
+  const [content, setContent] = useState("");
+  const [preview, setPreview] = useState<{ count: number; dedupeAvailable: boolean } | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [sending, setSending] = useState(false);
+
+  // Dry run whenever the audience changes, so the button always states the real reach.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setChecking(true);
+        const res = await rentMasterFetch<{ count: number; dedupeAvailable: boolean }>(
+          `/api/super-admin/welcome?audience=${audience}&days=${days}`, { role: "admin" });
+        if (!cancelled) setPreview({ count: res.count, dedupeAvailable: res.dedupeAvailable });
+      } catch {
+        if (!cancelled) setPreview(null);
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [audience, days]);
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    if (!(await confirmDialog({
+      title: "Send welcome message?",
+      message: `This sends an in-app notice and a push notification to ${preview?.count ?? 0} user${preview?.count === 1 ? "" : "s"}.`,
+      confirmLabel: "Send",
+    }))) return;
+    try {
+      setSending(true);
+      const res = await rentMasterFetch<{ message: string }>("/api/super-admin/welcome", {
+        method: "POST", role: "admin",
+        body: JSON.stringify({ title, content, audience, days: Number(days) }),
+      });
+      toast.success(res.message);
+      setContent("");
+      setPreview((p) => (p ? { ...p, count: 0 } : p));
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSending(false); }
+  }
+
+  const count = preview?.count ?? 0;
+
+  return (
+    <Card className="max-w-2xl p-6">
+      <form onSubmit={send} className="space-y-4">
+        <Field label="Who to welcome" required>
+          <Select value={audience} onChange={(e) => setAudience(e.target.value)}>
+            {AUDIENCES.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+          </Select>
+        </Field>
+        <Field label="How recently they joined" required
+          hint="People who have already been welcomed are always skipped, so sending again is safe.">
+          <Select value={days} onChange={(e) => setDays(e.target.value)}>
+            {WINDOWS.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
+          </Select>
+        </Field>
+
+        {preview && !preview.dedupeAvailable && (
+          <Alert>
+            The welcome log table is missing, so already-welcomed users cannot be skipped and a
+            second send would message people twice. Run <code>ADD_PRESENCE.sql</code> first.
+          </Alert>
+        )}
+
+        <Field label="Title" required>
+          <TextInput required value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+        <Field label="Message" required>
+          <TextArea required rows={5} placeholder="Write the welcome message…"
+            value={content} onChange={(e) => setContent(e.target.value)} />
+        </Field>
+
+        <Button type="submit" loading={sending} icon={Megaphone} className="w-full"
+          disabled={checking || count === 0}>
+          {checking ? "Checking who's new…"
+            : count === 0 ? "Nobody new to welcome"
+            : `Send welcome to ${count} user${count === 1 ? "" : "s"}`}
+        </Button>
+        <p className="text-center text-xs text-subtle">
+          Sends an in-app notice and a push notification.
+        </p>
+      </form>
+    </Card>
+  );
+}
+
 function CirculateTab({ owners }: { owners: AdminOwner[] }) {
+  const [mode, setMode] = useState<CirculateMode>("notice");
   const [form, setForm] = useState<{
     scope: NoticeScope; targetOwnerId: string; title: string; content: string;
   }>({ scope: "everyone", targetOwnerId: "", title: "", content: "" });
@@ -1572,9 +2289,20 @@ function CirculateTab({ owners }: { owners: AdminOwner[] }) {
     finally { setSaving(false); }
   }
 
+  if (mode === "welcome") {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Circulate" subtitle="Broadcast an announcement, or welcome the people who just joined." />
+        <CirculateModeSwitch mode={mode} onChange={setMode} />
+        <WelcomePanel />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Circulate notice" subtitle="Broadcast an announcement and choose who receives it." />
+      <PageHeader title="Circulate" subtitle="Broadcast an announcement, or welcome the people who just joined." />
+      <CirculateModeSwitch mode={mode} onChange={setMode} />
       {sentTo && (
         <Alert>
           Notice circulated to {sentTo}.{" "}
@@ -1729,7 +2457,9 @@ function OwnerDetailModal({
       const tier = tiers.find((t) => t.id === tierId);
       await rentMasterFetch("/api/super-admin/subscriptions", {
         method: "POST", role: "admin",
-        body: JSON.stringify({ ownerId, tierId, amountPaid: tier ? discountedPrice(tier) : 0, durationDays: 30 }),
+        // No durationDays: the server derives the tenure from the tier itself. This used to
+        // hardcode 30, so assigning a yearly plan gave the owner a month.
+        body: JSON.stringify({ ownerId, tierId, amountPaid: tier ? discountedPrice(tier) : 0 }),
       });
       await load();
       onChanged();
@@ -1757,6 +2487,48 @@ function OwnerDetailModal({
             <MiniStat icon={Users} label="Tenants" value={detail.tenantCount} />
           </div>
 
+          {/* Presence. `last_sign_in_at` has been on this payload all along but was never
+              shown anywhere; `online` / devices come from the heartbeat. */}
+          <Section title="Activity">
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted">Status</span>
+                <PresenceCell online={detail.online} lastSeenAt={detail.last_seen_at} lastSignInAt={detail.last_sign_in_at} />
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted">Last signed in</span>
+                <span className="text-fg">
+                  {detail.last_sign_in_at ? formatDateTime(detail.last_sign_in_at) : "Never"}
+                </span>
+              </div>
+              {detail.devices && detail.devices.length > 0 ? (
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-xs font-bold uppercase tracking-wider text-muted">
+                    Devices ({detail.devices.length})
+                  </div>
+                  {detail.devices.map((d) => (
+                    <div key={d.deviceId}
+                      className="flex items-center justify-between rounded-lg border border-line/[0.06] bg-overlay/[0.02] px-3 py-2">
+                      <span className="flex items-center gap-2 text-xs font-semibold text-fg">
+                        {d.platform === "android"
+                          ? <Smartphone className="h-3.5 w-3.5 text-success" />
+                          : <Globe className="h-3.5 w-3.5 text-muted" />}
+                        {d.platform === "android" ? "Android app" : "Web browser"}
+                      </span>
+                      <span className="text-xs text-subtle">
+                        {d.online ? "Online now" : timeAgo(d.lastSeenAt)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="pt-1 text-xs text-faint">
+                  No device activity recorded yet. (Requires ADD_PRESENCE.sql.)
+                </p>
+              )}
+            </div>
+          </Section>
+
           {/* Edit details */}
           <Section title="Details">
             <div className="grid grid-cols-2 gap-3">
@@ -1776,7 +2548,11 @@ function OwnerDetailModal({
               <div className="flex items-center justify-between rounded-lg border border-line/[0.06] bg-overlay/[0.02] px-3 py-2 text-sm">
                 <span className="text-fg">
                   {detail.subscription.subscription_tiers?.name || detail.subscription.tier_id}
-                  <span className="ml-2 text-xs text-subtle">exp {detail.subscription.expiry_date ? formatDate(detail.subscription.expiry_date) : "—"}</span>
+                  {/* A null expiry means a perpetual (free) plan — it is no longer written as a
+                      far-future sentinel date, which is what used to render as "2126". */}
+                  <span className="ml-2 text-xs text-subtle">
+                    {detail.subscription.expiry_date ? `exp ${formatDate(detail.subscription.expiry_date)}` : "never expires"}
+                  </span>
                 </span>
                 <Button size="sm" variant="danger" loading={busy} onClick={() => patch({ action: "cancel_subscription" })}>Cancel</Button>
               </div>
@@ -1868,7 +2644,15 @@ function OwnerDetailModal({
                 {detail.permissions_revoked ? "Grant permissions" : "Revoke permissions"}
               </Button>
               <Button size="sm" variant="danger" icon={Trash2} loading={busy}
-                onClick={async () => { if (await confirmDialog({ title: "Delete account?", message: "Delete this account permanently? This cannot be undone.", confirmLabel: "Delete", danger: true })) deleteThis(); }}>
+                onClick={async () => {
+                  // The counts are already on `detail` here — spell out the blast radius,
+                  // since deleting an owner cascades through everything they own.
+                  const p = detail.propertyCount ?? 0, t = detail.tenantCount ?? 0;
+                  const scope = (p || t)
+                    ? ` This also permanently deletes ${p} propert${p === 1 ? "y" : "ies"} and ${t} tenant${t === 1 ? "" : "s"}, with all their invoices, documents and records.`
+                    : "";
+                  if (await confirmDialog({ title: "Delete account?", message: `Delete this account permanently?${scope} This cannot be undone.`, confirmLabel: "Delete", danger: true })) deleteThis();
+                }}>
                 Delete account
               </Button>
             </div>

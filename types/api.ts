@@ -240,7 +240,11 @@ export interface SubscriptionTier {
   description: string | null;
   price: number;
   currency: string;
+  // 'month' | 'year' | 'days' (custom tenure) | 'custom' (enterprise "Contact us" tier).
+  // 'days' and 'custom' are deliberately different values — see ADD_PLAN_TENURE.sql.
   billing_interval: string;
+  // Tenure in days when billing_interval === 'days'; null otherwise.
+  duration_days?: number | null;
   max_properties_allowed: number;
   max_tenants_allowed: number;
   is_active?: boolean;
@@ -313,11 +317,27 @@ export interface AdminOwner {
   suspended: boolean;
   permissions_revoked: boolean;
   subscription: OwnerSubscription | null;
+  // Presence, from the client heartbeat (lib/presence.ts). `online` means the app is open
+  // right now (seen in the last 5 minutes) — distinct from `last_sign_in_at`, which only
+  // moves at login. Both are null/false until ADD_PRESENCE.sql has been run.
+  online?: boolean;
+  last_seen_at?: string | null;
+}
+
+// One device an account has been seen on.
+export interface PresenceDevice {
+  deviceId: string;
+  platform: string | null;
+  userAgent: string | null;
+  lastSeenAt: string;
+  firstSeenAt: string;
+  online: boolean;
 }
 
 export interface AdminOwnerDetail extends AdminOwner {
   propertyCount: number;
   tenantCount: number;
+  devices?: PresenceDevice[];
   // Staff module access. `staff_included_in_plan` wins — when it's true the per-owner
   // grant is moot and the admin toggle is disabled.
   staff_addon: boolean;
@@ -525,4 +545,32 @@ export interface ApiEnvelope<T> {
   count?: number;
   error?: string;
   message?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Admin analytics (GET /api/super-admin/analytics)
+// ---------------------------------------------------------------------------
+
+export interface DayCount {
+  date: string;   // YYYY-MM-DD
+  count: number;
+}
+
+export interface AnalyticsSummary {
+  range: { from: string; to: string };
+  previousRange: { from: string; to: string };
+  totals: { owners: number; admins: number; tenants: number; allUsers: number };
+  // Users seen in the last 5 minutes. `byPlatform` counts a user under each platform they
+  // are currently active on, so its sum can exceed `total`.
+  onlineNow: { total: number; byRole: Record<string, number>; byPlatform: Record<string, number> };
+  activeUsers: { current: number; previous: number; byRole: Record<string, number> };
+  // "New users" = signups. There is no anonymous-visitor tracking in the platform.
+  newUsers: {
+    owners: number;
+    tenants: number;
+    total: number;
+    previousTotal: number;
+    ownerSeries: DayCount[];
+    tenantSeries: DayCount[];
+  };
 }

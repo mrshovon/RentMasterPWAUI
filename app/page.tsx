@@ -165,9 +165,9 @@ export default function EntryGatewayPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-faint">Bari360 · v{APP_VERSION}</span>
-            <DownloadAndroid variant="link" />
+            <DownloadAndroid variant="icon" />
           </div>
         </div>
 
@@ -291,9 +291,9 @@ export default function EntryGatewayPage() {
               )}
             </div>
 
-            {/* Mobile download link (the brand panel with its link is desktop-only). Browser-only. */}
+            {/* Mobile download affordance (the brand panel's is desktop-only). Browser-only. */}
             <div className="flex justify-center lg:hidden">
-              <DownloadAndroid variant="link" />
+              <DownloadAndroid variant="icon" />
             </div>
           </div>
         </div>
