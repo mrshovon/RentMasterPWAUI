@@ -908,6 +908,11 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                   <div className="text-base font-black text-heading">{tier.name}</div>
                   {isCurrent ? <Badge tone="indigo">Current</Badge> : contact ? <Badge tone="cyan">Custom</Badge> : null}
                 </div>
+                {/* A hidden plan only ever reaches this list as the owner's OWN plan (the server
+                    filters the rest out), so say why nobody else is offered it. */}
+                {tier.is_public === false && (
+                  <p className="mt-1 text-xs text-subtle">Arranged for your account — not publicly listed.</p>
+                )}
                 <div className="mt-1 text-2xl font-black text-heading">
                   {contact ? "Contact us" : tier.price > 0 ? formatCurrency(discountedPrice(tier)) : "Free"}
                   {!contact && tier.price > 0 && <span className="text-sm font-medium text-muted"> / {tenureLabel(tier)}</span>}

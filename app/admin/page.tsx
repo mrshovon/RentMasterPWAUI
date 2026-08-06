@@ -6,7 +6,7 @@ import {
   Trash2, Mail, CheckCircle2, ShieldOff, ShieldCheck, Inbox, Building2, Eye,
   RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User,
   Wallet, Upload, Image as ImageIcon, X, Check, HardHat, Settings, Wrench,
-  BarChart3, Radio, Smartphone, Globe, TrendingUp, TrendingDown, Minus,
+  BarChart3, Radio, Smartphone, Globe, TrendingUp, TrendingDown, Minus, EyeOff,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
@@ -1636,14 +1636,17 @@ function PlansTab({
             .sort((a, b) => (a.billing_interval === "custom" ? 1 : 0) - (b.billing_interval === "custom" ? 1 : 0) || Number(a.price) - Number(b.price))
             .map((t) => {
             const inactive = t.is_active === false;
+            const hidden = t.is_public === false;
             const disc = Number(t.discount_percent || 0);
             const isContact = t.billing_interval === "custom";
             return (
               <Card key={t.id} className={`flex flex-col gap-3 p-5 ${inactive ? "opacity-60" : ""}`}>
                 <div className="flex items-start justify-between">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/10 text-warning"><CreditCard className="h-5 w-5" /></div>
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap justify-end gap-1">
                     {disc > 0 && <Badge tone="emerald"><Percent className="mr-0.5 inline h-3 w-3" />{disc}% off</Badge>}
+                    {/* Hidden is orthogonal to Inactive — a plan can be live but unlisted. */}
+                    {hidden && <Badge tone="amber"><EyeOff className="mr-0.5 inline h-3 w-3" />Hidden</Badge>}
                     <Badge tone={inactive ? "rose" : "slate"}>{inactive ? "Inactive" : "Active"}</Badge>
                   </div>
                 </div>
@@ -1716,6 +1719,8 @@ function TierModal({
 }) {
   const empty = { id: "", name: "", description: "", price: "0", billing_interval: "month", durationDays: "7", maxProperties: "-1", maxTenants: "-1", discountPercent: "0" };
   const [form, setForm] = useState(empty);
+  // Listed to owners by default. Unticking keeps the plan fully usable but assign-only.
+  const [isPublic, setIsPublic] = useState(true);
   const [addons, setAddons] = useState<AddonKey[]>([]);
   // UI-only master switch: there is no "allows add-ons" column, and none is needed — the plan
   // simply bundles zero modules. Kept as its own bit of state so unticking it doesn't lose the
@@ -1742,10 +1747,12 @@ function TierModal({
       const current = addonsOnTier(t);
       setAddons(current);
       setAddonsOn(current.length > 0);
+      setIsPublic(t.is_public !== false);
     } else {
       setForm(empty);
       setAddons([]);
       setAddonsOn(false);
+      setIsPublic(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
@@ -1771,6 +1778,7 @@ function TierModal({
         durationDays: isCustomDays ? form.durationDays : null,
         maxProperties: form.maxProperties,
         maxTenants: form.maxTenants, discountPercent: form.discountPercent,
+        isPublic,
         addons: selectedAddons,
         ...(confirmAddonRemoval ? { confirmAddonRemoval: true } : {}),
       };
@@ -1847,6 +1855,21 @@ function TierModal({
         <Field label="Discount (%)" hint="Applied to the displayed price when > 0.">
           <TextInput type="number" min="0" max="100" value={form.discountPercent} onChange={(e) => setForm({ ...form, discountPercent: e.target.value })} />
         </Field>
+
+        {/* Who can get this plan. Distinct from Deactivate, which retires it for everyone. */}
+        <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-fg">
+            <input type="checkbox" checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              className="h-4 w-4 accent-[rgb(var(--primary))]" />
+            List this plan to owners
+          </label>
+          <p className="mt-1 text-xs text-subtle">
+            {isPublic
+              ? "Owners can see this plan and choose it themselves."
+              : "Hidden: owners can't see or choose this plan — you assign it from their account page. Anyone already on it keeps seeing it so they can renew."}
+          </p>
+        </div>
 
         {/* Add-on modules bundled with this plan. Anyone on the plan gets them straight away,
             with no per-owner grant needed. */}

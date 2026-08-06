@@ -248,6 +248,10 @@ export interface SubscriptionTier {
   max_properties_allowed: number;
   max_tenants_allowed: number;
   is_active?: boolean;
+  // False = hidden: not listed to owners and not self-selectable, but still admin-assignable,
+  // and still visible to an owner already on it so they can renew. Distinct from is_active,
+  // which retires a plan for everyone. Absent on databases predating ADD_PLAN_VISIBILITY.sql.
+  is_public?: boolean;
   discount_percent?: number;
   // Whether this tier bundles the Staff module (true on the Whole Building / 'custom' tiers).
   staff_included?: boolean;
