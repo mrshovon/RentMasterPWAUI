@@ -12,6 +12,8 @@
 // request: see requireToken() below.
 // =============================================================================
 
+import { reportClientError } from "./client-log";
+
 export const BACKEND_API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
@@ -25,11 +27,57 @@ interface FetchOptions extends RequestInit {
 export class ApiError extends Error {
   status: number;
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /**
+   * The backend's correlation id for this failure (`req_7f3k9q`). Present on 5xx, where the
+   * message is deliberately generic and the real detail lives in app_logs under this id — so
+   * quoting it to support is the only way back to what actually went wrong.
+   */
+  requestId?: string;
+  constructor(message: string, status: number, code?: string, requestId?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.requestId = requestId;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// ENTITLEMENT INVALIDATION
+//
+// The server is always right about a plan — the token carries no plan claims, so every request is
+// evaluated against current state. The client is the part that goes stale: `plan` is fetched once
+// into React state and, until this existed, never refetched. An owner whose plan lapsed, or whose
+// add-on an admin revoked, kept the UI perks for the rest of the session while every write
+// silently 403'd underneath.
+//
+// These codes ARE the invalidation signal. If the server just refused a write on entitlement
+// grounds, the UI's copy of the plan is provably out of date, and the cheapest possible correction
+// is to refetch it right then. No polling interval catches this as fast, because the user pressing
+// the button is the event.
+//
+// A module-level pub/sub rather than an import of the hook: lib/use-plan.ts imports THIS file, so
+// calling into it from here would be a cycle.
+// -----------------------------------------------------------------------------
+const ENTITLEMENT_CODES = new Set([
+  "SUBSCRIPTION_LOCKED",
+  "ITEM_DISABLED",
+  "LIMIT_REACHED",
+  "FEATURE_NOT_ENABLED",
+]);
+
+type EntitlementListener = (code: string) => void;
+const entitlementListeners = new Set<EntitlementListener>();
+
+/** Subscribe to "the server says your entitlements changed". Returns an unsubscribe function. */
+export function onEntitlementChange(fn: EntitlementListener): () => void {
+  entitlementListeners.add(fn);
+  return () => entitlementListeners.delete(fn);
+}
+
+function notifyEntitlementChange(code: string): void {
+  for (const fn of entitlementListeners) {
+    try { fn(code); } catch { /* a bad listener must not break the fetch that found this */ }
   }
 }
 
@@ -339,10 +387,18 @@ export async function rentMasterFetch<T = any>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+
+      // The server refused on entitlement grounds ⇒ our copy of the plan is stale. Tell whoever
+      // holds it to refetch, before the error is thrown and the caller turns it into a toast.
+      if (errorData.code && ENTITLEMENT_CODES.has(errorData.code)) {
+        notifyEntitlementChange(errorData.code);
+      }
+
       throw new ApiError(
         errorData.error || `Request failed (${response.status}) — ${endpoint}`,
         response.status,
-        errorData.code
+        errorData.code,
+        errorData.requestId
       );
     }
 
@@ -357,6 +413,23 @@ export async function rentMasterFetch<T = any>(
     // Optional-chained: a thrown null would otherwise throw again here, inside the catch,
     // and the caller's toast would never fire at all.
     console.error(`[API] ${endpoint} —`, error?.message);
+
+    // Tee it into app_logs — but only what a log can actually help with.
+    //
+    // 401 is skipped: it is the ordinary end of a session, already handled above by signing the
+    // user out, and logging it would bury the real failures under routine expiry. A 5xx already
+    // wrote its own row server-side, so what is recorded here is the CLIENT's view of it — which
+    // is worth having, because it carries the route, the viewport and whether the browser thought
+    // it was online, none of which the server can see.
+    if (error?.status !== 401) {
+      reportClientError(error, {
+        route: endpoint,
+        status: error?.status,
+        code: error?.code,
+        requestId: error?.requestId,
+        extra: { kind: "fetch" },
+      });
+    }
     throw error;
   }
 }

@@ -289,6 +289,23 @@ export interface PlanState {
   limits: { maxProperties: number; maxTenants: number };
   permissionsRevoked: boolean;
   lockReason: "expired" | "revoked" | null;
+  /**
+   * Set when a paid plan ran out and the owner has been dropped to Free — null the rest of the
+   * time, including during grace. Note the shape this implies: a downgraded owner has
+   * `status: "active"` on `free_tier`, because they genuinely can work again, just within the
+   * free limits. Check this field, not `status`, to know a plan ended.
+   */
+  downgradedFrom: { tierId: string; tierName: string; endedAt: string | null } | null;
+}
+
+/** A lifecycle transition the owner has not acknowledged yet. Drives the one-time modal. */
+export type PlanEventKind = "expiring_soon" | "grace_started" | "downgraded";
+
+export interface PendingPlanEvent {
+  id: string;
+  event: PlanEventKind;
+  tierName: string | null;
+  endedAt: string | null;
 }
 
 export interface PlanUsage {
@@ -311,6 +328,7 @@ export interface FeatureMap {
 export interface SubscriptionResponse {
   success: boolean;
   subscription: PlanState;
+  pendingEvent: PendingPlanEvent | null;
   usage: PlanUsage;
   disabled: { propertyIds: string[]; tenantIds: string[] };
   availableTiers: SubscriptionTier[];
@@ -494,6 +512,43 @@ export interface PasswordResetRecord {
   // Attached by the admin queue endpoint (owners/admins are auth users, not a table).
   owner?: { name: string | null; email: string | null } | null;
   actor?: { name: string | null; email: string | null } | null;
+}
+
+// ---- Application log (admin-only diagnostic view) ----
+export type LogLevel = "error" | "warn" | "info";
+export type LogSource = "api" | "client" | "cron" | "email" | "push";
+
+export interface LogRecord {
+  id: string;
+  log_no: number;
+  level: LogLevel;
+  source: LogSource;
+  route: string | null;
+  method: string | null;
+  status: number | null;
+  code: string | null;
+  message: string;
+  /** Stack trace or raw provider error. Can be long — the table shows it on row expand. */
+  detail: string | null;
+  /** The reference shown to the user, e.g. "req_7f3k9q". The join key for a support request. */
+  request_id: string | null;
+  user_id: string | null;
+  user_role: string | null;
+  /** Snapshot taken at write time — no auth lookup is needed to read the log. */
+  user_email: string | null;
+  ip: string | null;
+  user_agent: string | null;
+  context: Record<string, unknown> | null;
+  created_at: string;
+}
+
+/** Keyset-paginated envelope from /api/super-admin/logs. `nextBefore` is the cursor. */
+export interface LogsResponse {
+  success: boolean;
+  count: number;
+  hasMore: boolean;
+  nextBefore: string | null;
+  data: LogRecord[];
 }
 
 // ---- Contact-us messages (owner -> system admin, from the custom plan card) ----

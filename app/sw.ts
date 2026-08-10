@@ -18,6 +18,15 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
+// API GETs whose answer must never come from a cache, however briefly.
+//
+// The runtime cache below is network-first with a 5-second timeout, which is right for invoices
+// and tenants: on a slow train, last-known data beats a spinner. It is wrong for entitlements.
+// A cached /api/admin/subscription would re-grant a plan that has just ended — silently
+// re-enabling paid tabs the app had already locked, which is the exact bug the whole plan-refresh
+// path exists to prevent. Better to show nothing than to show a stale yes.
+const NEVER_CACHE = ["/api/admin/subscription", "/api/logs", "/api/app/maintenance"];
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
@@ -28,7 +37,9 @@ const serwist = new Serwist({
     // online, but the last successful response is served when offline.
     {
       matcher: ({ url, request }) =>
-        request.method === "GET" && url.pathname.startsWith("/api/"),
+        request.method === "GET" &&
+        url.pathname.startsWith("/api/") &&
+        !NEVER_CACHE.some((p) => url.pathname.startsWith(p)),
       handler: new NetworkFirst({
         cacheName: "rentmaster-api-get",
         networkTimeoutSeconds: 5,

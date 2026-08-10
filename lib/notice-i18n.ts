@@ -30,6 +30,25 @@ const TEMPLATES: { re: RegExp; en: string }[] = [
     re: /^(.+) marked the rent for (.+) \(৳(.+)\) as sent\. Please verify the payment and confirm receipt\.$/,
     en: "{0} marked the rent for {1} (৳{2}) as sent. Please verify the payment and confirm receipt.",
   },
+  // ---- subscription lifecycle (rent-master-pwa/app/api/cron/subscriptions/route.ts) ----
+  // Keep these character-identical to messageFor() in that route. The titles need nothing here —
+  // they are fixed strings and resolve through the exact-match path — but every body interpolates
+  // a tier name, a day count or the free limits, so none of them can be a dictionary key.
+  {
+    // "Your Premium plan expires in 7 days. Renew now to keep everything as it is."
+    re: /^Your (.+) plan expires in (\d+) days?\. Renew now to keep everything as it is\.$/,
+    en: "Your {0} plan expires in {1} days. Renew now to keep everything as it is.",
+  },
+  {
+    // "Your Premium plan has expired. You have 6 days left to renew before…"
+    re: /^Your (.+) plan has expired\. You have (\d+) days? left to renew before your account moves to the free plan\.$/,
+    en: "Your {0} plan has expired. You have {1} days left to renew before your account moves to the free plan.",
+  },
+  {
+    // "Your Premium plan has ended and you are now on the free plan — 2 properties and 2 tenants…"
+    re: /^Your (.+) plan has ended and you are now on the free plan — (\d+) propert(?:y|ies) and (\d+) tenants?\. Nothing has been deleted; anything beyond those limits is view-only until you choose a plan\.$/,
+    en: "Your {0} plan has ended and you are now on the free plan — {1} properties and {2} tenants. Nothing has been deleted; anything beyond those limits is view-only until you choose a plan.",
+  },
 ];
 
 /**

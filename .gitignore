@@ -43,3 +43,6 @@ android/key.properties
 android/.gradle/
 android/local.properties
 android/app/release/
+
+# Verification builds (npm run build:check) — kept out of the dev server's .next
+.next-build

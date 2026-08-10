@@ -15,6 +15,7 @@ import {
   PageHeader, EmptyState, SearchInput, Spinner, ContactIcon, PhoneField,
 } from "./ui";
 import { validatePhone } from "../lib/validate";
+import { useT } from "../lib/i18n";
 
 // =============================================================================
 // STAFF — owner module (paid add-on).
@@ -217,6 +218,7 @@ export function StaffTab({
 /* ---------------------------------------------------------------- locked state */
 
 function StaffLocked({ onContact }: { onContact: () => void }) {
+  const t = useT();
   return (
     <div className="space-y-6">
       <PageHeader title="Staff" subtitle="Manage the people who work on your properties." />
@@ -226,7 +228,7 @@ function StaffLocked({ onContact }: { onContact: () => void }) {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-line/[0.08] bg-overlay/[0.03] text-warning">
             <Crown className="h-6 w-6" />
           </div>
-          <h2 className="text-xl font-extrabold tracking-tight text-heading">Staff is an add-on</h2>
+          <h2 className="text-xl font-extrabold tracking-tight text-heading">{t("Staff is an add-on")}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
             Keep a record of every caretaker, guard and cleaner you employ — their salary, the
             property they cover, and every payment you make them.
@@ -247,7 +249,7 @@ function StaffLocked({ onContact }: { onContact: () => void }) {
             ))}
           </ul>
           <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm text-muted">
-            Included with the <span className="font-semibold text-fg">Whole Building</span> plan,
+            Included with the <span className="font-semibold text-fg">{t("Whole Building")}</span> plan,
             or available as a paid add-on to your current plan.
           </div>
           <Button icon={ContactIcon} className="w-full" onClick={onContact}>
@@ -385,6 +387,7 @@ function StaffModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [designation, setDesignation] = useState("");
@@ -469,8 +472,9 @@ function StaffModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Role">
             <Select value={designation} onChange={(e) => setDesignation(e.target.value)}>
-              <option value="">Select a role…</option>
-              {DESIGNATIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+              <option value="">{t("Select a role…")}</option>
+              {/* Value stays English: it is what is stored on the staff row. */}
+              {DESIGNATIONS.map((d) => <option key={d} value={d}>{t(d)}</option>)}
             </Select>
           </Field>
           <Field label="Monthly salary" hint="The agreed figure. Payments are logged separately.">
@@ -484,7 +488,7 @@ function StaffModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Property" hint="Leave blank if they cover everything.">
             <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
-              <option value="">No property assigned</option>
+              <option value="">{t("No property assigned")}</option>
               {properties.map((p) => (
                 <option key={p.id} value={p.id}>{p.name} · {p.flat_no}</option>
               ))}
@@ -505,10 +509,10 @@ function StaffModal({
         </div>
 
         <Field label="Address">
-          <TextArea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Where they live" />
+          <TextArea rows={2} value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("Where they live")} />
         </Field>
         <Field label="Notes">
-          <TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything worth remembering" />
+          <TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("Anything worth remembering")} />
         </Field>
 
         <Button type="submit" loading={saving} icon={editing ? Pencil : Plus} className="w-full">
@@ -577,6 +581,7 @@ function LogPaymentModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const t = useT();
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState(todayStr());
   const [method, setMethod] = useState<StaffPaymentMethod>("cash");
@@ -625,7 +630,7 @@ function LogPaymentModal({
         <Field label="Method">
           <Select value={method} onChange={(e) => setMethod(e.target.value as StaffPaymentMethod)}>
             {(Object.keys(METHOD_LABEL) as StaffPaymentMethod[]).map((m) => (
-              <option key={m} value={m}>{METHOD_LABEL[m]}</option>
+              <option key={m} value={m}>{t(METHOD_LABEL[m])}</option>
             ))}
           </Select>
         </Field>
@@ -651,6 +656,7 @@ function PaymentHistoryModal({
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState<string | null>(null);
   const total = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
@@ -678,7 +684,7 @@ function PaymentHistoryModal({
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-4 py-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-muted">Total paid</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-muted">{t("Total paid")}</span>
             <span className="text-lg font-extrabold text-success">{formatCurrency(total)}</span>
           </div>
           {payments.map((p) => (
@@ -688,7 +694,7 @@ function PaymentHistoryModal({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs text-subtle">#{p.payment_no}</span>
                   <span className="text-sm font-bold text-heading">{formatCurrency(p.amount)}</span>
-                  <Badge tone="slate">{METHOD_LABEL[p.method] ?? p.method}</Badge>
+                  <Badge tone="slate">{t(METHOD_LABEL[p.method] ?? p.method)}</Badge>
                 </div>
                 <div className="mt-0.5 text-xs text-muted">
                   {formatDate(p.paid_on)}{p.note ? ` · ${p.note}` : ""}

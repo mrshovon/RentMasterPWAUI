@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, CreditCard, Wrench, Bell, Plus, TriangleAlert,
   Megaphone, ReceiptText, CircleDollarSign, Send, Upload, X, CheckCircle2,
@@ -15,6 +15,7 @@ import { ReceiptModal } from "../../components/receipt-modal";
 import { useSessionGuard } from "../../lib/use-session";
 import { usePresenceHeartbeat } from "../../lib/presence";
 import { useTabState } from "../../lib/use-tab";
+import { useRevalidateOnFocus } from "../../lib/use-revalidate";
 import { BillingLedger, BillingPayment, MaintenanceLog, Notice, PaymentStatus, PriorityLevel, TenantProfile, Document, ServiceChargeBreakdown, RentRevision } from "../../types/api";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
@@ -66,11 +67,13 @@ export default function TenantDashboard() {
   const [payments, setPayments] = useState<BillingPayment[]>([]);
   const [receipt, setReceipt] = useState<{ html: string; fileName: string } | null>(null);
 
-  useEffect(() => {
+  // `first` blanks the screen with a spinner; a background revalidation must not, or returning to
+  // the tab would flash an empty dashboard over data that is already correct.
+  const loadAll = useCallback(async (first = false) => {
     if (!tenantId) return; // wait for the real session — never fetch with a placeholder identity
-    (async () => {
+    {
       try {
-        setLoading(true);
+        if (first) setLoading(true);
         setError(""); // a stale failure must not outlive the request that caused it
         const [b, m, n, p, bp] = await Promise.allSettled([
           rentMasterFetch(`/api/admin/billing/tenant/${tenantId}`, { role: "tenant" }),
@@ -106,8 +109,18 @@ export default function TenantDashboard() {
       } finally {
         setLoading(false);
       }
-    })();
+    }
+    // `logout` is stable (it only ever calls location.replace); binding it would rebuild this on
+    // every render and restart the effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
+
+  useEffect(() => { void loadAll(true); }, [loadAll]);
+
+  // A tenant opens this app to see whether their rent was marked received. Loading once per mount
+  // meant the answer stayed whatever it had been when they first opened it, so coming back to the
+  // tab showed the same stale invoice. 30s-throttled.
+  useRevalidateOnFocus(() => { void loadAll(); });
 
   // Load the property's service charge component breakdown once we know the property.
   const propertyIdForCharges = profile?.property?.id;
@@ -178,7 +191,7 @@ export default function TenantDashboard() {
   // Build a "Tenant Copy" receipt for a paid invoice and open the preview.
   function openTenantReceipt(l: BillingLedger) {
     const html = buildReceiptHtml({
-      copyLabel: "Tenant Copy",
+      copyLabel: t("Tenant Copy"),
       // Matches the owner's copy: a property can carry its own name for receipts.
       ownerName: profile?.property?.receipt_name || profile?.owner?.name || "Owner",
       propertyAddress: profile?.property?.address || null,
@@ -299,8 +312,8 @@ export default function TenantDashboard() {
                   <table className="w-full min-w-[560px] text-left text-sm">
                     <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                       <tr>
-                        <th className="p-4">{t("Month")}</th><th className="p-4">Rent</th>
-                        <th className="p-4">{t("Service + Extra")}</th><th className="p-4">Total</th><th className="p-4">{t("Status")}</th>
+                        <th className="p-4">{t("Month")}</th><th className="p-4">{t("Rent")}</th>
+                        <th className="p-4">{t("Service + Extra")}</th><th className="p-4">{t("Total")}</th><th className="p-4">{t("Status")}</th>
                         <th className="p-4 text-right">{t("Payment")}</th>
                       </tr>
                     </thead>
@@ -403,7 +416,7 @@ export default function TenantDashboard() {
                   <AttachmentStrip raw={m.attachment_file_url} />
                   {m.resolution_remarks && (
                     <div className="rounded-lg border border-line/[0.06] bg-overlay/[0.03] px-3 py-2 text-xs text-fg">
-                      <span className="font-semibold text-muted">Owner update: </span>{m.resolution_remarks}
+                      <span className="font-semibold text-muted">{t("Owner update:")}</span>{m.resolution_remarks}
                     </div>
                   )}
                   <div className="flex items-center gap-2 border-t border-line/[0.06] pt-3 text-xs text-subtle">
@@ -731,18 +744,19 @@ function RentHistoryModal({
   revisions: RentRevision[];
   currentRent?: number;
 }) {
+  const t = useT();
   const lang = useLang();
   return (
     <Modal open={open} onClose={onClose} title="Rent revision history"
       subtitle="Every change to your rent, most recent first.">
       {typeof currentRent === "number" && (
         <div className="mb-4 flex items-center justify-between rounded-xl border border-line/[0.06] bg-overlay/[0.03] px-4 py-3">
-          <span className="text-sm font-semibold text-fg">Current rent</span>
+          <span className="text-sm font-semibold text-fg">{t("Current rent")}</span>
           <span className="text-lg font-black text-success">{formatCurrency(currentRent)}</span>
         </div>
       )}
       {revisions.length === 0 ? (
-        <p className="text-sm text-muted">No rent revisions yet — your rent has stayed the same since you moved in.</p>
+        <p className="text-sm text-muted">{t("No rent revisions yet — your rent has stayed the same since you moved in.")}</p>
       ) : (
         <div className="space-y-2">
           {revisions.map((r) => {
@@ -771,6 +785,7 @@ function RentHistoryModal({
 function BillPaymentAction({
   ledger, onSend,
 }: { ledger: BillingLedger; onSend: (id: string) => void }) {
+  const t = useT();
   if (ledger.payment_status === "paid") {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-semibold text-success">
@@ -779,7 +794,7 @@ function BillPaymentAction({
     );
   }
   if (ledger.payment_status === "sent") {
-    return <span className="text-xs text-warning">Awaiting owner confirmation</span>;
+    return <span className="text-xs text-warning">{t("Awaiting owner confirmation")}</span>;
   }
   // Partly paid: the owner has confirmed some of it, so "I've sent it" would be misleading —
   // what the tenant needs to see is what's left.
@@ -803,6 +818,7 @@ function TicketModal({
   open: boolean; onClose: () => void; propertyId?: string; tenantId?: string;
   onCreated: (m: MaintenanceLog) => void;
 }) {
+  const t = useT();
   const empty = { issueTitle: "", issueDescription: "", priorityLevel: "medium" };
   const [form, setForm] = useState(empty);
   const [items, setItems] = useState<{ file: File; preview: string; key: string }[]>([]);
@@ -863,15 +879,15 @@ function TicketModal({
             onChange={(e) => setForm({ ...form, issueTitle: e.target.value })} />
         </Field>
         <Field label="Description" required>
-          <TextArea required rows={4} placeholder="Describe the problem in detail…" value={form.issueDescription}
+          <TextArea required rows={4} placeholder={t("Describe the problem in detail…")} value={form.issueDescription}
             onChange={(e) => setForm({ ...form, issueDescription: e.target.value })} />
         </Field>
         <Field label="Priority">
           <Select value={form.priorityLevel} onChange={(e) => setForm({ ...form, priorityLevel: e.target.value })}>
-            <option value="low">Low — standard wear</option>
-            <option value="medium">Medium — needs attention</option>
-            <option value="high">High — damaging</option>
-            <option value="urgent">Urgent — critical failure</option>
+            <option value="low">{t("Low — standard wear")}</option>
+            <option value="medium">{t("Medium — needs attention")}</option>
+            <option value="high">{t("High — damaging")}</option>
+            <option value="urgent">{t("Urgent — critical failure")}</option>
           </Select>
         </Field>
         <Field label="Photos of the issue" hint="Attach one or more images (max 8MB each).">

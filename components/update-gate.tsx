@@ -6,6 +6,7 @@ import { Modal, Button } from "./ui";
 import { toast } from "./toast";
 import { isNativeApp } from "../lib/platform";
 import { checkForUpdate, startUpgrade, type ReleaseInfo } from "../lib/updates";
+import { useT } from "../lib/i18n";
 
 // Mounted once at the app root (next to Toaster/ConfirmHost). Inside the native app it checks
 // GitHub Releases for a newer version and, if found, shows a popup with the changelog as
@@ -35,6 +36,7 @@ function parseNotes(notes: string): { bullets: string[]; paragraphs: string[] } 
 }
 
 export function UpdateGate() {
+  const t = useT();
   const [release, setRelease] = useState<ReleaseInfo | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -121,7 +123,7 @@ export function UpdateGate() {
               ))}
             </ul>
           )}
-          {bullets.length === 0 && paragraphs.length === 0 && <p>Bug fixes and improvements.</p>}
+          {bullets.length === 0 && paragraphs.length === 0 && <p>{t("Bug fixes and improvements.")}</p>}
         </div>
 
         {busy && (

@@ -6,6 +6,7 @@ import { Modal, Button } from "./ui";
 import { BACKEND_API_BASE, getStoredSession } from "../lib/api-service";
 import { hardSignOut } from "../lib/use-session";
 import { formatDateTime } from "../lib/format";
+import { useT } from "../lib/i18n";
 
 // =============================================================================
 // Maintenance gate — mounted once at the app root (next to Toaster/ConfirmHost/UpdateGate).
@@ -37,6 +38,7 @@ const DEFAULT_MESSAGE =
   "Please try again after the window below.";
 
 export function MaintenanceGate() {
+  const t = useT();
   const [mode, setMode] = useState<MaintenanceMode | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [lastCheck, setLastCheck] = useState(0);
@@ -126,7 +128,9 @@ export function MaintenanceGate() {
       <div className="space-y-5">
         <div className="flex items-start gap-3 rounded-xl border border-warning/25 bg-warning/10 p-4">
           <Wrench className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
-          <p className="text-sm leading-relaxed text-fg">{mode.message || DEFAULT_MESSAGE}</p>
+          {/* The admin's own message is prose they typed and is not ours to rewrite; only our
+              own fallback has a dictionary entry. Same rule as lib/notice-i18n.ts. */}
+          <p className="text-sm leading-relaxed text-fg">{t(mode.message || DEFAULT_MESSAGE)}</p>
         </div>
 
         {window_ && (

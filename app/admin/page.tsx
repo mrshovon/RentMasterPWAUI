@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, CreditCard, Megaphone, Plus, Ban, KeyRound,
   Trash2, Mail, CheckCircle2, ShieldOff, ShieldCheck, Inbox, Building2, Eye,
   RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User,
   Wallet, Upload, Image as ImageIcon, X, Check, HardHat, Settings, Wrench,
   BarChart3, Radio, Smartphone, Globe, TrendingUp, TrendingDown, Minus, EyeOff,
+  ScrollText, ChevronDown, ChevronRight, RefreshCw,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
@@ -16,12 +17,14 @@ import { useSessionGuard } from "../../lib/use-session";
 import { usePresenceHeartbeat } from "../../lib/presence";
 import { useTabState } from "../../lib/use-tab";
 import { usePendingAction } from "../../lib/use-pending";
+import { useRevalidateOnFocus } from "../../lib/use-revalidate";
 import {
   AdminOwner, AdminOwnerDetail, SubscriptionTier,
   SupportTicket, TicketStatus, TicketCategory, PriorityLevel,
   PasswordResetRecord, ResetMethod, ContactMessage, ContactStatus,
   PaymentSubmission, PaymentSubmissionStatus, PaymentConfig,
   MaintenanceMode, NoticeScope, AccountProfile, AnalyticsSummary, DayCount,
+  LogRecord, LogLevel, LogSource, LogsResponse,
 } from "../../types/api";
 import { formatCurrency, formatDate, formatDateTime } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
@@ -85,10 +88,11 @@ export default function AdminDashboard() {
     setTiers(res.data || []);
   }
 
-  useEffect(() => {
-    (async () => {
+  // `first` blanks the screen with a spinner; a background revalidation must not.
+  const loadAll = useCallback(async (first = false) => {
+    {
       try {
-        setLoading(true);
+        if (first) setLoading(true);
         const [o, t, s, r, c, p] = await Promise.allSettled([
           rentMasterFetch("/api/super-admin/owners", { role: "admin" }),
           rentMasterFetch("/api/super-admin/tiers", { role: "admin" }),
@@ -108,8 +112,15 @@ export default function AdminDashboard() {
       } finally {
         setLoading(false);
       }
-    })();
+    }
   }, []);
+
+  useEffect(() => { void loadAll(true); }, [loadAll]);
+
+  // The admin console is a queue: pending payments, new messages, open tickets. Loading once per
+  // mount meant the badge counts were as old as the tab, which for a console someone leaves open
+  // all day is the whole working session. 30s-throttled.
+  useRevalidateOnFocus(() => { void loadAll(); });
 
   // The signed-in account, for the "Signed in as …" line on the overview. The stored session
   // carries a name but no email, so this is the only source for it.
@@ -158,6 +169,7 @@ export default function AdminDashboard() {
     { key: "tickets", label: "Tickets", icon: LifeBuoy, badge: metrics.openTickets },
     { key: "messages", label: "Messages", icon: Mail, badge: metrics.newMessages },
     { key: "reset-log", label: "Reset log", icon: KeyRound },
+    { key: "logs", label: "Logs", icon: ScrollText },
     { key: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -350,6 +362,10 @@ export default function AdminDashboard() {
       {tab === "messages" && <MessagesTab messages={messages} onOpen={setActiveMessage} />}
 
       {tab === "reset-log" && <ResetLogTab resets={resets} />}
+
+      {/* Fetches on open rather than with the dashboard's other lists: the log is the one table
+          that grows without bound, so it must never be pulled just because someone signed in. */}
+      {tab === "logs" && <LogsTab />}
 
       {tab === "settings" && <AdminSettingsTab />}
 
@@ -1548,6 +1564,234 @@ function ResetLogTab({ resets }: { resets: PasswordResetRecord[] }) {
   );
 }
 
+/* ============================================================ APPLICATION LOG TAB */
+const LOG_LEVEL_TONE: Record<LogLevel, "rose" | "amber" | "slate"> = {
+  error: "rose", warn: "amber", info: "slate",
+};
+const LOG_SOURCE_LABEL: Record<LogSource, string> = {
+  api: "API", client: "Browser", cron: "Scheduled job", email: "Email", push: "Push",
+};
+
+const LEVEL_FILTERS: { key: string; label: string }[] = [
+  { key: "", label: "All levels" },
+  { key: "error", label: "Errors" },
+  { key: "warn", label: "Warnings" },
+  { key: "info", label: "Info" },
+];
+const SOURCE_FILTERS: { key: string; label: string }[] = [
+  { key: "", label: "All sources" },
+  { key: "api", label: "API" },
+  { key: "client", label: "Browser" },
+  { key: "cron", label: "Scheduled job" },
+  { key: "email", label: "Email" },
+  { key: "push", label: "Push" },
+];
+
+/**
+ * The diagnostic trail behind every error a user sees. Support flow: they quote the reference
+ * from their screen ("req_7f3k9q"), you paste it into the search box, you get the stack.
+ *
+ * Filtering and paging are done by the SERVER here, unlike every other admin tab. Those fetch the
+ * whole table and filter in the browser, which is fine for a few hundred owners and wrong for a
+ * table that gains a row every time anything fails. Paging is keyset (`before=<created_at>`)
+ * rather than offset, because this list grows at its head while you are reading it.
+ */
+function LogsTab() {
+  const [rows, setRows] = useState<LogRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [level, setLevel] = useState("");
+  const [source, setSource] = useState("");
+  const [query, setQuery] = useState("");
+  // Applied search, separate from the input, so typing does not fire a request per keystroke.
+  const [applied, setApplied] = useState("");
+  const [nextBefore, setNextBefore] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  async function load(cursor: string | null = null) {
+    const params = new URLSearchParams();
+    if (level) params.set("level", level);
+    if (source) params.set("source", source);
+    if (applied) params.set("q", applied);
+    if (cursor) params.set("before", cursor);
+
+    try {
+      cursor ? setLoadingMore(true) : setLoading(true);
+      setError(null);
+      const res = await rentMasterFetch<LogsResponse>(
+        `/api/super-admin/logs?${params.toString()}`,
+        { role: "admin" },
+      );
+      setRows((prev) => (cursor ? [...prev, ...res.data] : res.data));
+      setHasMore(res.hasMore);
+      setNextBefore(res.nextBefore);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }
+
+  // Re-runs whenever a filter or the APPLIED search changes; `query` alone does not trigger it.
+  useEffect(() => { void load(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [level, source, applied]);
+
+  async function purge() {
+    const ok = await confirmDialog({
+      title: "Clear old log entries?",
+      message: "Everything older than 30 days will be permanently deleted. Recent entries are kept.",
+      confirmLabel: "Clear old entries",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const res = await rentMasterFetch<{ message: string }>(
+        "/api/super-admin/logs?olderThanDays=30",
+        { method: "DELETE", role: "admin" },
+      );
+      toast.success(res.message);
+      void load(null);
+    } catch (e: any) { toast.error(e.message); }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Logs"
+        subtitle="Every error the app has recorded, newest first. Search a reference to find the user's exact failure."
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-[220px] flex-1">
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder="Search message, route, email or reference…"
+          />
+        </div>
+        <select
+          value={level}
+          onChange={(e) => setLevel(e.target.value)}
+          className="rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-fg"
+        >
+          {LEVEL_FILTERS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+        </select>
+        <select
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          className="rounded-xl border border-line bg-surface px-3 py-2.5 text-sm text-fg"
+        >
+          {SOURCE_FILTERS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+        </select>
+        <Button variant="ghost" icon={RefreshCw} onClick={() => setApplied(query.trim())}>
+          Search
+        </Button>
+        <Button variant="ghost" icon={Trash2} onClick={purge}>Clear 30d+</Button>
+      </div>
+
+      {error && <Alert>{error}</Alert>}
+
+      {loading ? (
+        <Card className="flex items-center justify-center p-12"><Spinner /></Card>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          icon={ScrollText}
+          title="Nothing logged"
+          hint="Errors will appear here as they happen. An empty log is good news."
+        />
+      ) : (
+        <>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
+                  <tr>
+                    <th className="p-4 w-8"></th>
+                    <th className="p-4">#</th>
+                    <th className="p-4">Level</th>
+                    <th className="p-4">Source</th>
+                    <th className="p-4">What happened</th>
+                    <th className="p-4">Who</th>
+                    <th className="p-4">When</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line/[0.04]">
+                  {rows.map((r) => (
+                    <Fragment key={r.id}>
+                      <tr
+                        className="cursor-pointer hover:bg-overlay/[0.02]"
+                        onClick={() => setExpanded(expanded === r.id ? null : r.id)}
+                      >
+                        <td className="p-4 text-muted">
+                          {expanded === r.id
+                            ? <ChevronDown className="h-4 w-4" />
+                            : <ChevronRight className="h-4 w-4" />}
+                        </td>
+                        <td className="p-4 font-mono text-xs text-subtle">#{r.log_no}</td>
+                        <td className="p-4"><Badge tone={LOG_LEVEL_TONE[r.level]}>{r.level}</Badge></td>
+                        <td className="p-4 text-xs text-subtle">{LOG_SOURCE_LABEL[r.source] ?? r.source}</td>
+                        <td className="p-4">
+                          <div className="max-w-[420px] truncate font-medium text-heading">{r.message}</div>
+                          <div className="flex items-center gap-2 text-xs text-subtle">
+                            {r.method && <span className="font-mono">{r.method}</span>}
+                            {r.route && <span className="truncate font-mono">{r.route}</span>}
+                            {r.status != null && <span>· {r.status}</span>}
+                            {r.request_id && <span className="font-mono">· {r.request_id}</span>}
+                          </div>
+                        </td>
+                        <td className="p-4 text-xs text-subtle">
+                          {r.user_email || r.user_id || "—"}
+                          {r.user_role && <div className="text-faint">{r.user_role}</div>}
+                        </td>
+                        <td className="p-4 whitespace-nowrap text-xs text-subtle">{formatDateTime(r.created_at)}</td>
+                      </tr>
+
+                      {expanded === r.id && (
+                        <tr className="bg-overlay/[0.02]">
+                          <td colSpan={7} className="p-4">
+                            <div className="space-y-3">
+                              <div className="text-xs text-subtle">
+                                {r.ip && <span className="mr-4">IP {r.ip}</span>}
+                                {r.code && <span className="mr-4">Code {r.code}</span>}
+                                {r.user_agent && <span className="break-all">{r.user_agent}</span>}
+                              </div>
+                              {r.detail && (
+                                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl bg-bg p-4 font-mono text-[11px] leading-relaxed text-subtle">
+                                  {r.detail}
+                                </pre>
+                              )}
+                              {r.context && Object.keys(r.context).length > 0 && (
+                                <pre className="overflow-auto rounded-xl bg-bg p-4 font-mono text-[11px] text-subtle">
+                                  {JSON.stringify(r.context, null, 2)}
+                                </pre>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {hasMore && (
+            <div className="flex justify-center">
+              <Button variant="ghost" loading={loadingMore} onClick={() => void load(nextBefore)}>
+                Load older entries
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ============================================================ PLANS TAB */
 function discountedPrice(t: SubscriptionTier) {
   const d = Number(t.discount_percent || 0);
@@ -1946,11 +2190,182 @@ function AdminSettingsTab() {
       <PageHeader title="Settings" subtitle="Platform controls and this device's preferences." />
       <OwnerProfileCard />
       <MaintenanceCard />
+      <BrevoConfigCard />
       <AnalyticsConfigCard />
       {/* NB: AppSettingsCard is this DEVICE's push/update preferences — despite the name it
           has nothing to do with the app_settings table the two cards above write to. */}
       <AppSettingsCard />
     </div>
+  );
+}
+
+/**
+ * Brevo transactional email. Connecting an account here is what makes the app send mail at all —
+ * before this it sent none, and password recovery leaned on Supabase's built-in sender.
+ *
+ * THE API KEY IS WRITE-ONLY. The GET route returns `xkeysib-…4f2a` and a boolean, never the key,
+ * so the field below shows a preview as its placeholder and sends "" to mean "leave it alone".
+ * That is the one thing to keep in mind if this card is ever edited: an empty key field is not a
+ * request to clear the key.
+ */
+interface BrevoConfigView {
+  enabled: boolean;
+  senderEmail: string;
+  senderName: string;
+  replyTo: string;
+  hasApiKey: boolean;
+  apiKeyPreview: string;
+  encryptionReady: boolean;
+}
+
+function BrevoConfigCard() {
+  const [cfg, setCfg] = useState<BrevoConfigView | null>(null);
+  const [apiKey, setApiKey] = useState("");     // always starts blank — see above
+  const [senderEmail, setSenderEmail] = useState("");
+  const [senderName, setSenderName] = useState("");
+  const [replyTo, setReplyTo] = useState("");
+  const [enabled, setEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testTo, setTestTo] = useState("");
+
+  function adopt(d: BrevoConfigView) {
+    setCfg(d);
+    setSenderEmail(d.senderEmail || "");
+    setSenderName(d.senderName || "");
+    setReplyTo(d.replyTo || "");
+    setEnabled(!!d.enabled);
+    setApiKey("");
+  }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: BrevoConfigView }>(
+          "/api/super-admin/brevo-config", { role: "admin" });
+        adopt(res.data);
+      } catch { /* leave the defaults — the form still saves */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ data: BrevoConfigView; message: string }>(
+        "/api/super-admin/brevo-config",
+        {
+          method: "PUT", role: "admin",
+          body: JSON.stringify({ apiKey, senderEmail, senderName, replyTo, enabled }),
+        },
+      );
+      adopt(res.data);
+      toast.success(res.message);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function sendTest() {
+    const to = testTo.trim();
+    const parsed = validateEmail(to, { required: true });
+    if (!parsed.ok) { toast.error(parsed.error!); return; }
+    try {
+      setTesting(true);
+      const res = await rentMasterFetch<{ message: string }>(
+        "/api/super-admin/brevo-config",
+        { method: "POST", role: "admin", body: JSON.stringify({ to }) },
+      );
+      toast.success(res.message);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setTesting(false); }
+  }
+
+  if (loading) return <Card className="flex items-center justify-center p-8"><Spinner /></Card>;
+
+  return (
+    <Card className="p-6">
+      <h3 className="text-sm font-bold text-fg">Email (Brevo)</h3>
+      <p className="mt-1 text-xs text-subtle">
+        Connect a Brevo account to send account-creation, password-change and password-reset
+        emails. While this is off, password resets fall back to Supabase's built-in sender and no
+        other email is sent at all.
+      </p>
+
+      {cfg && !cfg.encryptionReady && (
+        <div className="mt-4">
+          <Alert>
+            NID_ENCRYPTION_KEY is not set on the server, so an API key cannot be stored securely.
+            Set it in the backend environment before connecting Brevo.
+          </Alert>
+        </div>
+      )}
+
+      <form onSubmit={save} className="mt-4 max-w-lg space-y-4">
+        <Field
+          label="API key"
+          hint={cfg?.hasApiKey
+            ? "A key is stored. Leave this blank to keep it, or paste a new one to replace it."
+            : "From Brevo → SMTP & API → API keys. Starts with xkeysib-."}
+        >
+          <TextInput
+            type="password"
+            value={apiKey}
+            placeholder={cfg?.hasApiKey ? cfg.apiKeyPreview : "xkeysib-…"}
+            onChange={(e) => setApiKey(e.target.value)}
+            autoComplete="off"
+          />
+        </Field>
+
+        <Field label="Sender email" hint="Must be a verified sender on your Brevo account, or every send is rejected.">
+          <TextInput
+            value={senderEmail}
+            placeholder="no-reply@bari360.space"
+            onChange={(e) => setSenderEmail(e.target.value)}
+          />
+        </Field>
+
+        <Field label="Sender name" hint="The name recipients see in their inbox.">
+          <TextInput value={senderName} placeholder="Bari360" onChange={(e) => setSenderName(e.target.value)} />
+        </Field>
+
+        <Field label="Reply-to address" hint="Optional. Where replies go if it isn't the sender address.">
+          <TextInput value={replyTo} placeholder="support@bari360.space" onChange={(e) => setReplyTo(e.target.value)} />
+        </Field>
+
+        <label className="flex items-center gap-2 text-sm text-fg">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="h-4 w-4 accent-[rgb(var(--primary))]"
+          />
+          Send emails through Brevo
+        </label>
+
+        <Button type="submit" loading={saving} icon={Mail}>Save email settings</Button>
+      </form>
+
+      {cfg?.hasApiKey && (
+        <div className="mt-6 border-t border-line/[0.08] pt-5">
+          <p className="text-xs text-subtle">
+            Send a test message. This is the only way to find out whether your sender address is
+            actually verified — Brevo accepts the settings and rejects the send.
+          </p>
+          <div className="mt-3 flex max-w-lg flex-wrap items-center gap-2">
+            <div className="min-w-[220px] flex-1">
+              <TextInput
+                value={testTo}
+                placeholder="you@example.com"
+                onChange={(e) => setTestTo(e.target.value)}
+              />
+            </div>
+            <Button variant="ghost" loading={testing} onClick={sendTest}>Send test</Button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 

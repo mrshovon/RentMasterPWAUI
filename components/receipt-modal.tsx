@@ -55,7 +55,9 @@ export function ReceiptModal({
         fileName: `${baseName}.png`,
         mimeType: "image/png",
       });
-      toast.success(`Receipt saved to ${where} as ${baseName}.png`);
+      // Interpolated, so it can never be an exact dictionary key. The location word is the
+      // only translatable part; the filename is the user’s own.
+      toast.success(`${t("Receipt saved to")} ${t(where)} — ${baseName}.png`);
     } catch (e: any) {
       toast.error(e?.message || "Could not save the receipt to this device.");
     } finally {

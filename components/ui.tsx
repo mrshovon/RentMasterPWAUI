@@ -11,6 +11,38 @@ import { validateEmail, validatePhone, MAX_EMAIL_LEN } from "../lib/validate";
 // translate it themselves. That is what makes the dashboards translatable without editing every
 // PageHeader/Field/EmptyState call — pages keep passing English, which doubles as the lookup key.
 // Strings with no dictionary entry (all of the admin console) render unchanged.
+//
+// That boundary now also covers PLACEHOLDERS, BUTTON LABELS and BADGE TEXT, which it did not
+// before — and that gap was most of the reason the app still showed English after switching to
+// Bangla. Roughly 40 placeholders and 60 button labels were plain JSX that never reached `t()`,
+// spread across three files of 3,000+ lines each. Translating them here instead of at every call
+// site fixes them all at once AND keeps them fixed: a new `<Button>Save</Button>` written next
+// year is translated without anyone remembering to wrap it.
+//
+// Only STRING children are translated (see `translateChildren`). A button containing an element
+// is passed through untouched, since there is no string to look up.
+
+/**
+ * Translate a component's children when — and only when — they are a bare string.
+ *
+ * `<Button>Add property</Button>` is a string and becomes "সম্পত্তি যোগ করুন".
+ * `<Button><Icon /> {count} left</Button>` is an array and is left exactly as written: the pieces
+ * are not a lookup key, and joining them would produce a key that no dictionary entry could ever
+ * match. Those few cases stay the caller's job.
+ */
+function useTranslatedChildren(children: ReactNode): ReactNode {
+  const t = useT();
+  return typeof children === "string" ? t(children) : children;
+}
+
+/** Placeholder/aria-label translation for the raw input primitives. */
+function useTranslatedInputProps<T extends { placeholder?: string; "aria-label"?: string }>(props: T): T {
+  const t = useT();
+  const next: any = { ...props };
+  if (typeof props.placeholder === "string") next.placeholder = t(props.placeholder);
+  if (typeof props["aria-label"] === "string") next["aria-label"] = t(props["aria-label"]);
+  return next;
+}
 
 // -----------------------------------------------------------------------------
 // Spinner
@@ -67,6 +99,7 @@ export function SearchInput({
   placeholder?: string;
   className?: string;
 }) {
+  const t = useT();
   return (
     <div className={cn("relative w-full sm:max-w-xs", className)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-subtle" />
@@ -74,7 +107,7 @@ export function SearchInput({
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={t(placeholder)}
         className="field-input pl-9 pr-8"
       />
       {value && (
@@ -82,7 +115,7 @@ export function SearchInput({
           type="button"
           onClick={() => onChange("")}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-subtle transition hover:text-fg"
-          aria-label="Clear search"
+          aria-label={t("Clear search")}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -112,6 +145,7 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
+  const label = useTranslatedChildren(children);
   const variants = {
     primary:
       "bg-primary hover:bg-primary/90 text-btn-ink shadow-lg shadow-primary/20 border border-primary/40",
@@ -139,7 +173,7 @@ export function Button({
       {...props}
     >
       {loading ? <Spinner /> : Icon ? <Icon className="h-4 w-4" /> : null}
-      {children}
+      {label}
     </button>
   );
 }
@@ -227,6 +261,7 @@ export function Badge({
   tone?: "slate" | "emerald" | "amber" | "rose" | "indigo" | "cyan";
   className?: string;
 }) {
+  const label = useTranslatedChildren(children);
   const tones = {
     slate: "bg-overlay/[0.06] text-muted border-line/[0.12]",
     emerald: "bg-success/10 text-success border-success/20",
@@ -243,7 +278,7 @@ export function Badge({
         className
       )}
     >
-      {children}
+      {label}
     </span>
   );
 }
@@ -440,7 +475,8 @@ export function Field({
 }
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn("field-input", props.className)} />;
+  const p = useTranslatedInputProps(props);
+  return <input {...p} className={cn("field-input", props.className)} />;
 }
 
 // -----------------------------------------------------------------------------
@@ -587,13 +623,15 @@ export function PasswordInput({
 }
 
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cn("field-input resize-none", props.className)} />;
+  const p = useTranslatedInputProps(props);
+  return <textarea {...p} className={cn("field-input resize-none", props.className)} />;
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
+  const p = useTranslatedInputProps(props);
   return (
     <select
-      {...props}
+      {...p}
       className={cn("field-input appearance-none cursor-pointer", props.className)}
     />
   );

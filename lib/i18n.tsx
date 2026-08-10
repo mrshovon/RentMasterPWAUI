@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { bn } from "./locales/bn";
 
 // =============================================================================
@@ -34,6 +34,19 @@ const DICTIONARIES: Record<Lang, Record<string, string>> = {
   bn,
 };
 
+/**
+ * `t()` for code that is not a React component — the receipt builder and the WhatsApp caption,
+ * which are plain functions that produce a document rather than a tree.
+ *
+ * Same lookup and the same fall-through-to-English behaviour as the hook; it just reads the
+ * module-level `currentLang` mirror instead of the context, exactly as lib/format.ts already
+ * does for month names. Components must still use `useT()`, which re-renders on a language
+ * change; this one is a snapshot taken at the moment it is called.
+ */
+export function translate(text: string, lang: Lang = currentLang): string {
+  return DICTIONARIES[lang][text] ?? text;
+}
+
 interface LanguageContextValue {
   lang: Lang;
   setLang: (next: Lang) => void;
@@ -46,13 +59,25 @@ const LanguageContext = createContext<LanguageContextValue>({
   t: (text) => text,
 });
 
+/**
+ * `useLayoutEffect` on the client, `useEffect` on the server.
+ *
+ * The distinction matters here and nowhere else in the app: a layout effect runs BEFORE the
+ * browser paints, so the language switch happens between hydration and the first frame the user
+ * sees. With a plain `useEffect` — which runs after paint — a Bangla user got a visible flash of
+ * English on every single load. React warns if `useLayoutEffect` reaches the server prerender, so
+ * it is swapped for the harmless one there.
+ */
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  // Starts at "en" for the static render, then syncs to the stored choice after mount — the same
-  // shape ThemeToggle uses. Reading localStorage during the first client render instead would be
-  // a hydration mismatch, since these pages are prerendered.
+  // Starts at "en" so hydration matches the prerendered HTML — these pages are statically
+  // exported (that is what makes the Android shell possible), so the server cannot know the
+  // reader's language. Reading localStorage in the initial state instead would be a hydration
+  // mismatch. The layout effect below closes the gap before anything is painted.
   const [lang, setLangState] = useState<Lang>("en");
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     let stored: string | null = null;
     try { stored = localStorage.getItem(STORAGE_KEY); } catch { /* private mode */ }
     if (stored === "bn" || stored === "en") {

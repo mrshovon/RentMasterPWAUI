@@ -10,6 +10,7 @@ import { rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
 import { confirmDialog } from "./confirm";
 import { formatCurrency, formatDate, formatMonth } from "../lib/format";
+import { useT } from "../lib/i18n";
 import type {
   Property, Account, AccountType, AccountTransaction, AccountTransfer, TxnDirection,
 } from "../types/api";
@@ -54,6 +55,7 @@ export function AccountsTab({
   /** Opens the "contact us" enquiry modal owned by the page. */
   onContact: () => void;
 }) {
+  const t = useT();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [txns, setTxns] = useState<AccountTransaction[]>([]);
   const [transfers, setTransfers] = useState<AccountTransfer[]>([]);
@@ -302,11 +304,11 @@ export function AccountsTab({
               <Filter className="h-3.5 w-3.5" /> Filter
             </span>
             <Select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="w-auto">
-              <option value="">All months</option>
+              <option value="">{t("All months")}</option>
               {monthOptions.map((m) => <option key={m} value={m}>{formatMonth(m)}</option>)}
             </Select>
             <Select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} className="w-auto">
-              <option value="">All properties</option>
+              <option value="">{t("All properties")}</option>
               {properties.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.flat_no}</option>)}
             </Select>
           </div>
@@ -367,6 +369,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 /* ---------------------------------------------------------------- locked state */
 
 function AccountsLocked({ onContact }: { onContact: () => void }) {
+  const t = useT();
   return (
     <div className="space-y-6">
       <PageHeader title="Accounts" subtitle="Track your building's money — balances, income and expenses." />
@@ -376,7 +379,7 @@ function AccountsLocked({ onContact }: { onContact: () => void }) {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-line/[0.08] bg-overlay/[0.03] text-warning">
             <Crown className="h-6 w-6" />
           </div>
-          <h2 className="text-xl font-extrabold tracking-tight text-heading">Accounts is an add-on</h2>
+          <h2 className="text-xl font-extrabold tracking-tight text-heading">{t("Accounts is an add-on")}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
             Keep the books for your building — cash, bank and mobile-money accounts, every income and
             expense, and money moved between them, all in one place.
@@ -397,7 +400,7 @@ function AccountsLocked({ onContact }: { onContact: () => void }) {
             ))}
           </ul>
           <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm text-muted">
-            Included with the <span className="font-semibold text-fg">Whole Building</span> plan,
+            Included with the <span className="font-semibold text-fg">{t("Whole Building")}</span> plan,
             or available as a paid add-on to your current plan.
           </div>
           <Button icon={ContactIcon} className="w-full" onClick={onContact}>
@@ -422,6 +425,7 @@ function AccountCard({
   onToggleActive: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const meta = ACCOUNT_TYPE_META[a.type] ?? ACCOUNT_TYPE_META.other;
   const Icon = meta.icon;
   return (
@@ -438,7 +442,7 @@ function AccountCard({
               {a.is_default && <Badge tone="cyan">Default</Badge>}
               {!a.is_active && <Badge tone="slate">Closed</Badge>}
             </div>
-            <div className="text-xs text-muted">{meta.label}</div>
+            <div className="text-xs text-muted">{t(meta.label)}</div>
             <div className="pt-1 text-lg font-extrabold text-heading">{formatCurrency(balance)}</div>
           </div>
         </div>
@@ -563,6 +567,7 @@ function AccountModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [type, setType] = useState<AccountType>("cash");
   const [openingBalance, setOpeningBalance] = useState("");
@@ -620,7 +625,7 @@ function AccountModal({
           <Field label="Type">
             <Select value={type} onChange={(e) => setType(e.target.value as AccountType)}>
               {(Object.keys(ACCOUNT_TYPE_META) as AccountType[]).map((k) => (
-                <option key={k} value={k}>{ACCOUNT_TYPE_META[k].label}</option>
+                <option key={k} value={k}>{t(ACCOUNT_TYPE_META[k].label)}</option>
               ))}
             </Select>
           </Field>
@@ -654,6 +659,7 @@ function TransactionModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const t = useT();
   const [accountId, setAccountId] = useState("");
   const [amount, setAmount] = useState("");
   const [txnDate, setTxnDate] = useState(todayStr());
@@ -708,7 +714,7 @@ function TransactionModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Account" required>
             <Select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              <option value="">Select an account…</option>
+              <option value="">{t("Select an account…")}</option>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.name}{a.is_default ? " (default)" : ""}</option>
               ))}
@@ -725,9 +731,12 @@ function TransactionModal({
           </Field>
           <Field label="Category">
             <Select value={categorySel} onChange={(e) => setCategorySel(e.target.value)}>
-              <option value="">No category</option>
-              {presets.map((c) => <option key={c} value={c}>{c}</option>)}
-              <option value={CUSTOM}>Custom…</option>
+              <option value="">{t("No category")}</option>
+              {/* The VALUE stays English — it is what gets stored and grouped on. Only the label
+                  is translated, so a Bangla user's "ভাড়া" and an English user's "Rent" remain the
+                  same category in the ledger. */}
+              {presets.map((c) => <option key={c} value={c}>{t(c)}</option>)}
+              <option value={CUSTOM}>{t("Custom…")}</option>
             </Select>
           </Field>
         </div>
@@ -739,12 +748,12 @@ function TransactionModal({
         )}
         <Field label="Property" hint="Tie this entry to one of your properties.">
           <Select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
-            <option value="">No property</option>
+            <option value="">{t("No property")}</option>
             {properties.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.flat_no}</option>)}
           </Select>
         </Field>
         <Field label="Note">
-          <TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything worth remembering" />
+          <TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("Anything worth remembering")} />
         </Field>
         <Button type="submit" loading={saving} variant={income ? "success" : "danger"}
           icon={income ? TrendingUp : TrendingDown} className="w-full">
@@ -765,6 +774,7 @@ function TransferModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const t = useT();
   const [fromAccountId, setFromAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
   const [amount, setAmount] = useState("");
@@ -805,13 +815,13 @@ function TransferModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="From" required>
             <Select value={fromAccountId} onChange={(e) => setFromAccountId(e.target.value)}>
-              <option value="">Select…</option>
+              <option value="">{t("Select…")}</option>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </Select>
           </Field>
           <Field label="To" required>
             <Select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
-              <option value="">Select…</option>
+              <option value="">{t("Select…")}</option>
               {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </Select>
           </Field>
@@ -826,7 +836,7 @@ function TransferModal({
           </Field>
         </div>
         <Field label="Note">
-          <TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. moved cash to bank" />
+          <TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("e.g. moved cash to bank")} />
         </Field>
         <Button type="submit" loading={saving} icon={ArrowRightLeft} className="w-full">
           Transfer

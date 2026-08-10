@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, Building2, Users, ReceiptText, Wrench, Megaphone,
   Plus, MapPin, KeyRound, Phone, CircleDollarSign, Home, TriangleAlert,
@@ -20,6 +20,9 @@ import { usePresenceHeartbeat } from "../../lib/presence";
 import { PLAN_ADDONS, addonsOnTier } from "../../lib/addons";
 import { useTabState } from "../../lib/use-tab";
 import { usePendingAction } from "../../lib/use-pending";
+import { usePlan } from "../../lib/use-plan";
+import { useRevalidateOnFocus } from "../../lib/use-revalidate";
+import { PlanEventGate } from "../../components/plan-event-gate";
 import {
   Property, Tenant, BillingLedger, BillingPayment, MaintenanceLog, Notice,
   PaymentStatus, PriorityLevel, ResolutionStatus, Document, OccupancyHistory, RentRevision,
@@ -82,7 +85,10 @@ export default function OwnerDashboard() {
   const [payments, setPayments] = useState<BillingPayment[]>([]);
   const [maintenance, setMaintenance] = useState<MaintenanceLog[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [plan, setPlan] = useState<SubscriptionResponse | null>(null);
+  // Plan state is NOT plain useState any more: it revalidates on focus, on a visible-only poll,
+  // and the instant the server refuses a write on entitlement grounds. See lib/use-plan.ts —
+  // before that, an owner's perks only ever changed at login.
+  const { plan, refreshPlan: loadPlan, clearPendingEvent } = usePlan();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [account, setAccount] = useState<AccountProfile | null>(null);
 
@@ -153,10 +159,12 @@ export default function OwnerDashboard() {
     }
   }
 
-  useEffect(() => {
-    (async () => {
+  // `first` blanks the screen with a spinner; a background revalidation must not, or returning to
+  // the tab would flash an empty dashboard over data that is already correct.
+  const loadAll = useCallback(async (first = false) => {
+    {
       try {
-        setLoading(true);
+        if (first) setLoading(true);
         const [p, t, b, m, n, s, rm, bp] = await Promise.allSettled([
           rentMasterFetch("/api/admin/properties", { role: "owner" }),
           rentMasterFetch("/api/admin/tenants", { role: "owner" }),
@@ -181,17 +189,15 @@ export default function OwnerDashboard() {
       } finally {
         setLoading(false);
       }
-    })();
+    }
   }, []);
 
-  // Load the owner's plan state (limits, expiry, lock status).
-  async function loadPlan() {
-    try {
-      const res = await rentMasterFetch<SubscriptionResponse>("/api/admin/subscription", { role: "owner" });
-      setPlan(res);
-    } catch { /* non-fatal — plan tab shows a retry */ }
-  }
-  useEffect(() => { loadPlan(); }, []);
+  useEffect(() => { void loadAll(true); }, [loadAll]);
+
+  // These lists were loaded once and never again. On a phone — where this app is installed and
+  // "closing" it means backgrounding it — that meant coming back to a snapshot from hours ago.
+  // 30s-throttled, so rapid app switching costs nothing.
+  useRevalidateOnFocus(() => { void loadAll(); });
 
   // Client-side pre-check before opening create modals. The server enforces these
   // authoritatively too — this is a friendlier early exit that routes to the Plan tab.
@@ -202,6 +208,15 @@ export default function OwnerDashboard() {
       return s.lockReason === "revoked"
         ? "Your management permissions have been revoked by an administrator. Contact support to restore access."
         : "Your subscription has lapsed. Renew your plan to continue managing your properties.";
+    }
+    // A plan that ran out drops the owner to Free rather than locking them (lib/subscription.ts),
+    // so `status` reads "active" here. Saying "you've reached your Free Baseline limit" without
+    // mentioning why they are on it would be baffling to someone who was paying last week.
+    if (s.downgradedFrom) {
+      const u0 = kind === "property" ? plan.usage.properties : plan.usage.tenants;
+      if (u0.limit !== -1 && u0.current >= u0.limit) {
+        return `Your ${s.downgradedFrom.tierName} plan has ended, so you're on the free plan — ${u0.limit} ${kind === "property" ? "properties" : "tenants"}. Choose a plan to add more.`;
+      }
     }
     const u = kind === "property" ? plan.usage.properties : plan.usage.tenants;
     if (u.limit !== -1 && u.current >= u.limit) {
@@ -363,11 +378,13 @@ export default function OwnerDashboard() {
 
   // Build an "Owner Copy" receipt (paid OR due) and open the preview, ready to share via WhatsApp.
   function openOwnerReceipt(l: BillingLedger) {
-    const t = tenants.find((x) => x.id === l.tenant_id);
+    // Named `tenant`, not `t`: `t` is the translator in this scope, and shadowing it here is how
+    // the receipt's copy label silently stopped being translatable.
+    const tenant = tenants.find((x) => x.id === l.tenant_id);
     const prop = properties.find((p) => p.id === l.property_id);
-    const tenantName = l.tenants?.name || t?.name || "Tenant";
+    const tenantName = l.tenants?.name || tenant?.name || "Tenant";
     const html = buildReceiptHtml({
-      copyLabel: "Owner Copy",
+      copyLabel: t("Owner Copy"),
       // A property can carry its own name for receipts (a building or business name); the
       // account name is the fallback.
       ownerName: prop?.receipt_name || session?.name || "Owner",
@@ -382,7 +399,7 @@ export default function OwnerDashboard() {
       total: l.total_payable,
       paymentStatus: l.payment_status,
       paidAt: l.paid_at,
-      dueDay: t?.due_date,
+      dueDay: tenant?.due_date,
       payments: paymentsFor(l.id).map((p) => ({ paidOn: p.paid_on, amount: Number(p.amount) })),
       amountPaid: Number(l.amount_paid || 0),
       note: l.extra_charge_remarks,
@@ -395,7 +412,7 @@ export default function OwnerDashboard() {
       status: l.payment_status,
       property: prop?.name || "",
     });
-    setReceipt({ html, phone: l.tenants?.phone || t?.phone || null, message, fileName: `rent-receipt-${l.billing_month}` });
+    setReceipt({ html, phone: l.tenants?.phone || tenant?.phone || null, message, fileName: `rent-receipt-${l.billing_month}` });
   }
 
   // ---- Vacate a property (archives occupancy on the backend) ----
@@ -436,6 +453,17 @@ export default function OwnerDashboard() {
       {error && <div className="mb-6"><Alert>{error}</Alert></div>}
 
       {plan && <PlanBanner plan={plan} onRenew={() => setTab("plan")} />}
+
+      {/* Shown once per lifecycle transition, then acknowledged server-side. Mounted here rather
+          than in app/layout.tsx because it is owner-only and needs the plan state. */}
+      {plan && (
+        <PlanEventGate
+          event={plan.pendingEvent}
+          freeLimits={plan.subscription.limits}
+          onDismissed={clearPendingEvent}
+          onChoosePlan={() => setTab("plan")}
+        />
+      )}
 
       {tab === "overview" && (
         <OverviewTab
@@ -699,6 +727,9 @@ const tenureLabel = (t: SubscriptionTier) => {
 
 function planStatusBadge(s: PlanState): { tone: "emerald" | "amber" | "rose"; label: string } {
   if (s.status === "locked") return { tone: "rose", label: s.lockReason === "revoked" ? "Revoked" : "Lapsed" };
+  // Checked BEFORE `status`, because a downgraded owner is genuinely active again — on the free
+  // plan. Reporting that as plain "Active" would hide the only thing that changed.
+  if (s.downgradedFrom) return { tone: "amber", label: "Plan ended" };
   if (s.status === "grace") return { tone: "amber", label: "In grace" };
   if (s.warnExpiringSoon) return { tone: "amber", label: "Expiring soon" };
   return { tone: "emerald", label: "Active" };
@@ -713,6 +744,9 @@ function PlanBanner({ plan, onRenew }: { plan: SubscriptionResponse; onRenew: ()
     msg = s.lockReason === "revoked"
       ? "Your management permissions have been revoked by an administrator. Contact support to restore access."
       : "Your subscription has lapsed. Renew your plan to regain access — you can still view your data.";
+  } else if (s.downgradedFrom) {
+    tone = "amber";
+    msg = `Your ${s.downgradedFrom.tierName} plan has ended, so you're on the free plan — ${s.limits.maxProperties} properties and ${s.limits.maxTenants} tenants. Nothing was deleted; anything beyond that is view-only.`;
   } else if (s.status === "grace") {
     tone = "amber";
     msg = `Your ${s.tierName} plan expired. ${s.daysLeftInGrace} day${s.daysLeftInGrace === 1 ? "" : "s"} of grace left to renew before management is locked.`;
@@ -738,6 +772,7 @@ function PlanBanner({ plan, onRenew }: { plan: SubscriptionResponse; onRenew: ()
 }
 
 function UsageMeter({ label, current, limit, icon: Icon }: { label: string; current: number; limit: number; icon: any }) {
+  const t = useT();
   const unlimited = limit === -1;
   const pct = unlimited ? 0 : Math.min(100, limit === 0 ? 100 : Math.round((current / limit) * 100));
   const atCap = !unlimited && current >= limit;
@@ -756,8 +791,8 @@ function UsageMeter({ label, current, limit, icon: Icon }: { label: string; curr
           <div className={`h-full rounded-full ${atCap ? "bg-danger" : "bg-primary"}`} style={{ width: `${pct}%` }} />
         </div>
       )}
-      {unlimited && <div className="mt-3 text-xs text-success">Unlimited on your plan</div>}
-      {atCap && <div className="mt-2 text-xs text-danger">Limit reached — upgrade to add more.</div>}
+      {unlimited && <div className="mt-3 text-xs text-success">{t("Unlimited on your plan")}</div>}
+      {atCap && <div className="mt-2 text-xs text-danger">{t("Limit reached — upgrade to add more.")}</div>}
     </Card>
   );
 }
@@ -857,7 +892,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
         <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
           <div>
-            <div className="font-bold text-warning">Payment awaiting approval</div>
+            <div className="font-bold text-warning">{t("Payment awaiting approval")}</div>
             <p className="mt-0.5 text-warning/90">
               We&apos;ve received your payment for the <strong>{pendingPayment.tier_name || pendingPayment.tier_id}</strong> plan
               (৳{Number(pendingPayment.amount || 0)}, txn {pendingPayment.txn_id}). Our team will review and activate it shortly.
@@ -871,7 +906,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
         <div className="flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
           <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
           <div>
-            <div className="font-bold text-danger">Your last payment could not be approved</div>
+            <div className="font-bold text-danger">{t("Your last payment could not be approved")}</div>
             <p className="mt-0.5 text-danger/90">
               {rejectedPayment.admin_notes
                 ? <>Reason: {rejectedPayment.admin_notes}</>
@@ -890,7 +925,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
 
       {/* Available plans */}
       <div className="space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-muted">Available plans</h2>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-muted">{t("Available plans")}</h2>
         <div className="grid gap-4 md:grid-cols-2">
           {[...plan.availableTiers]
             .sort((a, b) => (isContactTier(a) ? 1 : 0) - (isContactTier(b) ? 1 : 0) || Number(a.price) - Number(b.price))
@@ -911,7 +946,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                 {/* A hidden plan only ever reaches this list as the owner's OWN plan (the server
                     filters the rest out), so say why nobody else is offered it. */}
                 {tier.is_public === false && (
-                  <p className="mt-1 text-xs text-subtle">Arranged for your account — not publicly listed.</p>
+                  <p className="mt-1 text-xs text-subtle">{t("Arranged for your account — not publicly listed.")}</p>
                 )}
                 <div className="mt-1 text-2xl font-black text-heading">
                   {contact ? "Contact us" : tier.price > 0 ? formatCurrency(discountedPrice(tier)) : "Free"}
@@ -942,7 +977,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                       {/* Optional modules this plan bundles — no separate purchase needed. */}
                       {PLAN_ADDONS.filter((a) => addonsOnTier(tier).includes(a.key)).map((a) => (
                         <li key={a.key} className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-success" />{a.label} included
+                          <CheckCircle2 className="h-4 w-4 text-success" />{t(a.label)} {t("included")}
                         </li>
                       ))}
                       {/* A trial: say so up front, not only once the button is greyed out. */}
@@ -1017,6 +1052,7 @@ function PaymentModal({
 }: {
   tier: SubscriptionTier | null; onClose: () => void; onSubmitted: () => Promise<void>;
 }) {
+  const t = useT();
   const [config, setConfig] = useState<PaymentConfig | null>(null);
   const [senderMsisdn, setSenderMsisdn] = useState("");
   const [txnId, setTxnId] = useState("");
@@ -1076,7 +1112,7 @@ function PaymentModal({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={config.qrUrl} alt={`${providerName} QR code`} className="h-44 w-44 rounded-lg bg-white object-contain p-2" />
               </button>
-              <span className="text-[11px] text-subtle">Tap the QR to enlarge and scan</span>
+              <span className="text-[11px] text-subtle">{t("Tap the QR to enlarge and scan")}</span>
             </div>
           ) : null}
           {config?.walletNumber ? (
@@ -1095,7 +1131,7 @@ function PaymentModal({
             <p className="mt-3 whitespace-pre-wrap text-xs text-muted">{config.instructions}</p>
           ) : null}
           {!config?.qrUrl && !config?.walletNumber && (
-            <p className="mt-3 text-xs text-warning">Payment details haven&apos;t been set up yet. Please contact us.</p>
+            <p className="mt-3 text-xs text-warning">{t("Payment details haven't been set up yet. Please contact us.")}</p>
           )}
         </div>
 
@@ -1108,13 +1144,13 @@ function PaymentModal({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={config.qrUrl} alt={`${providerName} QR code`}
               className="max-h-[80vh] w-auto max-w-[90vw] rounded-2xl bg-white object-contain p-4 shadow-2xl" />
-            <span className="text-sm text-heading/80">Tap anywhere to close</span>
+            <span className="text-sm text-heading/80">{t("Tap anywhere to close")}</span>
           </div>
         )}
 
         {/* Proof of payment */}
         <form onSubmit={submit} className="space-y-4">
-          <p className="text-xs text-muted">After paying, enter your payment details below so we can verify and activate your plan.</p>
+          <p className="text-xs text-muted">{t("After paying, enter your payment details below so we can verify and activate your plan.")}</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <PhoneField label="Mobile number you paid from" required
               value={senderMsisdn} onChange={setSenderMsisdn} />
@@ -1217,6 +1253,7 @@ function OverviewTab({
   onQuickInvoice: () => void; onQuickProperty: () => void;
   sessionName?: string; accountEmail?: string | null;
 }) {
+  const t = useT();
   return (
     <div className="space-y-8">
       <PageHeader
@@ -1249,9 +1286,9 @@ function OverviewTab({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="p-6">
-          <h3 className="mb-4 text-sm font-bold text-fg">Occupancy</h3>
+          <h3 className="mb-4 text-sm font-bold text-fg">{t("Occupancy")}</h3>
           {properties.length === 0 ? (
-            <p className="text-sm text-subtle">No properties yet.</p>
+            <p className="text-sm text-subtle">{t("No properties yet.")}</p>
           ) : (
             <>
               <div className="mb-3 flex items-end justify-between">
@@ -1274,7 +1311,7 @@ function OverviewTab({
 
         <Card className="p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-fg">Recent maintenance</h3>
+            <h3 className="text-sm font-bold text-fg">{t("Recent maintenance")}</h3>
             <Badge tone={metrics.openTickets ? "amber" : "emerald"}>
               {metrics.openTickets} open
             </Badge>
@@ -1294,7 +1331,7 @@ function OverviewTab({
               </div>
             ))}
             {maintenance.length === 0 && (
-              <p className="text-sm text-subtle">No maintenance reported. 🎉</p>
+              <p className="text-sm text-subtle">{t("No maintenance reported. 🎉")}</p>
             )}
           </div>
         </Card>
@@ -1441,6 +1478,7 @@ function TenantsTab({
   onToggleLogin: (t: Tenant) => void;
   isPending: (key: string) => boolean;
 }) {
+  const t = useT();
   const propName = (id: string | null) => (id ? properties.find((p) => p.id === id)?.name : undefined);
   const isDisabled = (id: string) => disabledIds.includes(id);
   const [query, setQuery] = useState("");
@@ -1474,12 +1512,12 @@ function TenantsTab({
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="p-4">Resident</th>
-                    <th className="p-4">Property</th>
-                    <th className="p-4">Rent</th>
-                    <th className="p-4">Due day</th>
-                    <th className="p-4">Passcode</th>
-                    <th className="p-4 text-right">Actions</th>
+                    <th className="p-4">{t("Resident")}</th>
+                    <th className="p-4">{t("Property")}</th>
+                    <th className="p-4">{t("Rent")}</th>
+                    <th className="p-4">{t("Due day")}</th>
+                    <th className="p-4">{t("Passcode")}</th>
+                    <th className="p-4 text-right">{t("Actions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line/[0.04]">
@@ -1602,6 +1640,7 @@ function BillingTab({
   onHistory: (l: BillingLedger) => void;
   onReceipt: (l: BillingLedger) => void; onSignature: () => void; hasSignature: boolean;
 }) {
+  const t = useT();
   const paymentCount = (id: string) => payments.filter((p) => p.ledger_id === id).length;
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -1648,12 +1687,12 @@ function BillingTab({
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
                 <tr>
-                  <th className="p-4">Tenant / Month</th>
-                  <th className="p-4">Rent</th>
-                  <th className="p-4">Extras</th>
-                  <th className="p-4">Total</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4 text-right">Mark as</th>
+                  <th className="p-4">{t("Tenant / Month")}</th>
+                  <th className="p-4">{t("Rent")}</th>
+                  <th className="p-4">{t("Extras")}</th>
+                  <th className="p-4">{t("Total")}</th>
+                  <th className="p-4">{t("Status")}</th>
+                  <th className="p-4 text-right">{t("Mark as")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/[0.04]">
@@ -1741,6 +1780,7 @@ function StatusButton({
 
 /* ============================================================ MAINTENANCE */
 function MaintenanceTab({ logs, onUpdate }: { logs: MaintenanceLog[]; onUpdate: (m: MaintenanceLog) => void }) {
+  const t = useT();
   return (
     <div className="space-y-6">
       <PageHeader title="Maintenance requests" subtitle="Incident tickets reported across your portfolio." />
@@ -1761,7 +1801,7 @@ function MaintenanceTab({ logs, onUpdate }: { logs: MaintenanceLog[]; onUpdate: 
               <AttachmentStrip raw={m.attachment_file_url} />
               {m.resolution_remarks && (
                 <div className="rounded-lg border border-line/[0.06] bg-overlay/[0.03] px-3 py-2 text-xs text-fg">
-                  <span className="font-semibold text-muted">Owner note: </span>{m.resolution_remarks}
+                  <span className="font-semibold text-muted">{t("Owner note:")}</span>{m.resolution_remarks}
                 </div>
               )}
               <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line/[0.06] pt-3 text-xs text-subtle">
@@ -1844,6 +1884,7 @@ function RaiseTicketModal({
 }: {
   open: boolean; onClose: () => void; onCreated: (t: SupportTicket) => void;
 }) {
+  const t = useT();
   const empty = { subject: "", description: "", category: "other" as TicketCategory, priority: "medium" as PriorityLevel };
   const [form, setForm] = useState(empty);
   const [items, setItems] = useState<{ file: File; preview: string; key: string }[]>([]);
@@ -1898,25 +1939,25 @@ function RaiseTicketModal({
             onChange={(e) => setForm({ ...form, subject: e.target.value })} />
         </Field>
         <Field label="Description" required>
-          <TextArea required rows={4} placeholder="Describe the issue in detail…" value={form.description}
+          <TextArea required rows={4} placeholder={t("Describe the issue in detail…")} value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })} />
         </Field>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Category">
             <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value as TicketCategory })}>
-              <option value="billing">Billing</option>
-              <option value="technical">Technical</option>
-              <option value="account">Account</option>
-              <option value="feature_request">Feature request</option>
-              <option value="other">Other</option>
+              <option value="billing">{t("Billing")}</option>
+              <option value="technical">{t("Technical")}</option>
+              <option value="account">{t("Account")}</option>
+              <option value="feature_request">{t("Feature request")}</option>
+              <option value="other">{t("Other")}</option>
             </Select>
           </Field>
           <Field label="Priority">
             <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as PriorityLevel })}>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+              <option value="low">{t("Low")}</option>
+              <option value="medium">{t("Medium")}</option>
+              <option value="high">{t("High")}</option>
+              <option value="urgent">{t("Urgent")}</option>
             </Select>
           </Field>
         </div>
@@ -2039,6 +2080,7 @@ function TenantModal({
 }: {
   open: boolean; onClose: () => void; properties: Property[]; onCreated: (t: Tenant, passcode?: string) => void;
 }) {
+  const t = useT();
   const empty = {
     propertyId: "", name: "", phone: "", familyMembers: "1", nid: "",
     monthlyRent: "", dueDate: "5", rentedDate: "", serviceCharge: "0", advanceAmount: "0",
@@ -2077,7 +2119,7 @@ function TenantModal({
       <form onSubmit={submit} className="space-y-4">
         <Field label="Property" required>
           <Select required value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
-            <option value="">Select a property…</option>
+            <option value="">{t("Select a property…")}</option>
             {(vacant.length ? vacant : properties).map((p) => (
               <option key={p.id} value={p.id}>{p.name} · Flat {p.flat_no}{p.is_vacant ? "" : " (occupied)"}</option>
             ))}
@@ -2145,6 +2187,7 @@ function PaymentReceivedModal({
   onClose: () => void;
   onConfirm: (ledgerId: string, amount: number, date: string) => Promise<void>;
 }) {
+  const t = useT();
   const today = new Date().toISOString().slice(0, 10);
   const total = Number(ledger?.total_payable || 0);
   const alreadyPaid = Number(ledger?.amount_paid || 0);
@@ -2192,17 +2235,17 @@ function PaymentReceivedModal({
               <span className="font-semibold text-heading">{formatMonth(ledger.billing_month)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted">Invoice total</span>
+              <span className="text-muted">{t("Invoice total")}</span>
               <span className="font-semibold text-heading">{formatCurrency(total)}</span>
             </div>
             {alreadyPaid > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-muted">Already paid</span>
+                <span className="text-muted">{t("Already paid")}</span>
                 <span className="font-semibold text-heading">{formatCurrency(alreadyPaid)}</span>
               </div>
             )}
             <div className="flex items-center justify-between">
-              <span className="text-muted">Balance</span>
+              <span className="text-muted">{t("Balance")}</span>
               <span className={`font-black ${balance > 0 ? "text-danger" : "text-success"}`}>
                 {formatCurrency(balance)}
               </span>
@@ -2348,6 +2391,7 @@ function PaymentHistoryModal({
 function InvoiceModal({
   open, onClose, tenants, onCreated,
 }: { open: boolean; onClose: () => void; tenants: Tenant[]; onCreated: (l: BillingLedger) => void }) {
+  const t = useT();
   const thisMonth = new Date().toISOString().slice(0, 7);
   const empty = {
     tenantId: "", billingMonth: thisMonth, rentAmount: "", serviceCharge: "0",
@@ -2412,7 +2456,7 @@ function InvoiceModal({
           <div className="grid grid-cols-2 gap-4">
             <Field label="Tenant" required>
               <Select required value={form.tenantId} onChange={(e) => pickTenant(e.target.value)}>
-                <option value="">Select tenant…</option>
+                <option value="">{t("Select tenant…")}</option>
                 {billable.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.phone}</option>)}
               </Select>
             </Field>
@@ -2442,12 +2486,12 @@ function InvoiceModal({
             </Field>
           </div>
           <Field label="Note" hint="Appears on the receipt — e.g. explain an extra charge.">
-            <TextArea rows={2} placeholder="e.g. Extra charge is for the shared water-tank repair."
+            <TextArea rows={2} placeholder={t("e.g. Extra charge is for the shared water-tank repair.")}
               value={form.extraChargeRemarks}
               onChange={(e) => setForm({ ...form, extraChargeRemarks: e.target.value })} />
           </Field>
           <div className="flex items-center justify-between rounded-xl border border-line/[0.06] bg-overlay/[0.03] px-4 py-3">
-            <span className="text-sm font-semibold text-fg">Total payable</span>
+            <span className="text-sm font-semibold text-fg">{t("Total payable")}</span>
             <span className="text-xl font-black text-success">{formatCurrency(total)}</span>
           </div>
           <Button type="submit" loading={saving} className="w-full">Generate invoice</Button>
@@ -2460,6 +2504,7 @@ function InvoiceModal({
 function NoticeModal({
   open, onClose, tenants, onCreated,
 }: { open: boolean; onClose: () => void; tenants: Tenant[]; onCreated: (n: Notice) => void }) {
+  const t = useT();
   const empty = { targetScope: "all_tenants", targetTenantId: "", title: "", content: "" };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
@@ -2486,15 +2531,15 @@ function NoticeModal({
       <form onSubmit={submit} className="space-y-4">
         <Field label="Audience" required>
           <Select value={form.targetScope} onChange={(e) => setForm({ ...form, targetScope: e.target.value })}>
-            <option value="all_tenants">All tenants</option>
-            <option value="individual_tenant">A specific tenant</option>
+            <option value="all_tenants">{t("All tenants")}</option>
+            <option value="individual_tenant">{t("A specific tenant")}</option>
           </Select>
         </Field>
         {form.targetScope === "individual_tenant" && (
           <Field label="Tenant" required>
             <Select required value={form.targetTenantId}
               onChange={(e) => setForm({ ...form, targetTenantId: e.target.value })}>
-              <option value="">Select tenant…</option>
+              <option value="">{t("Select tenant…")}</option>
               {tenants.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.phone}</option>)}
             </Select>
           </Field>
@@ -2504,7 +2549,7 @@ function NoticeModal({
             onChange={(e) => setForm({ ...form, title: e.target.value })} />
         </Field>
         <Field label="Message" required>
-          <TextArea required rows={4} placeholder="Write your announcement…" value={form.content}
+          <TextArea required rows={4} placeholder={t("Write your announcement…")} value={form.content}
             onChange={(e) => setForm({ ...form, content: e.target.value })} />
         </Field>
         <Button type="submit" loading={saving} icon={Inbox} className="w-full">Broadcast notice</Button>
@@ -2634,6 +2679,7 @@ function ReminderModal({
 }: {
   open: boolean; onClose: () => void; tenants: Tenant[]; template: string; onCreated: () => Promise<void>;
 }) {
+  const t = useT();
   const todayIso = new Date().toISOString().slice(0, 10);
   const [targetAll, setTargetAll] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -2689,7 +2735,7 @@ function ReminderModal({
           </button>
           {!targetAll && (
             <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-2">
-              {tenants.length === 0 && <p className="p-2 text-xs text-subtle">No tenants yet.</p>}
+              {tenants.length === 0 && <p className="p-2 text-xs text-subtle">{t("No tenants yet.")}</p>}
               {tenants.map((t) => {
                 const on = selected.includes(t.id);
                 return (
@@ -2732,8 +2778,8 @@ function ReminderModal({
           </Field>
           <Field label="Repeat" required>
             <Select value={recurrence} onChange={(e) => setRecurrence(e.target.value as ReminderRecurrence)}>
-              <option value="once">One-time</option>
-              <option value="monthly">Every month on this day</option>
+              <option value="once">{t("One-time")}</option>
+              <option value="monthly">{t("Every month on this day")}</option>
             </Select>
           </Field>
         </div>
@@ -2809,6 +2855,7 @@ const SERVICE_CHARGE_FIELDS = [
 ] as const;
 
 function ServiceChargeModal({ property, onClose }: { property: Property | null; onClose: () => void }) {
+  const t = useT();
   const blank = Object.fromEntries(SERVICE_CHARGE_FIELDS.map((f) => [f.key, "0"])) as Record<string, string>;
   const [form, setForm] = useState<Record<string, string>>(blank);
   const [loading, setLoading] = useState(false);
@@ -2857,19 +2904,19 @@ function ServiceChargeModal({ property, onClose }: { property: Property | null; 
       title="Service charge breakdown"
       subtitle={property ? `${property.name} · Flat ${property.flat_no}` : undefined}>
       {loading ? (
-        <div className="py-8 text-center text-sm text-muted">Loading breakdown…</div>
+        <div className="py-8 text-center text-sm text-muted">{t("Loading breakdown…")}</div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             {SERVICE_CHARGE_FIELDS.map((f) => (
-              <Field key={f.key} label={`${f.label} (৳)`}>
+              <Field key={f.key} label={`${t(f.label)} (৳)`}>
                 <TextInput type="number" min="0" value={form[f.key]}
                   onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
               </Field>
             ))}
           </div>
           <div className="flex items-center justify-between rounded-xl border border-line/[0.06] bg-overlay/[0.03] px-4 py-3">
-            <span className="text-sm font-semibold text-fg">Total service charge</span>
+            <span className="text-sm font-semibold text-fg">{t("Total service charge")}</span>
             <span className="text-xl font-black text-success">{formatCurrency(total)}</span>
           </div>
           <Button type="submit" loading={saving} className="w-full">Save breakdown</Button>
@@ -2882,6 +2929,7 @@ function ServiceChargeModal({ property, onClose }: { property: Property | null; 
 function EditTenantModal({
   tenant, properties, onClose, onSaved,
 }: { tenant: Tenant | null; properties: Property[]; onClose: () => void; onSaved: (t: Tenant) => void }) {
+  const t = useT();
   const empty = {
     propertyId: "", name: "", phone: "", monthlyRent: "", serviceCharge: "", advanceAmount: "",
     dueDate: "", familyMembers: "", nid: "", rentedDate: "",
@@ -2951,7 +2999,7 @@ function EditTenantModal({
       <form onSubmit={submit} className="space-y-4">
         <Field label="Property" hint="Move the tenant to another unit, or leave them unassigned.">
           <Select value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
-            <option value="">— Unassigned —</option>
+            <option value="">{t("— Unassigned —")}</option>
             {assignable.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} · Flat {p.flat_no}{p.id === tenant?.property_id ? " (current)" : ""}
@@ -3019,7 +3067,7 @@ function EditTenantModal({
 
       {revisions.length > 0 && (
         <div className="mt-6 space-y-2">
-          <h4 className="text-[11px] font-bold uppercase tracking-wider text-subtle">Rent revision history</h4>
+          <h4 className="text-[11px] font-bold uppercase tracking-wider text-subtle">{t("Rent revision history")}</h4>
           {revisions.map((r) => (
             <div key={r.id} className="flex items-center justify-between rounded-lg border border-line/[0.06] bg-overlay/[0.02] px-3 py-2 text-xs">
               <span className="text-muted">{formatDate(r.changed_at)}</span>
@@ -3037,6 +3085,7 @@ function EditTenantModal({
 
 /* ============================================================ PROPERTY HISTORY */
 function PropertyHistoryModal({ property, onClose }: { property: Property | null; onClose: () => void }) {
+  const t = useT();
   const [rows, setRows] = useState<OccupancyHistory[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -3056,7 +3105,7 @@ function PropertyHistoryModal({ property, onClose }: { property: Property | null
     <Modal open={!!property} onClose={onClose} size="lg" title="Occupancy history"
       subtitle={property ? `${property.name} · past residents` : undefined}>
       {loading ? (
-        <p className="text-sm text-subtle">Loading…</p>
+        <p className="text-sm text-subtle">{t("Loading…")}</p>
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted">
           No past tenants archived yet. When you vacate this unit, the outgoing resident is recorded here.
@@ -3088,6 +3137,7 @@ function SignatureModal({
 }: {
   open: boolean; onClose: () => void; current: string | null; onSaved: (url: string) => void;
 }) {
+  const t = useT();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [saving, setSaving] = useState(false);
@@ -3132,7 +3182,7 @@ function SignatureModal({
         <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] px-4 py-6 text-center text-sm text-muted transition hover:border-primary/40 hover:text-fg">
           <Upload className="h-5 w-5" />
           <span>{current ? "Replace signature image" : "Upload signature image"}</span>
-          <span className="text-[11px] text-subtle">Transparent PNG recommended</span>
+          <span className="text-[11px] text-subtle">{t("Transparent PNG recommended")}</span>
           <input type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
         </label>
         <Button type="submit" loading={saving} disabled={!file} className="w-full">Save signature</Button>
@@ -3150,6 +3200,7 @@ function SettingsTab({
   template: string; onTemplateSaved: (t: string) => void;
   reminderTemplate: string; onReminderTemplateSaved: (t: string) => void;
 }) {
+  const t = useT();
   const [text, setText] = useState(template);
   const [savingMsg, setSavingMsg] = useState(false);
   const [reminderText, setReminderText] = useState(reminderTemplate);
@@ -3197,8 +3248,8 @@ function SettingsTab({
         <div className="mb-4 flex items-center gap-2">
           <div className="rounded-lg bg-success/10 p-2 text-success"><MessageCircle className="h-4 w-4" /></div>
           <div>
-            <h3 className="text-sm font-bold text-heading">WhatsApp receipt message</h3>
-            <p className="text-xs text-subtle">Sent alongside a rent receipt when you share it to WhatsApp.</p>
+            <h3 className="text-sm font-bold text-heading">{t("WhatsApp receipt message")}</h3>
+            <p className="text-xs text-subtle">{t("Sent alongside a rent receipt when you share it to WhatsApp.")}</p>
           </div>
         </div>
         <form onSubmit={saveTemplate} className="space-y-4">
@@ -3225,8 +3276,8 @@ function SettingsTab({
         <div className="mb-4 flex items-center gap-2">
           <div className="rounded-lg bg-primary/10 p-2 text-primary"><CalendarClock className="h-4 w-4" /></div>
           <div>
-            <h3 className="text-sm font-bold text-heading">Rent reminder message</h3>
-            <p className="text-xs text-subtle">The default message pre-filled when you create a new reminder.</p>
+            <h3 className="text-sm font-bold text-heading">{t("Rent reminder message")}</h3>
+            <p className="text-xs text-subtle">{t("The default message pre-filled when you create a new reminder.")}</p>
           </div>
         </div>
         <form onSubmit={saveReminderTemplate} className="space-y-4">
@@ -3258,6 +3309,7 @@ function SettingsTab({
 }
 
 function ChangePasswordCard() {
+  const t = useT();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -3284,8 +3336,8 @@ function ChangePasswordCard() {
       <div className="mb-4 flex items-center gap-2">
         <div className="rounded-lg bg-primary/10 p-2 text-primary"><Lock className="h-4 w-4" /></div>
         <div>
-          <h3 className="text-sm font-bold text-heading">Change password</h3>
-          <p className="text-xs text-subtle">Update the password you use to sign in.</p>
+          <h3 className="text-sm font-bold text-heading">{t("Change password")}</h3>
+          <p className="text-xs text-subtle">{t("Update the password you use to sign in.")}</p>
         </div>
       </div>
       <form onSubmit={submit} className="max-w-md space-y-4">
@@ -3308,6 +3360,7 @@ function ChangePasswordCard() {
 function MaintenanceStatusModal({
   log, onClose, onSaved,
 }: { log: MaintenanceLog | null; onClose: () => void; onSaved: (m: MaintenanceLog) => void }) {
+  const t = useT();
   const [status, setStatus] = useState<ResolutionStatus>("reported");
   const [remarks, setRemarks] = useState("");
   const [saving, setSaving] = useState(false);
@@ -3335,13 +3388,13 @@ function MaintenanceStatusModal({
       <form onSubmit={submit} className="space-y-4">
         <Field label="Status" required>
           <Select value={status} onChange={(e) => setStatus(e.target.value as ResolutionStatus)}>
-            <option value="reported">Reported</option>
-            <option value="in_progress">In progress</option>
-            <option value="resolved">Resolved</option>
+            <option value="reported">{t("Reported")}</option>
+            <option value="in_progress">{t("In progress")}</option>
+            <option value="resolved">{t("Resolved")}</option>
           </Select>
         </Field>
         <Field label="Remarks" hint="Shared with the tenant on their request.">
-          <TextArea rows={4} placeholder="e.g. Plumber scheduled for Friday; parts ordered."
+          <TextArea rows={4} placeholder={t("e.g. Plumber scheduled for Friday; parts ordered.")}
             value={remarks} onChange={(e) => setRemarks(e.target.value)} />
         </Field>
         <Button type="submit" loading={saving} className="w-full">Save update</Button>
@@ -3352,6 +3405,7 @@ function MaintenanceStatusModal({
 
 /* ============================================================ TENANT DOCUMENTS */
 function OwnerDocumentsModal({ tenant, onClose }: { tenant: Tenant | null; onClose: () => void }) {
+  const t = useT();
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState("");
@@ -3427,10 +3481,10 @@ function OwnerDocumentsModal({ tenant, onClose }: { tenant: Tenant | null; onClo
           </Field>
           <Field label="Type">
             <Select value={docType} onChange={(e) => setDocType(e.target.value)}>
-              <option value="deed">Deed</option>
-              <option value="agreement">Agreement</option>
-              <option value="receipt">Receipt</option>
-              <option value="other">Other</option>
+              <option value="deed">{t("Deed")}</option>
+              <option value="agreement">{t("Agreement")}</option>
+              <option value="receipt">{t("Receipt")}</option>
+              <option value="other">{t("Other")}</option>
             </Select>
           </Field>
         </div>
@@ -3454,11 +3508,11 @@ function OwnerDocumentsModal({ tenant, onClose }: { tenant: Tenant | null; onClo
       </form>
 
       <div className="mt-6 space-y-2">
-        <h4 className="text-[11px] font-bold uppercase tracking-wider text-subtle">Existing documents</h4>
+        <h4 className="text-[11px] font-bold uppercase tracking-wider text-subtle">{t("Existing documents")}</h4>
         {loading ? (
-          <p className="text-sm text-subtle">Loading…</p>
+          <p className="text-sm text-subtle">{t("Loading…")}</p>
         ) : docs.length === 0 ? (
-          <p className="text-sm text-subtle">No documents yet for this tenant.</p>
+          <p className="text-sm text-subtle">{t("No documents yet for this tenant.")}</p>
         ) : (
           docs.map((d) => (
             <div key={d.id} className="flex items-center gap-3 rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-3 py-2.5">

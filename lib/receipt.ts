@@ -1,3 +1,6 @@
+import { translate as tr } from "./i18n";
+import { formatMonth } from "./format";
+
 // Builds a self-contained, printable "MONEY RECEIPT" (inline CSS so it renders
 // identically inside an <iframe> preview and a print window). Matches the
 // reference design: bordered card, status word top-left, centered underlined
@@ -36,7 +39,10 @@ function esc(s: unknown): string {
   );
 }
 
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+// Month names come from lib/format.ts via formatMonth(), NOT from a local array. This file used
+// to carry its own hardcoded English list, which is why a receipt shared by a Bangla-speaking
+// owner still said "June 2026" — and a receipt is the one artefact that leaves the app entirely
+// and lands in a tenant's hands, so it is the worst place for the language to revert.
 
 function ordinal(d: number): string {
   const s = ["th", "st", "nd", "rd"];
@@ -48,7 +54,7 @@ export function buildReceiptHtml(o: ReceiptOptions): string {
   const money = (n: number) => "৳" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
   const [y, m] = (o.billingMonth || "").split("-");
-  const monthLabel = MONTHS[parseInt(m, 10) - 1] ? `${MONTHS[parseInt(m, 10) - 1]} ${y}` : o.billingMonth;
+  const monthLabel = formatMonth(o.billingMonth) ;
 
   // Dates are compared as CALENDAR DAYS, not timestamps: paying on the due day is on time, which
   // is what the note printed further down actually promises ("by or on the 5th"). Comparing
@@ -87,12 +93,12 @@ export function buildReceiptHtml(o: ReceiptOptions): string {
   const dateStr = fmtDay(paid || new Date());
 
   const statusWord = isPaid
-    ? `<span class="status paid">PAID</span>`
+    ? `<span class="status paid">${esc(tr("PAID"))}</span>`
     : isPartial
-      ? `<span class="status partial">PARTIAL</span>`
-      : `<span class="status due">DUE</span>`;
-  const statusHtml = `${statusWord}${late ? ` <span class="status late">LATE</span>` : ""}`;
-  const totalLabel = isPaid ? "Total Paid" : "Total Due";
+      ? `<span class="status partial">${esc(tr("PARTIAL"))}</span>`
+      : `<span class="status due">${esc(tr("DUE"))}</span>`;
+  const statusHtml = `${statusWord}${late ? ` <span class="status late">${esc(tr("LATE"))}</span>` : ""}`;
+  const totalLabel = isPaid ? tr("Total Paid") : tr("Total Due");
 
   // A payment history is only worth printing when there is more than one payment. A rent
   // settled in one go — on time or late — says everything it needs to through the Date row
@@ -107,32 +113,34 @@ export function buildReceiptHtml(o: ReceiptOptions): string {
     ? installments
         .map((p, i) =>
           row(
-            `${ordinal(i + 1)} Payment:`,
+            `${ordinal(i + 1)} ${tr("Payment")}:`,
             `${fmtDay(p.date)} — ${money(p.amount)}`,
             false,
             !!(dueKey && p.key > dueKey) // red: this one arrived after the due date
           )
         )
         .join("")
-    : row("Date:", dateStr);
+    : row(`${tr("Date")}:`, dateStr);
 
   // Outside the branch above: what is still owed is not payment history, and a single
   // part-payment needs it printed just as much as several do.
-  const balanceRowHtml = balance > 0 ? row("Balance Due:", money(balance), true, overdueBalance) : "";
+  const balanceRowHtml = balance > 0 ? row(`${tr("Balance Due")}:`, money(balance), true, overdueBalance) : "";
 
   let rowsHtml =
     paymentRowsHtml +
     balanceRowHtml +
-    row("Month:", esc(monthLabel)) +
-    row("Tenant Name:", esc(o.tenantName || "Tenant"), true) +
-    row("House Rent:", money(o.houseRent)) +
-    row("Service Charge:", money(o.serviceCharge)) +
-    row("Extra Charge:", money(o.extraCharge));
-  if (Number(o.discount) > 0) rowsHtml += row("Discount:", "−" + money(o.discount || 0));
+    row(`${tr("Month")}:`, esc(monthLabel)) +
+    row(`${tr("Tenant Name")}:`, esc(o.tenantName || tr("Tenant")), true) +
+    row(`${tr("House Rent")}:`, money(o.houseRent)) +
+    row(`${tr("Service Charge")}:`, money(o.serviceCharge)) +
+    row(`${tr("Extra Charge")}:`, money(o.extraCharge));
+  if (Number(o.discount) > 0) rowsHtml += row(`${tr("Discount")}:`, "−" + money(o.discount || 0));
 
+  // Interpolated, so it cannot be an exact-match dictionary key: the day is spliced into a
+  // translated template instead, the same technique lib/notice-i18n.ts uses for backend strings.
   const fixedNote = o.dueDay
-    ? `Note: Please pay the rent by or on the ${ordinal(o.dueDay)} of the month.`
-    : `Note: Please pay the rent by or on the due date of the month.`;
+    ? tr("Note: Please pay the rent by or on the {0} of the month.").replace("{0}", ordinal(o.dueDay))
+    : tr("Note: Please pay the rent by or on the due date of the month.");
   const notesHtml =
     (o.note ? `<div class="note-line">${esc(o.note)}</div>` : "") +
     `<div class="note-line">${esc(fixedNote)}</div>`;
@@ -142,7 +150,7 @@ export function buildReceiptHtml(o: ReceiptOptions): string {
     : "";
 
   return (
-`<!doctype html><html><head><meta charset="utf-8"><title>Money Receipt</title><style>
+`<!doctype html><html><head><meta charset="utf-8"><title>${esc(tr("Money Receipt"))}</title><style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#eef2f6;color:#111;padding:16px}
 .receipt{max-width:780px;margin:0 auto;background:#fff;border:3px solid #000;padding:24px 28px;position:relative}
@@ -170,16 +178,16 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#eef2f6;color:#1
 @page{size:A4 portrait;margin:12mm}
 @media print{body{background:#fff;padding:0}.receipt{zoom:.45;margin:0;max-width:none;width:780px;padding:24px 28px}}
 </style></head><body><div class="receipt">
-<div class="head"><div>${statusHtml}</div><div class="title">MONEY RECEIPT</div><div class="copy">${esc(o.copyLabel)}</div></div>
-<div class="oname">${esc(o.ownerName || "Owner")}</div>
+<div class="head"><div>${statusHtml}</div><div class="title">${esc(tr("MONEY RECEIPT"))}</div><div class="copy">${esc(o.copyLabel)}</div></div>
+<div class="oname">${esc(o.ownerName || tr("Owner"))}</div>
 <div class="addr">${esc(o.propertyAddress || "")}</div>
 <div class="divider"></div>
 ${rowsHtml}
 <div class="total-box"><div class="t-lbl">${totalLabel}:</div><div class="t-val">${money(o.total)}</div></div>
 <div class="notes">${notesHtml}</div>
 <div class="bottom">
-<div class="ref">Ref: ${esc(o.refNo || "")}</div>
-<div class="sign">${sigImg}<div class="sig-line"></div><div class="sig-role">Landlord's Signature</div></div>
+<div class="ref">${esc(tr("Ref"))}: ${esc(o.refNo || "")}</div>
+<div class="sign">${sigImg}<div class="sig-line"></div><div class="sig-role">${esc(tr("Landlord’s Signature"))}</div></div>
 </div>
 </div></body></html>`
   );

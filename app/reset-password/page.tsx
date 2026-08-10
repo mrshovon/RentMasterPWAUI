@@ -6,6 +6,7 @@ import { getSupabaseBrowser } from "../../lib/supabase-browser";
 import { apiResetComplete } from "../../lib/api-service";
 import { Button, PasswordInput } from "../../components/ui";
 import { ThemeToggle } from "../../components/theme-toggle";
+import { useT } from "../../lib/i18n";
 
 // Landing page for the password-recovery email link.
 //
@@ -36,6 +37,7 @@ const MIN_LEN = 8;
 const SESSION_WAIT_MS = 8000;
 
 export default function ResetPasswordPage() {
+  const t = useT();
   const [phase, setPhase] = useState<Phase>("checking");
   const [failure, setFailure] = useState<FailureKind>("link");
   const [password, setPassword] = useState("");
@@ -153,12 +155,12 @@ export default function ResetPasswordPage() {
 
         <div className="flex items-center justify-center gap-3">
           <img src="/logo.png" alt="Bari360" className="h-9 w-9 rounded-xl object-cover" />
-          <span className="text-sm font-black uppercase tracking-widest text-fg">Bari360</span>
+          <span className="text-sm font-black uppercase tracking-widest text-fg">{t("Bari360")}</span>
         </div>
 
         <div className="rounded-2xl border border-line/[0.06] bg-surface/40 p-6 backdrop-blur-xl sm:p-8">
           {phase === "checking" && (
-            <p className="text-center text-sm text-muted">Verifying your reset link…</p>
+            <p className="text-center text-sm text-muted">{t("Verifying your reset link…")}</p>
           )}
 
           {phase === "invalid" && (
@@ -187,8 +189,8 @@ export default function ResetPasswordPage() {
           {phase === "done" && (
             <div className="space-y-4 text-center">
               <CheckCircle2 className="mx-auto h-8 w-8 text-success" />
-              <h2 className="text-xl font-extrabold text-heading">Password updated</h2>
-              <p className="text-sm text-muted">You can now sign in with your new password.</p>
+              <h2 className="text-xl font-extrabold text-heading">{t("Password updated")}</h2>
+              <p className="text-sm text-muted">{t("You can now sign in with your new password.")}</p>
               <Button className="w-full" onClick={() => window.location.replace("/")} icon={ArrowRight}>
                 Go to sign in
               </Button>
@@ -198,8 +200,8 @@ export default function ResetPasswordPage() {
           {(phase === "ready" || phase === "saving") && (
             <form onSubmit={submit} className="space-y-5">
               <div className="space-y-1.5 text-center">
-                <h2 className="text-2xl font-extrabold tracking-tight text-heading">Choose a new password</h2>
-                <p className="text-sm text-muted">Enter and confirm your new password below.</p>
+                <h2 className="text-2xl font-extrabold tracking-tight text-heading">{t("Choose a new password")}</h2>
+                <p className="text-sm text-muted">{t("Enter and confirm your new password below.")}</p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-muted">

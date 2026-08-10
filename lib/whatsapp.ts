@@ -1,6 +1,7 @@
 // Helpers for sharing a rent receipt over WhatsApp.
 
 import { BD_COUNTRY_CODE, BD_PHONE_LEN, validatePhone } from "./validate";
+import { translate } from "./i18n";
 
 // Turn a stored phone into the digits-only, country-coded form wa.me expects (no "+", no spaces).
 // Returns null when the number isn't one WhatsApp could reach.
@@ -41,9 +42,12 @@ export interface ReceiptMessageContext {
 // Substitute the owner's template placeholders. Falls back to a sensible default sentence when the
 // owner hasn't set a template yet.
 export function resolveReceiptMessage(template: string | null | undefined, ctx: ReceiptMessageContext): string {
+  // An owner's own template is prose they wrote and is never rewritten — the same rule as
+  // lib/notice-i18n.ts. Only OUR default sentence is translated, so a Bangla-speaking owner who
+  // has not customised anything still sends their tenant a Bangla message.
   const base = (template && template.trim())
     ? template
-    : "Hello {tenant}, please find your rent receipt for {month}. Amount: {amount} ({status}).";
+    : translate("Hello {tenant}, please find your rent receipt for {month}. Amount: {amount} ({status}).");
   return base
     .replace(/\{tenant\}/g, ctx.tenant)
     .replace(/\{month\}/g, ctx.month)
