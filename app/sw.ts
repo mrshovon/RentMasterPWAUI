@@ -55,7 +55,9 @@ serwist.addEventListeners();
 // Web Push (VAPID) — Phase B. Listeners are inert until the client subscribes.
 // ---------------------------------------------------------------------------
 self.addEventListener("push", (event) => {
-  let payload: { title?: string; body?: string; url?: string; tag?: string } = {};
+  // `sound` is the recipient's own choice, filled in per recipient by the backend's deliver()
+  // (lib/push-send.ts): "custom" = the Bari360 tone, "default" = the device's, "off" = silent.
+  let payload: { title?: string; body?: string; url?: string; tag?: string; sound?: string } = {};
   try {
     payload = event.data ? event.data.json() : {};
   } catch {
@@ -64,15 +66,40 @@ self.addEventListener("push", (event) => {
 
   const title = payload.title || "Bari360";
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body: payload.body || "",
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      tag: payload.tag,
-      data: { url: payload.url || "/" },
-    }),
+    self.registration
+      .showNotification(title, {
+        body: payload.body || "",
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: payload.tag,
+        // The ONLY sound control the Web Push API gives us. There is no way to attach an audio
+        // file to a notification the browser draws — with the app closed, "custom" and "default"
+        // both end up as whatever sound the browser uses. The Bari360 tone is played by the page
+        // below when one is open, and by the notification channel in the native app (which is
+        // where it matters, and where it works in every state).
+        silent: payload.sound === "off",
+        data: { url: payload.url || "/" },
+      })
+      .then(() => notifyOpenClients(payload.sound)),
   );
 });
+
+/**
+ * Tell any open page that a push just arrived, so it can play the brand tone.
+ *
+ * Only pages that are actually on screen are messaged: a tab sitting in the background has no
+ * business making a noise the user cannot trace, and the notification itself already carries the
+ * browser's own sound there.
+ */
+async function notifyOpenClients(sound?: string): Promise<void> {
+  if (sound !== "custom") return;
+  const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  for (const client of clients) {
+    if (client.visibilityState === "visible") {
+      client.postMessage({ type: "bari360-push", sound });
+    }
+  }
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

@@ -1,15 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, BellOff, CheckCircle2, Smartphone } from "lucide-react";
+import { Bell, BellOff, CheckCircle2, Play, Smartphone } from "lucide-react";
 import { Card, Button } from "./ui";
 import { PushTestButton } from "./push-toggle";
 import { UpdateCheckButton } from "./update-gate";
+import { toast } from "./toast";
 import { ensurePushSubscription, getPushPermission, type PushPermission } from "../lib/push";
-import { getSessionToken } from "../lib/api-service";
+import { getSessionToken, rentMasterFetch } from "../lib/api-service";
 import { isNativeApp } from "../lib/platform";
 import { APP_VERSION } from "../lib/app-config";
 import { useT } from "../lib/i18n";
+import {
+  DEFAULT_NOTIFICATION_SOUND,
+  getStoredSound,
+  playTone,
+  storeSound,
+  type NotificationSound,
+} from "../lib/notification-sound";
 
 // =============================================================================
 // "App & notifications" — the home for the per-device actions that used to float
@@ -17,10 +25,17 @@ import { useT } from "../lib/i18n";
 // Settings tab of all three dashboards (owner, tenant, admin).
 // =============================================================================
 
+const SOUND_OPTIONS: { value: NotificationSound; label: string }[] = [
+  { value: "custom", label: "Bari360 tone" },
+  { value: "default", label: "Device tone" },
+  { value: "off", label: "Silent" },
+];
+
 export function AppSettingsCard() {
   const [permission, setPermission] = useState<PushPermission>("unsupported");
   const [native, setNative] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [sound, setSound] = useState<NotificationSound>(DEFAULT_NOTIFICATION_SOUND);
   const t = useT();
 
   useEffect(() => {
@@ -29,10 +44,37 @@ export function AppSettingsCard() {
     if (isNativeApp()) {
       setNative(true);
       setPermission("granted");
-      return;
+    } else {
+      setPermission(getPushPermission());
     }
-    setPermission(getPushPermission());
+
+    // Show the last known choice immediately, then correct it from the server. The stored copy is
+    // what the tone player reads, so it has to exist on this device regardless.
+    setSound(getStoredSound());
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: { sound: NotificationSound } }>("/api/notifications/preferences");
+        if (res?.data?.sound) { setSound(res.data.sound); storeSound(res.data.sound); }
+      } catch { /* keep the stored value — a failed read must not reset anyone's choice */ }
+    })();
   }, []);
+
+  async function pickSound(next: NotificationSound) {
+    const previous = sound;
+    setSound(next);          // optimistic: the control must not lag behind the tap
+    storeSound(next);
+    if (next === "custom") playTone();   // also doubles as the autoplay unlock gesture
+    try {
+      await rentMasterFetch("/api/notifications/preferences", {
+        method: "PUT",
+        body: JSON.stringify({ sound: next }),
+      });
+    } catch (e: any) {
+      setSound(previous);
+      storeSound(previous);
+      toast.error(e?.message || "Could not save your notification sound.");
+    }
+  }
 
   async function enable() {
     setBusy(true);
@@ -80,6 +122,51 @@ export function AppSettingsCard() {
             <Button size="sm" variant="secondary" icon={Bell} loading={busy} onClick={enable}>
               {t("Enable notifications")}
             </Button>
+          </div>
+        )}
+
+        {/* --- Notification sound. Hidden when there are no notifications to sound. --- */}
+        {permission === "granted" && (
+          <div className="border-t border-line/[0.06] pt-4">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-heading">{t("Notification sound")}</div>
+                <p className="text-[11px] text-subtle">{t("Applies to all your devices, not just this one.")}</p>
+              </div>
+              <button
+                type="button"
+                onClick={playTone}
+                aria-label={t("Play the Bari360 tone")}
+                className="rounded-lg p-1.5 text-muted transition hover:bg-overlay/[0.06] hover:text-heading"
+              >
+                <Play className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex gap-1 rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-1">
+              {SOUND_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => void pickSound(option.value)}
+                  className={
+                    "flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition " +
+                    (sound === option.value
+                      ? "bg-primary text-white shadow-sm"
+                      : "text-muted hover:bg-overlay/[0.06] hover:text-heading")
+                  }
+                >
+                  {t(option.label)}
+                </button>
+              ))}
+            </div>
+            {!native && sound === "custom" && (
+              // Said out loud because it cannot be fixed: the Web Push API has no way to attach a
+              // sound to a notification the browser draws. Better an honest sentence than a
+              // setting people think is broken.
+              <p className="mt-2 text-[11px] text-subtle">
+                {t("On the web the Bari360 tone plays while the app is open. When it is closed your browser uses its own sound. Install the Android app for the tone every time.")}
+              </p>
+            )}
           </div>
         )}
 

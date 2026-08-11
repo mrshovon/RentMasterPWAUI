@@ -1,9 +1,4 @@
-- When a paid plan runs out you are now told, instead of finding out by bumping into it. You get a message in the app, a notification and an email ten days before it expires, again when it expires, and once more when it ends.
-- A plan that ends now moves you to the free plan rather than locking you out. Nothing is deleted. Anything beyond the free limits stays where it is and can still be viewed, and you can start using it again the moment you choose a plan.
-- The app now keeps itself up to date while it is open. If your plan changes, or an administrator turns a module on or off, you see it within moments instead of having to sign out and back in.
-- Your dashboard now refreshes when you come back to it, so returning to the app no longer shows you figures from hours ago.
-- Bangla is now complete. Buttons, table headings, dropdown lists, search boxes, messages and the printable rent receipt all read in Bangla when you choose it, and the app no longer flashes English while it loads.
-- The rent receipt you share is now in your chosen language, month names included.
-- Error messages are clearer. When something goes wrong you get a plain message and a short reference code instead of technical text, and that code lets support find exactly what happened.
-- If a screen ever fails to load, you now get a proper message and a way to try again rather than a blank page.
-- Bari360 can now send email. You get a message when your account is created, when your password changes, and when you ask to reset it.
+- Notifications now arrive with the Bari360 tone, so you can tell them apart from everything else on your phone.
+- You choose the sound. In Settings, under App and notifications, pick the Bari360 tone, your phone's own tone, or silent. Your choice follows you to every device you sign in on.
+- Silent still means you get the notification. It appears in your notification tray as usual, it just does not make a noise.
+- Bari360 can now show you an announcement when you open the app, so important news reaches you without you having to go looking for it.

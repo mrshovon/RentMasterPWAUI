@@ -30,6 +30,7 @@ import { formatCurrency, formatDate, formatDateTime } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { AppSettingsCard } from "../../components/app-settings-card";
+import { AnnouncementModal, type Announcement } from "../../components/announcement-gate";
 import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
@@ -2189,6 +2190,7 @@ function AdminSettingsTab() {
     <div className="space-y-8">
       <PageHeader title="Settings" subtitle="Platform controls and this device's preferences." />
       <OwnerProfileCard />
+      <AnnouncementCard />
       <MaintenanceCard />
       <BrevoConfigCard />
       <AnalyticsConfigCard />
@@ -2454,6 +2456,149 @@ function AnalyticsConfigCard() {
  * app open (components/maintenance-gate.tsx). The admin is never blocked — otherwise turning
  * it back off would need a database edit.
  */
+/* ============================================================ ANNOUNCEMENT CARD */
+// One announcement at a time, shown to every owner and tenant on app open while it is switched on.
+// The admin is deliberately never shown it themselves (components/announcement-gate.tsx skips
+// role 'admin') — that is what guarantees they can always reach this card to switch it back off.
+// The Preview button below renders the real AnnouncementModal, so what is previewed cannot drift
+// from what ships.
+function AnnouncementCard() {
+  const EMPTY: Announcement = { enabled: false, title: "", body: "", imageUrl: null, updatedAt: "" };
+  const [draft, setDraft] = useState<Announcement>(EMPTY);
+  const [saved, setSaved] = useState<Announcement>(EMPTY);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: Announcement }>("/api/super-admin/announcement", { role: "admin" });
+        if (res.data) { setDraft(res.data); setSaved(res.data); }
+      } catch (e: any) { toast.error(e.message); }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    try {
+      setUploading(true);
+      const url = await uploadFile(file, { role: "owner", folder: "announcements" });
+      setDraft((d) => ({ ...d, imageUrl: url }));
+      toast.success("Image uploaded — remember to Save.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setUploading(false); }
+  }
+
+  async function save(nextEnabled = draft.enabled) {
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ data: Announcement }>("/api/super-admin/announcement", {
+        method: "PATCH", role: "admin",
+        body: JSON.stringify({
+          enabled: nextEnabled,
+          title: draft.title,
+          body: draft.body,
+          imageUrl: draft.imageUrl,
+        }),
+      });
+      setDraft(res.data);
+      setSaved(res.data);
+      toast.success(res.data.enabled ? "Announcement is showing." : "Announcement is hidden.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg bg-primary/10 p-2 text-primary"><Megaphone className="h-4 w-4" /></div>
+          <div>
+            <h3 className="text-sm font-bold text-heading">Announcement popup</h3>
+            <p className="text-xs text-subtle">
+              Owners and tenants see this every time they open the app, until you hide it. You never see it — use Preview.
+            </p>
+          </div>
+        </div>
+        <Badge tone={saved.enabled ? "emerald" : "slate"}>{saved.enabled ? "Showing" : "Hidden"}</Badge>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-subtle">Loading…</p>
+      ) : (
+        <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-4">
+              <Field label="Title" hint="Leave the title and details blank to show only the image.">
+                <TextInput maxLength={120} value={draft.title}
+                  onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
+                  placeholder="e.g. Eid holiday support hours" />
+              </Field>
+              <Field label="Details">
+                <TextArea rows={5} maxLength={1000} value={draft.body}
+                  onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
+                  placeholder="What you want everyone to know." />
+              </Field>
+            </div>
+
+            <div className="space-y-3">
+              <div className="text-sm font-bold text-fg">Image</div>
+              <div className="flex items-center justify-center rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] p-4">
+                {draft.imageUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={draft.imageUrl} alt="Announcement" className="max-h-52 w-full rounded-lg object-contain" />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-8 text-subtle">
+                    <ImageIcon className="h-10 w-10" />
+                    <span className="text-xs">No image uploaded yet</span>
+                  </div>
+                )}
+              </div>
+              <label className="block">
+                <input type="file" accept="image/*" className="hidden" onChange={onPickImage} />
+                <span className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line/[0.1] bg-overlay/[0.03] px-4 py-2.5 text-sm font-semibold text-fg transition hover:bg-overlay/[0.06]">
+                  {uploading ? <Spinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
+                  {draft.imageUrl ? "Replace image" : "Upload image"}
+                </span>
+              </label>
+              {draft.imageUrl && (
+                <Button type="button" variant="secondary" icon={Trash2} className="w-full"
+                  onClick={() => setDraft((d) => ({ ...d, imageUrl: null }))}>
+                  Remove image
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="secondary" loading={saving}>Save announcement</Button>
+            <Button type="button" variant="secondary" icon={Eye} onClick={() => setPreviewing(true)}>Preview</Button>
+            {saved.enabled ? (
+              <Button type="button" variant="danger" icon={EyeOff} loading={saving} onClick={() => save(false)}>
+                Hide it
+              </Button>
+            ) : (
+              <Button type="button" icon={Power} loading={saving} onClick={() => save(true)}>
+                Show it
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-subtle">
+            Saving publishes immediately while it is showing. Everyone sees the popup again the next time they open the app.
+          </p>
+        </form>
+      )}
+
+      {previewing && <AnnouncementModal announcement={draft} onClose={() => setPreviewing(false)} />}
+    </Card>
+  );
+}
+
 function MaintenanceCard() {
   const [mode, setMode] = useState<MaintenanceMode | null>(null);
   const [loading, setLoading] = useState(true);

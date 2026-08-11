@@ -42,6 +42,18 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color" />
+        <!-- Fallback channel for a push that arrives before the app has ever been opened, i.e.
+             before lib/native-push.ts has had a chance to create the real channels. Android would
+             otherwise invent a "Miscellaneous" channel with the system default sound.
+
+             A LITERAL string, not @string/… — the Firebase SDK reads this with Bundle.getString(),
+             which returns null for a metadata entry stored as a resource reference.
+
+             Keep in step with SOUND_CHANNELS in the backend's lib/fcm-send.ts and with
+             createSoundChannels() in lib/native-push.ts. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="bari360_tone_v1" />
     </application>
 
     <!-- Permissions -->

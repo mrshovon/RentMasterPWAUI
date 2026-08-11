@@ -166,6 +166,15 @@ export const bn: Record<string, string> = {
   "Check for updates": "আপডেট দেখুন",
   "Turn on notifications for invoices, payments and maintenance updates.":
     "চালান, পেমেন্ট ও রক্ষণাবেক্ষণের খবর পেতে নোটিফিকেশন চালু করুন।",
+  "Notification sound": "নোটিফিকেশনের শব্দ",
+  "Applies to all your devices, not just this one.":
+    "আপনার সব ডিভাইসে প্রযোজ্য, শুধু এটিতে নয়।",
+  "Play the Bari360 tone": "বাড়ি৩৬০-এর সুরটি বাজান",
+  "Bari360 tone": "বাড়ি৩৬০ সুর",
+  "Device tone": "ডিভাইসের সুর",
+  "Silent": "নিঃশব্দ",
+  "On the web the Bari360 tone plays while the app is open. When it is closed your browser uses its own sound. Install the Android app for the tone every time.":
+    "ওয়েবে অ্যাপ খোলা থাকলে বাড়ি৩৬০-এর সুরটি বাজে। অ্যাপ বন্ধ থাকলে ব্রাউজার তার নিজের শব্দ ব্যবহার করে। সব সময় এই সুর পেতে অ্যান্ড্রয়েড অ্যাপ ইনস্টল করুন।",
   "Change password": "পাসওয়ার্ড পরিবর্তন",
   "Update the password you use to sign in.": "সাইন ইন করার পাসওয়ার্ড পরিবর্তন করুন।",
   "Current password": "বর্তমান পাসওয়ার্ড",
@@ -184,6 +193,9 @@ export const bn: Record<string, string> = {
   "System under maintenance": "সিস্টেম রক্ষণাবেক্ষণে আছে",
   "Maintenance window": "রক্ষণাবেক্ষণের সময়",
   "Continue to sign in": "সাইন ইন করতে এগিয়ে যান",
+
+  // ---------------------------------------------------------------- announcement popup
+  "Got it": "বুঝেছি",
 
   // ---------------------------------------------------------------- tenant dashboard
   "Here's the current status of your suite.": "আপনার ইউনিটের বর্তমান অবস্থা এখানে।",

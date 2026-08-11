@@ -5,6 +5,8 @@ import { ConfirmHost } from "../components/confirm";
 import { UpdateGate } from "../components/update-gate";
 import { MaintenanceGate } from "../components/maintenance-gate";
 import { AnalyticsGate } from "../components/analytics-gate";
+import { AnnouncementGate } from "../components/announcement-gate";
+import { NotificationSoundGate } from "../components/notification-sound-gate";
 import { LanguageProvider } from "../lib/i18n";
 
 export const metadata: Metadata = {
@@ -56,9 +58,14 @@ export default function RootLayout({
           <Toaster />
           <ConfirmHost />
           <UpdateGate />
+          {/* Before MaintenanceGate on purpose: if both ever fire at once, the maintenance
+              portal mounts second and lands on top, which is the one that must be read. */}
+          <AnnouncementGate />
           <MaintenanceGate />
           {/* Renders nothing — loads GA/GTM if the admin has configured and enabled it. */}
           <AnalyticsGate />
+          {/* Renders nothing — plays the Bari360 tone for pushes that land while a page is open. */}
+          <NotificationSoundGate />
         </LanguageProvider>
       </body>
     </html>

@@ -7,6 +7,7 @@
 
 import { isNativeApp } from "./platform";
 import { getSessionToken, BACKEND_API_BASE } from "./api-service";
+import { getStoredSound, playTone } from "./notification-sound";
 
 let started = false;
 
@@ -27,12 +28,23 @@ export async function ensureNativePush(): Promise<void> {
       return;
     }
 
+    await createSoundChannels(PushNotifications);
+
     // FCM token -> backend. Fires again automatically if the token rotates.
     await PushNotifications.addListener("registration", (token) => {
       void registerToken(token.value);
     });
     await PushNotifications.addListener("registrationError", (err) => {
       console.error("[native-push] registration error:", err);
+    });
+
+    // A push that lands while the app is OPEN. Android hands it to the plugin instead of the
+    // notification tray, so nothing is drawn and nothing is played — the owner sitting on their
+    // dashboard would otherwise never know a tenant had just filed something. Play the tone
+    // ourselves, and only the brand one: 'default' is a system sound we have no way to reach from
+    // here, and 'off' means off.
+    await PushNotifications.addListener("pushNotificationReceived", () => {
+      if (getStoredSound() === "custom") playTone();
     });
 
     // Tap on a notification -> deep-link the WebView to payload.data.url.
@@ -45,6 +57,59 @@ export async function ensureNativePush(): Promise<void> {
   } catch (err) {
     console.error("[native-push] setup failed:", err);
     started = false;
+  }
+}
+
+/**
+ * Create one Android notification channel per sound option, so the backend can pick a sound by
+ * naming a channel (see SOUND_CHANNELS in lib/fcm-send.ts on the backend — the ids must match
+ * exactly, or the notification lands on an auto-created channel with default settings).
+ *
+ * ⚠️ Android freezes a channel's sound the moment it is created. Nothing can change it afterwards,
+ * not an app update and not the user's setting — which is exactly why there are three channels
+ * rather than one we reconfigure, and why the ids carry a `_v1`. Changing the brand tone later
+ * means creating `bari360_tone_v2`; editing this is a no-op on every phone that already ran the app.
+ *
+ * `sound` resolves to res/raw/<name> — see android/app/src/main/res/raw/bari360_tone.mp3. The
+ * plugin strips the extension itself.
+ *
+ * Safe to call on every launch: createChannel is an upsert, so this also self-heals after the user
+ * clears app data. Failures are logged and swallowed — a missing channel costs the custom tone,
+ * but push itself must still register.
+ */
+async function createSoundChannels(
+  PushNotifications: typeof import("@capacitor/push-notifications")["PushNotifications"],
+): Promise<void> {
+  try {
+    await PushNotifications.createChannel({
+      id: "bari360_tone_v1",
+      name: "Bari360 alerts",
+      description: "Rent, invoice and maintenance alerts, with the Bari360 tone.",
+      sound: "bari360_tone.mp3",
+      importance: 5,
+      visibility: 1,
+      vibration: true,
+    });
+    await PushNotifications.createChannel({
+      id: "bari360_default_v1",
+      name: "Bari360 alerts (device tone)",
+      description: "The same alerts, using your phone's own notification sound.",
+      importance: 5,
+      visibility: 1,
+      vibration: true,
+    });
+    await PushNotifications.createChannel({
+      id: "bari360_silent_v1",
+      name: "Bari360 alerts (silent)",
+      description: "The same alerts, with no sound. They still appear in your notification tray.",
+      // IMPORTANCE_LOW. Android has no "notification without a sound" flag — silence IS the
+      // importance level, so this is the only way to honour the Off setting on Android 8+.
+      importance: 2,
+      visibility: 1,
+      vibration: false,
+    });
+  } catch (err) {
+    console.error("[native-push] could not create notification channels:", err);
   }
 }
 
