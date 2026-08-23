@@ -7,6 +7,7 @@ import { PushToggle } from "./push-toggle";
 import { DownloadAndroid } from "./download-android";
 import { ThemeToggle } from "./theme-toggle";
 import { LanguageToggle } from "./language-toggle";
+import { LegalLinks } from "./legal-links";
 import { useT } from "../lib/i18n";
 
 export interface NavItem {
@@ -23,7 +24,7 @@ export interface NavItem {
 }
 
 interface ShellProps {
-  brand: "owner" | "tenant" | "admin";
+  brand: "owner" | "tenant" | "admin" | "building";
   roleLabel: string;
   sessionName?: string;
   sessionId?: string;
@@ -52,7 +53,9 @@ export function DashboardShell({
       ? "from-primary to-accent"
       : brand === "admin"
         ? "from-warning to-danger"
-        : "from-success to-accent";
+        : brand === "building"
+          ? "from-accent to-primary"
+          : "from-success to-accent";
 
   const activeTab = nav.find((n) => n.key === active);
 
@@ -150,6 +153,9 @@ export function DashboardShell({
                 row, where a bare icon would read as an unlabelled item next to text ones.
                 Renders only in a browser (hidden inside the installed Android app). */}
             <DownloadAndroid variant="icon" />
+          </div>
+          <div className="flex justify-center pt-1">
+            <LegalLinks />
           </div>
         </div>
       </aside>

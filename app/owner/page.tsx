@@ -6,7 +6,7 @@ import {
   Plus, MapPin, KeyRound, Phone, CircleDollarSign, Home, TriangleAlert,
   CheckCircle2, Send, Circle, Inbox, Pencil, DoorOpen, FileText, Trash2, Upload, Download, X, History,
   Receipt, PenLine, Gem, Crown, Sparkles, ArrowUpCircle, Infinity as InfinityIcon, CalendarClock, Copy, RotateCcw,
-  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle, HardHat, Wallet, Info,
+  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle, HardHat, Wallet, Info, Share2,
 } from "lucide-react";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
 import { validateEmail, validatePhone } from "../../lib/validate";
@@ -36,6 +36,7 @@ import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { StaffTab } from "../../components/staff-tab";
 import { AccountsTab } from "../../components/accounts-tab";
+import { ServiceChargeTab } from "../../components/service-charge-tab";
 import { AppSettingsCard } from "../../components/app-settings-card";
 import { useT, useLang } from "../../lib/i18n";
 import { translateNoticeText } from "../../lib/notice-i18n";
@@ -267,6 +268,9 @@ export default function OwnerDashboard() {
     // The crown says so up front, instead of the tab looking free until you open it.
     { key: "staff", label: t("Staff"), icon: HardHat, locked: !plan?.features?.staff?.enabled },
     { key: "accounts", label: t("Accounts"), icon: Wallet, locked: !plan?.features?.accounts?.enabled },
+    // Only for a flat owner inside a Whole Building plan. Everyone else has no such invoices, so
+    // the tab would be an empty screen asking to be understood.
+    ...(plan?.building ? [{ key: "service-charge", label: t("Service charge"), icon: ReceiptText }] : []),
     { key: "plan", label: t("Plan"), icon: Gem },
     { key: "support", label: t("Support"), icon: LifeBuoy, badge: metrics.openSupport },
     { key: "settings", label: t("Settings"), icon: Settings },
@@ -376,15 +380,18 @@ export default function OwnerDashboard() {
       .sort((a, b) => a.paid_on.localeCompare(b.paid_on));
   }
 
-  // Build an "Owner Copy" receipt (paid OR due) and open the preview, ready to share via WhatsApp.
-  function openOwnerReceipt(l: BillingLedger) {
+  // Build a receipt (paid OR due) and open the preview, ready to share via WhatsApp.
+  // `copy` picks which side's document it is: the owner's own record, or the tenant's copy —
+  // same figures, same signature, only the label at the top differs. The tenant copy is offered
+  // by the UI only once the invoice is settled; see BillingTab.
+  function openReceipt(l: BillingLedger, copy: "owner" | "tenant") {
     // Named `tenant`, not `t`: `t` is the translator in this scope, and shadowing it here is how
     // the receipt's copy label silently stopped being translatable.
     const tenant = tenants.find((x) => x.id === l.tenant_id);
     const prop = properties.find((p) => p.id === l.property_id);
     const tenantName = l.tenants?.name || tenant?.name || "Tenant";
     const html = buildReceiptHtml({
-      copyLabel: t("Owner Copy"),
+      copyLabel: copy === "tenant" ? t("Tenant Copy") : t("Owner Copy"),
       // A property can carry its own name for receipts (a building or business name); the
       // account name is the fallback.
       ownerName: prop?.receipt_name || session?.name || "Owner",
@@ -520,7 +527,8 @@ export default function OwnerDashboard() {
           onSent={setPaymentStatus}
           onPaid={setPayFor}
           onHistory={setHistoryFor}
-          onReceipt={openOwnerReceipt}
+          onReceipt={(l) => openReceipt(l, "owner")}
+          onTenantCopy={(l) => openReceipt(l, "tenant")}
           onSignature={() => setSigOpen(true)}
           hasSignature={!!ownerSignature}
         />
@@ -556,6 +564,8 @@ export default function OwnerDashboard() {
           onContact={() => setAccountsContactOpen(true)}
         />
       )}
+
+      {tab === "service-charge" && <ServiceChargeTab />}
 
       {tab === "support" && (
         <SupportTab tickets={tickets} onCreate={() => setTicketOpen(true)} />
@@ -797,6 +807,55 @@ function UsageMeter({ label, current, limit, icon: Icon }: { label: string; curr
   );
 }
 
+// The Plan tab for a flat owner inside a Whole Building plan. Deliberately has no price, no tier
+// list and no payment button: the building administrator is billed, not this owner. See
+// GET /api/admin/subscription, which returns `building` and an empty `availableTiers` for them.
+function BuildingManagedPlan({ plan }: { plan: SubscriptionResponse }) {
+  const t = useT();
+  const b = plan.building!;
+  const s = plan.subscription;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Your plan"
+        subtitle="This account is covered by your building's plan."
+      />
+
+      <Card className="p-5">
+        <div className="flex items-start gap-4">
+          <div className="rounded-xl bg-primary/10 p-3">
+            <Building2 className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-heading">{s.tierName}</h3>
+            <p className="mt-1 text-sm text-muted">
+              {t("Your building administrator manages and pays for this plan.")}
+            </p>
+            {b.unitLabel && (
+              <p className="mt-2 text-sm text-fg">
+                <span className="text-muted">{t("Your flat")}: </span>
+                <strong className="text-heading">{b.unitLabel}</strong>
+              </p>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <UsageMeter label="Properties" current={plan.usage.properties.current} limit={plan.usage.properties.limit} icon={Building2} />
+        <UsageMeter label="Tenants" current={plan.usage.tenants.current} limit={plan.usage.tenants.limit} icon={Users} />
+      </div>
+
+      <Card className="p-5">
+        <p className="text-sm text-muted">
+          {t("There is nothing to pay and nothing to renew here. To change what your account can do, speak to your building administrator.")}
+        </p>
+      </Card>
+    </div>
+  );
+}
+
 function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | null; onReload: () => Promise<void>; ownerName: string | null }) {
   const t = useT();
   const [busy, setBusy] = useState<string | null>(null);
@@ -818,6 +877,14 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
       <EmptyState icon={Gem} title="Loading your plan…" hint="Fetching your subscription details."
         action={<Button size="sm" variant="secondary" onClick={onReload}>Retry</Button>} />
     );
+  }
+
+  // A flat owner inside a Whole Building plan has no plan of their own to manage — their building
+  // administrator is the billing party. They get a plain statement of who covers them instead of
+  // a price list. The server refuses the switch and the payment anyway (403 BUILDING_MANAGED_PLAN);
+  // this only stops the UI offering buttons that can only fail.
+  if (plan.building) {
+    return <BuildingManagedPlan plan={plan} />;
   }
 
   const s = plan.subscription;
@@ -1630,7 +1697,7 @@ function TenantsTab({
 /* ============================================================ BILLING */
 function BillingTab({
   ledgers, payments, outstanding, onCreate, onUnpaid, onSent, onPaid, onHistory,
-  onReceipt, onSignature, hasSignature,
+  onReceipt, onTenantCopy, onSignature, hasSignature,
 }: {
   ledgers: BillingLedger[]; payments: BillingPayment[]; outstanding: number;
   onCreate: () => void;
@@ -1638,7 +1705,10 @@ function BillingTab({
   onSent: (id: string, s: PaymentStatus) => void;
   onPaid: (l: BillingLedger) => void;
   onHistory: (l: BillingLedger) => void;
-  onReceipt: (l: BillingLedger) => void; onSignature: () => void; hasSignature: boolean;
+  onReceipt: (l: BillingLedger) => void;
+  /** Offered only on a settled invoice — the tenant's own copy of the receipt, ready to send. */
+  onTenantCopy: (l: BillingLedger) => void;
+  onSignature: () => void; hasSignature: boolean;
 }) {
   const t = useT();
   const paymentCount = (id: string) => payments.filter((p) => p.ledger_id === id).length;
@@ -1696,7 +1766,12 @@ function BillingTab({
                 </tr>
               </thead>
               <tbody className="divide-y divide-line/[0.04]">
-                {filtered.map((l) => (
+                {filtered.map((l) => {
+                  // Settled = frozen. The status is a record of money the owner has confirmed,
+                  // so from here neither side may move it; only the history (read-only) and the
+                  // receipts stay live. Mirrored server-side — see SETTLED_INVOICE_ERROR.
+                  const locked = l.payment_status === "paid";
+                  return (
                   <tr key={l.id} className="hover:bg-overlay/[0.02]">
                     <td className="p-4">
                       <div className="font-semibold text-heading">{l.tenants?.name ?? "Tenant"}</div>
@@ -1711,7 +1786,16 @@ function BillingTab({
                     </td>
                     <td className="p-4 font-bold text-heading">{formatCurrency(l.total_payable)}</td>
                     <td className="p-4">
-                      <Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge>
+                        {/* Says why the buttons on this row are dead, so a locked invoice reads
+                            as deliberate rather than broken. */}
+                        {locked && (
+                          <span title={t("Settled — this invoice is locked")} className="text-subtle">
+                            <Lock className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                      </div>
                       {l.payment_status === "paid" && l.paid_at && (
                         <div className="mt-1 text-xs text-subtle">on {formatDate(l.paid_at)}</div>
                       )}
@@ -1727,6 +1811,14 @@ function BillingTab({
                           className="rounded-lg p-1.5 text-primary transition hover:bg-primary/10">
                           <Receipt className="h-4 w-4" />
                         </button>
+                        {/* The tenant's own copy, sendable over WhatsApp. Only once the money is
+                            confirmed — before that there is nothing to give a receipt for. */}
+                        {locked && (
+                          <button title={t("Share tenant copy")} onClick={() => onTenantCopy(l)}
+                            className="rounded-lg p-1.5 text-success transition hover:bg-success/10">
+                            <Share2 className="h-4 w-4" />
+                          </button>
+                        )}
                         {paymentCount(l.id) > 0 && (
                           <button title={`Payments (${paymentCount(l.id)})`} onClick={() => onHistory(l)}
                             className="rounded-lg p-1.5 text-muted transition hover:bg-overlay/[0.06] hover:text-heading">
@@ -1734,17 +1826,19 @@ function BillingTab({
                           </button>
                         )}
                         <StatusButton active={l.payment_status === "unpaid"} tone="rose" icon={Circle}
-                          onClick={() => onUnpaid(l)} title="Unpaid" />
+                          onClick={() => onUnpaid(l)} title="Unpaid" disabled={locked} />
                         <StatusButton active={l.payment_status === "sent"} tone="amber" icon={Send}
-                          onClick={() => onSent(l.id, "sent")} title="Sent" />
+                          onClick={() => onSent(l.id, "sent")} title="Sent" disabled={locked} />
                         {/* Asks for the amount and date, so rent paid in parts can be recorded
-                            part by part. Stays enabled on a settled invoice for a late top-up. */}
+                            part by part — until the invoice settles, after which it is frozen
+                            (no late top-ups, no corrections). */}
                         <StatusButton active={l.payment_status === "paid"} tone="emerald" icon={CheckCircle2}
-                          onClick={() => onPaid(l)} title="Payment received" />
+                          onClick={() => onPaid(l)} title="Payment received" disabled={locked} />
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1757,11 +1851,14 @@ function BillingTab({
 }
 
 function StatusButton({
-  active, tone, icon: Icon, onClick, title,
+  active, tone, icon: Icon, onClick, title, disabled = false,
 }: {
   active: boolean; tone: "rose" | "amber" | "emerald";
   icon: typeof Circle; onClick: () => void; title: string;
+  /** Set on a settled invoice, where the status may no longer be moved at all. */
+  disabled?: boolean;
 }) {
+  const t = useT();
   const tones = {
     rose: "text-danger hover:bg-danger/10",
     amber: "text-warning hover:bg-warning/10",
@@ -1769,9 +1866,11 @@ function StatusButton({
   };
   return (
     <button
-      title={title}
+      // Interpolated, so it can never be an exact dictionary key — only the reason is translated.
+      title={disabled ? `${title} — ${t("Settled — this invoice is locked")}` : title}
       onClick={onClick}
-      className={`rounded-lg p-1.5 transition ${tones[tone]} ${active ? "bg-overlay/[0.06] ring-1 ring-line/10" : "text-faint"}`}
+      disabled={disabled}
+      className={`rounded-lg p-1.5 transition ${tones[tone]} ${active ? "bg-overlay/[0.06] ring-1 ring-line/10" : "text-faint"} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`}
     >
       <Icon className="h-4 w-4" />
     </button>
@@ -2304,7 +2403,9 @@ function PaymentReceivedModal({
 
 /**
  * The installments recorded against one invoice, with the running balance. Also the undo path:
- * deleting a payment walks the invoice's status back down on its own.
+ * deleting a payment walks the invoice's status back down on its own — which is exactly why the
+ * delete button disappears once the invoice is settled. Leaving it would make the status lock
+ * bypassable in one click, and the server refuses the call anyway.
  */
 function PaymentHistoryModal({
   ledger, payments, dueDay, onClose, onDelete,
@@ -2315,7 +2416,9 @@ function PaymentHistoryModal({
   onClose: () => void;
   onDelete: (p: BillingPayment) => Promise<void>;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState<string | null>(null);
+  const locked = ledger?.payment_status === "paid";
   const total = Number(ledger?.total_payable || 0);
   const paid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
   const balance = Math.max(0, total - paid);
@@ -2375,12 +2478,21 @@ function PaymentHistoryModal({
                   </div>
                   <div className="mt-0.5 text-xs text-muted">{formatDate(p.paid_on)}</div>
                 </div>
-                <button title="Delete" disabled={busy === p.id} onClick={() => remove(p)}
-                  className="rounded-lg p-1.5 text-danger transition hover:bg-danger/10 disabled:opacity-50">
-                  {busy === p.id ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
-                </button>
+                {!locked && (
+                  <button title="Delete" disabled={busy === p.id} onClick={() => remove(p)}
+                    className="rounded-lg p-1.5 text-danger transition hover:bg-danger/10 disabled:opacity-50">
+                    {busy === p.id ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+                  </button>
+                )}
               </div>
             ))
+          )}
+
+          {locked && payments.length > 0 && (
+            <p className="flex items-center justify-center gap-1.5 text-center text-xs text-subtle">
+              <Lock className="h-3.5 w-3.5" />
+              {t("This invoice is settled — payments can no longer be changed.")}
+            </p>
           )}
         </div>
       )}

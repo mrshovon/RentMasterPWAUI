@@ -13,6 +13,7 @@
 // =============================================================================
 
 import { reportClientError } from "./client-log";
+import { LEGAL_VERSION } from "../content/legal/generated";
 
 export const BACKEND_API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
@@ -86,12 +87,32 @@ const SESSION_KEY = "rentmaster_session";
 // The shape we persist in localStorage. `refreshToken`/`expiresAt` are present for owner/admin
 // (Supabase) sessions and drive silent token renewal; tenants have a long-lived JWT and neither.
 export interface StoredSession {
-  role: "owner" | "tenant" | "admin";
+  // "building" is the BUILDING ADMIN. The auth metadata role is `building_admin`; it is stored
+  // in the short form here because this value doubles as the dashboard route segment
+  // (`window.location.replace("/" + role)`), and `/building_admin` is not a URL anyone wants.
+  role: "owner" | "tenant" | "admin" | "building";
   userId: string;
   name: string;
   token?: string;
   refreshToken?: string;
   expiresAt?: number; // unix seconds (Supabase session.expires_at)
+}
+
+/**
+ * Map the role the backend reports (straight from auth user_metadata) to the role we store —
+ * which doubles as the dashboard route segment, so `building_admin` becomes `building`.
+ *
+ * Anything unrecognised falls back to "owner", which is what the login page did before this
+ * existed and what middleware does server-side.
+ */
+export function sessionRoleFor(authRole: string | null | undefined): StoredSession["role"] {
+  switch (authRole) {
+    case "admin": return "admin";
+    case "tenant": return "tenant";
+    case "building_admin":
+    case "building": return "building";
+    default: return "owner";
+  }
 }
 
 export function getStoredSession(): StoredSession | null {
@@ -224,10 +245,29 @@ export async function apiLogin(payload: {
   return json;
 }
 
+// Which edition of the Terms and Privacy Policy is currently published. Public endpoint — the
+// signup form needs this before any account exists. Falls back to the version compiled into the
+// documents themselves, so a failed read never blocks signup; the backend applies the same
+// fallback, so the two agree.
+export async function apiTermsVersion(): Promise<string> {
+  try {
+    const res = await fetch(`${BACKEND_API_BASE}/api/app/terms-version`, { cache: "no-store" });
+    const json = await res.json().catch(() => ({}));
+    const version = json?.data?.version;
+    return typeof version === "string" && version.trim() ? version.trim() : LEGAL_VERSION;
+  } catch {
+    return LEGAL_VERSION;
+  }
+}
+
 // Owner self-signup → creates an auto-confirmed owner and returns a session (same shape as
 // apiLogin) so the caller can persist() and land on /owner. Throws with the backend's message.
 export async function apiSignup(payload: {
   name: string; email: string; phone?: string; password: string;
+  // Consent, recorded server-side in terms_acceptances. `termsVersion` is the edition the form
+  // actually displayed, echoed back so the stored record names the text this person was shown.
+  // The backend refuses with TERMS_NOT_ACCEPTED unless acceptedTerms is literally true.
+  acceptedTerms: boolean; termsVersion: string;
 }): Promise<{ token: string; refreshToken?: string; expiresAt?: number; role: string; id: string; name: string }> {
   let res: Response;
   try {

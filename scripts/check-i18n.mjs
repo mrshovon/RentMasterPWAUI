@@ -30,6 +30,15 @@ const ROOT = process.cwd();
 const INCLUDE_DIRS = ["app", "components", "lib"];
 const EXCLUDE = [
   "app/admin/page.tsx",     // super-admin console — intentionally English
+  // The building-admin console is an operator tool, English by the same standing decision as the
+  // super-admin console above. The OWNER-facing view of the same service charges is
+  // components/service-charge-tab.tsx, which is in scope and fully translated.
+  "app/building/page.tsx",
+  "components/building-invoices-tab.tsx",
+  "components/building-spaces-tab.tsx",
+  "components/building-setup-tab.tsx",
+  "components/building-notices-tab.tsx",
+  "components/building-reports-tab.tsx",
   "app/global-error.tsx",   // runs with the LanguageProvider gone; English by necessity
   "app/sw.ts",              // service worker: no React context at all
 ];

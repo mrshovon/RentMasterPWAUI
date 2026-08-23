@@ -331,8 +331,186 @@ export interface SubscriptionResponse {
   pendingEvent: PendingPlanEvent | null;
   usage: PlanUsage;
   disabled: { propertyIds: string[]; tenantIds: string[] };
+  /** Empty for an owner under a building — there is nothing for them to switch to. */
   availableTiers: SubscriptionTier[];
   features: FeatureMap;
+  /** Set when this owner is a flat owner inside a Whole Building plan. Their building admin is
+   *  the billing party, so the Plan tab shows who covers them instead of a price list. */
+  building?: { id: string; name: string; unitLabel: string | null } | null;
+}
+
+/* ---------- Whole Building ---------- */
+
+export interface Building {
+  id: string;
+  building_no?: number;
+  admin_id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  letterhead_url: string | null;
+  signatory_name: string | null;
+  signatory_title: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  /** Only on GET /api/admin/building — how many owners are on the roster. */
+  owner_count?: number;
+}
+
+export type BuildingNoticeAudience = "all_owners" | "all_tenants" | "individual_owner";
+
+/** The canonical PRINTABLE record of a building notice. Its in-app copies live in the ordinary
+ *  `notices` table, written by the fan-out in the POST route — this row is what carries the
+ *  reference number and issue date a physical notice needs. */
+export interface BuildingNotice {
+  id: string;
+  notice_no?: number;
+  building_id: string;
+  title: string;
+  content: string;
+  audience: BuildingNoticeAudience;
+  target_owner_id: string | null;
+  issued_on: string;
+  reference_no: string | null;
+  /** How many in-app notices the fan-out actually created. */
+  delivered_count: number;
+  created_at: string;
+}
+
+/** GET /api/admin/building/reports?kind=income_expense */
+export interface BuildingPeriodReport {
+  success: boolean;
+  kind: "income_expense";
+  building: BuildingReportHeader;
+  period: { from: string; to: string };
+  income: { total: number; lines: { category: string; amount: number }[] };
+  expense: { total: number; lines: { category: string; amount: number }[] };
+  net: number;
+  entryCount: number;
+}
+
+/** GET /api/admin/building/reports?kind=owner_statement */
+export interface BuildingOwnerReport {
+  success: boolean;
+  kind: "owner_statement";
+  building: BuildingReportHeader;
+  owner: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    unitLabel: string | null;
+    defaultServiceCharge: number;
+    joinedAt: string | null;
+  };
+  invoices: BuildingServiceInvoice[];
+  totals: { billed: number; received: number; due: number };
+}
+
+/** camelCase on purpose — this is the report API's shape, not a database row. */
+export interface BuildingReportHeader {
+  id: string;
+  name: string;
+  address: string | null;
+  city: string | null;
+  letterheadUrl: string | null;
+  signatoryName: string | null;
+  signatoryTitle: string | null;
+}
+
+/** A definition, not a ledger entry: `monthly_cost` is an indicative running cost the building
+ *  admin types in, and nothing derives from it. See ADD_BUILDING_EXTRAS.sql. */
+export interface BuildingAmenity {
+  id: string;
+  building_id: string;
+  name: string;
+  description: string | null;
+  monthly_cost: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Also a definition. The money itself lives in account_transactions; this exists so it arrives
+ *  under a consistent category instead of differently-typed free text each month. */
+export interface BuildingIncomeSource {
+  id: string;
+  building_id: string;
+  name: string;
+  category: string | null;
+  default_amount: number;
+  note: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** unpaid -> partial -> paid. Deliberately has no 'sent': that value exists on a rent invoice
+ *  because a tenant can claim "I've paid" from their own app. Service charges are recorded by
+ *  the building admin alone. */
+export type BuildingInvoiceStatus = "unpaid" | "partial" | "paid";
+
+export interface BuildingServicePayment {
+  id: string;
+  payment_no?: number;
+  invoice_id: string;
+  building_id: string;
+  owner_id: string;
+  amount: number;
+  paid_on: string;
+  method: StaffPaymentMethod;
+  note: string | null;
+  created_at: string;
+}
+
+export interface BuildingServiceInvoice {
+  id: string;
+  invoice_no?: number;
+  building_id: string;
+  admin_id: string;
+  owner_id: string;
+  billing_month: string; // "YYYY-MM"
+  service_charge: number;
+  extra_charge: number;
+  extra_charge_remarks: string | null;
+  discount: number;
+  total_payable: number;
+  // Derived server-side by recalcBuildingInvoice() — never written by hand.
+  amount_paid: number;
+  payment_status: BuildingInvoiceStatus;
+  paid_at: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Present on the single-invoice GET and on the owner's statement, not on the list. */
+  payments?: BuildingServicePayment[];
+}
+
+/** GET /api/admin/building/statement — the flat owner's read of their own service charges.
+ *  `building` is null when this owner is not in a building, which is how the owner dashboard
+ *  decides whether to show the tab at all. */
+export interface BuildingStatementResponse {
+  success: boolean;
+  building: { id: string; name: string; unitLabel: string | null } | null;
+  count: number;
+  data: BuildingServiceInvoice[];
+}
+
+export interface BuildingOwner {
+  building_id: string;
+  owner_id: string;
+  unit_label: string | null;
+  default_service_charge: number;
+  joined_at: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  // Joined from the auth user behind the roster row, server-side.
+  email: string | null;
+  name: string | null;
+  phone: string | null;
+  suspended: boolean;
 }
 
 export interface AdminOwner {

@@ -29,7 +29,7 @@ function sameSession(a: SessionProfile, b: SessionProfile): boolean {
  * React state still held the old profile and the mount effect never fired again. The page
  * painted in full. So: `replace` on the way out, and re-validate on the way back in.
  */
-export function useSessionGuard(allowedRole?: "owner" | "tenant" | "admin") {
+export function useSessionGuard(allowedRole?: "owner" | "tenant" | "admin" | "building") {
   const [session, setSession] = useState<SessionProfile | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
 
@@ -85,7 +85,7 @@ export function useSessionGuard(allowedRole?: "owner" | "tenant" | "admin") {
     };
   }, [allowedRole]);
 
-  const login = (role: "owner" | "tenant" | "admin", userId: string, name: string) => {
+  const login = (role: "owner" | "tenant" | "admin" | "building", userId: string, name: string) => {
     setStoredSession({ role, userId, name });
     window.location.replace(`/${role}`);
   };

@@ -2955,9 +2955,10 @@ function CirculateTab({ owners }: { owners: AdminOwner[] }) {
 
 /* ============================================================ CREATE OWNER */
 function CreateOwnerModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
-  const empty = { email: "", pass: "", name: "", phone: "", role: "owner" };
+  const empty = { email: "", pass: "", name: "", phone: "", role: "owner", buildingName: "" };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const isBuildingAdmin = form.role === "building_admin";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -2974,7 +2975,16 @@ function CreateOwnerModal({ open, onClose, onCreated }: { open: boolean; onClose
         method: "POST", role: "admin",
         body: JSON.stringify({ ...form, email: parsedEmail.value, phone: parsedPhone.value }),
       });
-      if (res.success) { setForm(empty); onCreated(); onClose(); toast.success("Owner account created."); }
+      if (res.success) {
+        setForm(empty);
+        onCreated();
+        onClose();
+        // The backend creates the building and assigns the Whole Building plan best-effort, and
+        // reports anything it could not finish. Surfacing those is the difference between "the
+        // account exists" and "the account works".
+        if (res.warnings?.length) res.warnings.forEach((w: string) => toast.warning(w));
+        else toast.success(isBuildingAdmin ? "Building admin account created." : "Owner account created.");
+      }
     } catch (e: any) { toast.error(e.message); }
     finally { setSaving(false); }
   }
@@ -2998,10 +3008,21 @@ function CreateOwnerModal({ open, onClose, onCreated }: { open: boolean; onClose
           <Field label="Role">
             <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
               <option value="owner">Owner</option>
+              <option value="building_admin">Building Admin</option>
               <option value="admin">Admin</option>
             </Select>
           </Field>
         </div>
+        {isBuildingAdmin && (
+          <Field
+            label="Building name"
+            required
+            hint="Their building is created with this name and put on the Whole Building plan. They can edit the address and letterhead themselves."
+          >
+            <TextInput required value={form.buildingName}
+              onChange={(e) => setForm({ ...form, buildingName: e.target.value })} />
+          </Field>
+        )}
         <Button type="submit" loading={saving} className="w-full">Create account</Button>
       </form>
     </Modal>

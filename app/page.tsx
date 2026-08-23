@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ArrowRight, Phone, Lock, Mail, User } from "lucide-react";
 import {
-  apiLogin, apiForgotPassword, apiSignup,
-  getStoredSession, setStoredSession, clearSession, ensureValidToken,
+  apiLogin, apiForgotPassword, apiSignup, apiTermsVersion,
+  getStoredSession, setStoredSession, clearSession, ensureValidToken, sessionRoleFor,
 } from "../lib/api-service";
+import { LegalLinks } from "../components/legal-links";
+import { LEGAL_VERSION } from "../content/legal/generated";
 import { Button, Modal, Field, TextInput, PasswordInput, EmailField, PhoneField } from "../components/ui";
 import { validateEmail, validatePhone } from "../lib/validate";
 import { toast } from "../components/toast";
@@ -84,7 +87,7 @@ export default function EntryGatewayPage() {
   // re-registers permitted devices on every dashboard mount and otherwise prompts from an
   // explicit button. `replace` (not `href`) so Back doesn't land on the login screen while signed in.
   function persist(
-    role: "owner" | "tenant" | "admin", userId: string, name: string,
+    role: "owner" | "tenant" | "admin" | "building", userId: string, name: string,
     token?: string, refreshToken?: string, expiresAt?: number,
   ) {
     setStoredSession({ role, userId, name, token, refreshToken, expiresAt });
@@ -122,7 +125,10 @@ export default function EntryGatewayPage() {
     try {
       setLoading(true);
       const r = await apiLogin({ mode: "owner", email: parsedEmail.value, password: ownerPass });
-      persist(r.role === "admin" ? "admin" : "owner", r.id, r.name, r.token, r.refreshToken, r.expiresAt);
+      // sessionRoleFor maps the auth metadata role onto the stored role AND the route segment.
+      // This line used to collapse everything that was not "admin" into "owner", which is where a
+      // new role silently lands on the wrong dashboard.
+      persist(sessionRoleFor(r.role), r.id, r.name, r.token, r.refreshToken, r.expiresAt);
     } catch (err: any) {
       setError(err.message);
       setLoading(false);
@@ -168,6 +174,7 @@ export default function EntryGatewayPage() {
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-faint">Bari360 · v{APP_VERSION}</span>
             <DownloadAndroid variant="icon" />
+            <LegalLinks />
           </div>
         </div>
 
@@ -291,9 +298,12 @@ export default function EntryGatewayPage() {
               )}
             </div>
 
-            {/* Mobile download affordance (the brand panel's is desktop-only). Browser-only. */}
-            <div className="flex justify-center lg:hidden">
+            {/* Mobile download affordance (the brand panel's is desktop-only). Browser-only.
+                The legal links ride along here for the same reason: on a phone the brand panel
+                never renders, so this is the ONLY place an unauthenticated visitor can reach them. */}
+            <div className="flex flex-col items-center gap-3 lg:hidden">
               <DownloadAndroid variant="icon" />
+              <LegalLinks />
             </div>
           </div>
         </div>
@@ -318,8 +328,20 @@ function SignupModal({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [accepted, setAccepted] = useState(false);
+  // The edition of the documents this form is showing. Echoed back on submit so the consent row
+  // records the text the person actually saw, not whatever the server considers current later.
+  const [termsVersion, setTermsVersion] = useState(LEGAL_VERSION);
   const [submitting, setSubmitting] = useState(false);
   const t = useT();
+
+  // Only worth asking once the modal is actually open.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    apiTermsVersion().then((v) => { if (!cancelled) setTermsVersion(v); });
+    return () => { cancelled = true; };
+  }, [open]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -331,10 +353,15 @@ function SignupModal({
     const parsedPhone = validatePhone(phone);
     if (!parsedPhone.ok) { toast.error(t(parsedPhone.error)); return; }
     if (password.length < 8) { toast.error(t("Password must be at least 8 characters.")); return; }
+    // The button is disabled until this is ticked, so this guard is for the paths that bypass it
+    // (Enter in a text field). The backend enforces it independently — a client-side tick-box is
+    // not a consent record.
+    if (!accepted) { toast.error(t("Please accept the Terms and Privacy Policy.")); return; }
     try {
       setSubmitting(true);
       const r = await apiSignup({
         name: name.trim(), email: parsedEmail.value, phone: parsedPhone.value, password,
+        acceptedTerms: true, termsVersion,
       });
       toast.success(t("Welcome to Bari360!"));
       onSuccess(r.id, r.name, r.token, r.refreshToken, r.expiresAt);
@@ -358,7 +385,41 @@ function SignupModal({
         <Field label={t("Password")} required hint={t("At least 8 characters.")}>
           <PasswordInput required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
-        <Button type="submit" loading={submitting} className="w-full" icon={User}>
+        {/* Consent. The sentence is ONE translation key with {terms}/{privacy} placeholders rather
+            than three concatenated fragments — Bangla puts the noun phrases in a different order,
+            and fragment-joining produces nonsense there. */}
+        <label className="flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed text-muted">
+          <input
+            type="checkbox"
+            checked={accepted}
+            onChange={(e) => setAccepted(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[rgb(var(--primary))]"
+          />
+          <span>
+            {t("I agree to the {terms} and the {privacy}.")
+              .split(/(\{terms\}|\{privacy\})/)
+              .map((part, i) => {
+                if (part === "{terms}") {
+                  return (
+                    <Link key={i} href="/terms" target="_blank"
+                      className="font-semibold text-primary underline underline-offset-2 hover:opacity-80">
+                      {t("Terms & Conditions")}
+                    </Link>
+                  );
+                }
+                if (part === "{privacy}") {
+                  return (
+                    <Link key={i} href="/privacy" target="_blank"
+                      className="font-semibold text-primary underline underline-offset-2 hover:opacity-80">
+                      {t("Privacy Policy")}
+                    </Link>
+                  );
+                }
+                return <span key={i}>{part}</span>;
+              })}
+          </span>
+        </label>
+        <Button type="submit" loading={submitting} disabled={!accepted} className="w-full" icon={User}>
           {t("Create account")}
         </Button>
       </form>

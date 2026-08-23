@@ -13,6 +13,18 @@
 // =============================================================================
 
 export const bn: Record<string, string> = {
+  // ---------------------------------------------------------------- legal / consent
+  // The consent sentence is one key with {terms}/{privacy} placeholders, not three fragments —
+  // Bangla orders the noun phrases differently and joined fragments read as nonsense there.
+  "I agree to the {terms} and the {privacy}.": "আমি {terms} এবং {privacy} মেনে নিচ্ছি।",
+  "Please accept the Terms and Privacy Policy.":
+    "অনুগ্রহ করে শর্তাবলি ও গোপনীয়তা নীতি মেনে নিন।",
+  "Terms & Conditions": "শর্তাবলি",
+  "Privacy Policy": "গোপনীয়তা নীতি",
+  Terms: "শর্তাবলি",
+  Privacy: "গোপনীয়তা",
+  Back: "ফিরে যান",
+
   // ---------------------------------------------------------------- login / signup
   "Property Management, Reimagined": "সম্পত্তি ব্যবস্থাপনা, নতুন রূপে",
   "Properties, tenants, billing and requests — one calm dashboard.":
@@ -559,6 +571,10 @@ export const bn: Record<string, string> = {
   "Rent Receipt": "ভাড়ার রসিদ",
   "Owner Copy": "মালিকের কপি",
   "Tenant Copy": "ভাড়াটিয়ার কপি",
+  "Share tenant copy": "ভাড়াটিয়ার কপি শেয়ার করুন",
+  "Settled — this invoice is locked": "পরিশোধিত — এই চালানটি লক করা",
+  "This invoice is settled — payments can no longer be changed.":
+    "এই চালানটি পরিশোধিত — পেমেন্ট আর পরিবর্তন করা যাবে না।",
   "Message copied — long-press to paste it as the caption in WhatsApp.":
     "বার্তা কপি হয়েছে — WhatsApp-এ ক্যাপশন হিসেবে পেস্ট করতে চেপে ধরুন।",
   "Hello {tenant}, please find your rent receipt for {month}. Amount: {amount} ({status}).":
@@ -656,7 +672,49 @@ export const bn: Record<string, string> = {
   "Signature saved.": "স্বাক্ষর সংরক্ষিত হয়েছে।",
   "Transparent PNG recommended": "স্বচ্ছ PNG দেওয়াই ভালো",
 
+  // ---- Whole Building: the PRINTED documents (lib/building-print.ts) + print modal ----
+  // These leave the app and land in an owner's hands on paper, so the language must not revert
+  // to English the way it once did on receipts.
+  "Income & Expense Statement": "আয় ও ব্যয়ের বিবরণী",
+  "Service Charge Statement": "সার্ভিস চার্জ বিবরণী",
+  "Authorised Signature": "অনুমোদিত স্বাক্ষর",
+  "Generated on": "তৈরির তারিখ",
+  "Issued": "ইস্যুর তারিখ",
+  "Period": "সময়কাল",
+  "Surplus": "উদ্বৃত্ত",
+  "Deficit": "ঘাটতি",
+  "Flat": "ফ্ল্যাট",
+  "Nothing recorded in this period.": "এই সময়ে কোনো লেনদেন রেকর্ড হয়নি।",
+  "No invoices have been issued yet.": "এখনও কোনো ইনভয়েস দেওয়া হয়নি।",
+  "Balance shown is the amount outstanding after each month's invoice.": "প্রতিটি মাসের ইনভয়েসের পর অবশিষ্ট বকেয়া এখানে দেখানো হয়েছে।",
+  "Your browser's print dialog can also save this as a PDF.": "আপনার ব্রাউজারের প্রিন্ট উইন্ডো থেকে এটি PDF হিসেবেও সংরক্ষণ করা যাবে।",
+  "Saved to": "সংরক্ষণ করা হয়েছে",
+  "The document isn't ready yet — try again in a moment.": "ডকুমেন্টটি এখনও প্রস্তুত নয় — একটু পরে আবার চেষ্টা করুন।",
+  "Could not turn the document into an image on this device.": "এই ডিভাইসে ডকুমেন্টটিকে ছবিতে রূপান্তর করা যায়নি।",
+
+  // ---- Whole Building: the flat owner's service-charge tab (components/service-charge-tab.tsx) ----
+  // Read-only on purpose — the building administrator issues these and records the money.
+  "Service charge invoice": "সার্ভিস চার্জ ইনভয়েস",
+  "What your building bills you each month, and what has been received.": "আপনার ভবন প্রতি মাসে আপনার কাছে যা দাবি করে এবং যা জমা পড়েছে।",
+  "Your building administrator issues these invoices and records the payments.": "আপনার ভবন প্রশাসক এই ইনভয়েসগুলো তৈরি করেন এবং পেমেন্ট রেকর্ড করেন।",
+  "No service charge invoices yet": "এখনও কোনো সার্ভিস চার্জ ইনভয়েস নেই",
+  "Your building administrator has not issued one to you.": "আপনার ভবন প্রশাসক এখনও আপনাকে কোনো ইনভয়েস দেননি।",
+  "Nothing received against this invoice yet.": "এই ইনভয়েসের বিপরীতে এখনও কিছু জমা পড়েনি।",
+  "Billed": "দাবিকৃত",
+  "Received": "জমা",
+  "Due": "বকেয়া",
+  "Payable": "প্রদেয়",
+  "Still due": "এখনও বকেয়া",
+  "Details": "বিস্তারিত",
+  "Invoice": "ইনভয়েস",
+
   // ---- plan and payment ----
+  // Whole Building: what a flat owner sees instead of a price list, because their building
+  // administrator is the billing party.
+  "This account is covered by your building's plan.": "এই অ্যাকাউন্টটি আপনার ভবনের প্ল্যানের আওতাভুক্ত।",
+  "Your building administrator manages and pays for this plan.": "আপনার ভবন প্রশাসক এই প্ল্যানটি পরিচালনা করেন এবং এর খরচ বহন করেন।",
+  "Your flat": "আপনার ফ্ল্যাট",
+  "There is nothing to pay and nothing to renew here. To change what your account can do, speak to your building administrator.": "এখানে কোনো পেমেন্ট বা নবায়নের প্রয়োজন নেই। আপনার অ্যাকাউন্টের সুবিধা পরিবর্তন করতে ভবন প্রশাসকের সঙ্গে যোগাযোগ করুন।",
   "Available plans": "সম্ভাব্য প্ল্যান",
   "Current plan": "বর্তমান প্ল্যান",
   "Choose a plan": "একটি প্ল্যান বেছে নিন",
