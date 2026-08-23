@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserRound, Mail, Phone } from "lucide-react";
+import { UserRound, Mail, Phone, KeyRound } from "lucide-react";
 import { Card, Button, Field, TextInput, PhoneField } from "./ui";
-import { validatePhone } from "../lib/validate";
+import { validatePhone, isSystemLogin } from "../lib/validate";
 import { toast } from "./toast";
 import { rentMasterFetch, getStoredSession, setStoredSession } from "../lib/api-service";
 import type { AccountProfile, TenantProfile } from "../types/api";
@@ -108,10 +108,24 @@ export function OwnerProfileCard() {
         <p className="text-sm text-subtle">{t("Loading…")}</p>
       ) : (
         <form onSubmit={submit} className="max-w-md space-y-4">
-          <ReadOnlyField
-            label="Email" icon={Mail} value={profile?.email ?? ""}
-            hint="This is the account you sign in with. Contact support to change it."
-          />
+          {/* A building account's login is a system-issued identifier, not a mailbox, and it
+              cannot be recovered by email — so it is named and explained differently.
+
+              Two whole elements rather than one with ternary props, deliberately: ReadOnlyField
+              translates `label`/`hint` itself, and check-i18n only sees them when they are
+              LITERAL props. A ternary would make them expressions, and a missing Bangla key
+              would then render English with no warning. */}
+          {isSystemLogin(profile?.email) ? (
+            <ReadOnlyField
+              label="Login ID" icon={KeyRound} value={profile?.email ?? ""}
+              hint="This is what you sign in with. Your building administrator can reset your password."
+            />
+          ) : (
+            <ReadOnlyField
+              label="Email" icon={Mail} value={profile?.email ?? ""}
+              hint="This is the account you sign in with. Contact support to change it."
+            />
+          )}
           <Field label="Full name" required>
             <TextInput required value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
           </Field>

@@ -10,7 +10,7 @@ import {
 import { LegalLinks } from "../components/legal-links";
 import { LEGAL_VERSION } from "../content/legal/generated";
 import { Button, Modal, Field, TextInput, PasswordInput, EmailField, PhoneField } from "../components/ui";
-import { validateEmail, validatePhone } from "../lib/validate";
+import { validateEmail, validatePhone, isSystemLogin } from "../lib/validate";
 import { toast } from "../components/toast";
 import { DownloadAndroid } from "../components/download-android";
 import { LanguageToggle } from "../components/language-toggle";
@@ -262,11 +262,14 @@ export default function EntryGatewayPage() {
                 <form onSubmit={loginOwner} className="space-y-5">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                      {t("Email")} <span className="text-danger">*</span>
+                      {t("Email or login ID")} <span className="text-danger">*</span>
                     </label>
                     <div className="relative">
                       <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-                      <input type="email" inputMode="email" autoComplete="email" autoCapitalize="none"
+                      {/* Still type="email": a building login ID is a valid address, so native
+                          validation accepts it and the keyboard stays the right one for the far
+                          larger population of owners who really do sign in with an email. */}
+                      <input type="email" inputMode="email" autoComplete="username" autoCapitalize="none"
                         spellCheck={false} maxLength={254} required
                         placeholder="owner@example.com" value={email}
                         onChange={(e) => setEmail(e.target.value)} className="field-input pl-10" />
@@ -437,12 +440,17 @@ function ForgotPasswordModal({
   const [email, setEmail] = useState(initialEmail);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  // A building login has no inbox, so it gets an explanation instead of the "check your inbox"
+  // panel. Promising a link that can never arrive is the worst copy this screen could show.
+  const [blocked, setBlocked] = useState(false);
   const t = useT();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = validateEmail(email, { required: true });
     if (!parsed.ok) { toast.error(t(parsed.error)); return; }
+    // Advice, not the rule — the backend refuses this domain too, and that is the one that counts.
+    if (isSystemLogin(parsed.value)) { setBlocked(true); return; }
     try {
       setSending(true);
       await apiForgotPassword(parsed.value);
@@ -454,12 +462,22 @@ function ForgotPasswordModal({
     }
   }
 
-  function close() { setSent(false); onClose(); }
+  function close() { setSent(false); setBlocked(false); onClose(); }
 
   return (
     <Modal open={open} onClose={close} title={t("Reset your password")}
       subtitle={t("We'll email you a secure link to set a new password.")}>
-      {sent ? (
+      {blocked ? (
+        <div className="space-y-5">
+          <p className="text-sm text-fg">
+            {t("Building accounts can't reset their own password.")}
+          </p>
+          <p className="text-sm text-fg">
+            {t("Ask your building administrator to set a new one for you — or the platform administrator, if you run the building.")}
+          </p>
+          <Button className="w-full" onClick={close}>{t("Done")}</Button>
+        </div>
+      ) : sent ? (
         <div className="space-y-5">
           <p className="text-sm text-fg">
             {t("If an account exists for")} <span className="font-semibold text-heading">{email.trim()}</span>

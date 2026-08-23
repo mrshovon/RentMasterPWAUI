@@ -30,7 +30,7 @@ import {
   PageHeader, EmptyState, FullScreenLoader, SearchInput, EmailField, PhoneField,
   PasswordInput,
 } from "../../components/ui";
-import { validateEmail, validatePhone } from "../../lib/validate";
+import { validateEmail, validatePhone, memberOwnerLoginId } from "../../lib/validate";
 
 // =====================================================================================
 // 🏢 BUILDING ADMIN CONSOLE
@@ -166,6 +166,7 @@ export default function BuildingAdminDashboard() {
 
       <CreateOwnerModal
         open={createOpen}
+        building={building}
         onClose={() => setCreateOpen(false)}
         onCreated={load}
       />
@@ -258,7 +259,7 @@ function OwnersTab({
     const ok = await confirmDialog({
       title: `Detach ${o.name || "this owner"}?`,
       message:
-        "Their login keeps working and nothing is deleted — but they leave your building, and their plan drops back to the free limits (2 properties, 2 tenants).",
+        "Their login keeps working and nothing is deleted — but they leave your building, and their plan drops back to the free limits (2 properties, 2 tenants). Their login ID stays reserved to them, so the next owner of that flat gets a numbered variant of it.",
       confirmLabel: "Detach",
       danger: true,
     });
@@ -275,12 +276,11 @@ function OwnersTab({
     }
   }
 
-  async function resetPassword(o: BuildingOwner) {
-    const password = window.prompt(`New password for ${o.name || o.email} (at least 8 characters):`);
-    if (!password) return;
-    if (password.length < 8) { toast.error("Password must be at least 8 characters."); return; }
-    await act(o.owner_id, { action: "password", password }, "Password reset. Give it to them out of band.");
-  }
+  // Deliberately a modal rather than window.prompt. For an owner whose login is a generated
+  // identifier this is the ONLY way back into their account, so it has to show them which login
+  // the password belongs to — and a prompt cannot mask what is being typed, cannot display the
+  // ID beside it, and is blocked outright in the Android WebView on some versions.
+  const [resetting, setResetting] = useState<BuildingOwner | null>(null);
 
   return (
     <div className="space-y-6">
@@ -342,7 +342,7 @@ function OwnersTab({
                       <Button
                         size="sm" variant="ghost" icon={KeyRound}
                         loading={busy === o.owner_id}
-                        onClick={() => resetPassword(o)}
+                        onClick={() => setResetting(o)}
                       >
                         Password
                       </Button>
@@ -378,7 +378,77 @@ function OwnersTab({
           </table>
         </Card>
       )}
+
+      <ResetPasswordModal
+        owner={resetting}
+        onClose={() => setResetting(null)}
+        onDone={async (ownerId, password) => {
+          await act(ownerId, { action: "password", password }, "Password reset. Give it to them out of band.");
+          setResetting(null);
+        }}
+      />
     </div>
+  );
+}
+
+/* ============================================================ RESET PASSWORD */
+
+function ResetPasswordModal({
+  owner,
+  onClose,
+  onDone,
+}: {
+  owner: BuildingOwner | null;
+  onClose: () => void;
+  onDone: (ownerId: string, password: string) => Promise<void>;
+}) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setPassword(""); setConfirm(""); }, [owner?.owner_id]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password.length < 8) { toast.error("Password must be at least 8 characters."); return; }
+    if (password !== confirm) { toast.error("The two passwords do not match."); return; }
+    try {
+      setSaving(true);
+      await onDone(owner!.owner_id, password);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      open={!!owner}
+      onClose={onClose}
+      title="Reset password"
+      subtitle={owner?.name || "This owner"}
+    >
+      <form onSubmit={submit} className="space-y-4">
+        {/* Shown because the admin has to relay both halves, and for a generated login this is
+            the only place the ID is visible next to the password it belongs to. */}
+        <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-3">
+          <p className="text-[11px] uppercase tracking-wide text-muted">Login ID</p>
+          <p className="mt-1 font-mono text-sm break-all text-heading">{owner?.email || "—"}</p>
+        </div>
+        <Field label="New password" required hint="At least 8 characters.">
+          <PasswordInput required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+        </Field>
+        <Field label="Confirm password" required>
+          <PasswordInput required minLength={8} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        </Field>
+        <p className="text-xs text-muted">
+          Nothing is emailed — a building login has no inbox. Send the new password to them yourself.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" loading={saving}>Set password</Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -386,10 +456,12 @@ function OwnersTab({
 
 function CreateOwnerModal({
   open,
+  building,
   onClose,
   onCreated,
 }: {
   open: boolean;
+  building: Building | null;
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
@@ -399,30 +471,55 @@ function CreateOwnerModal({
   };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const [issued, setIssued] = useState<{ name: string; loginId: string } | null>(null);
+
+  // A house number on the building is what switches this form from "type their email" to
+  // "their login is generated". A building that predates the feature simply never turns it on.
+  const houseNo = building?.house_no || "";
+  const generatesLogins = !!houseNo;
+  const preview = generatesLogins ? memberOwnerLoginId(houseNo, form.unitLabel, form.phone) : null;
+
+  function close() {
+    setIssued(null);
+    onClose();
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const parsedEmail = validateEmail(form.email, { required: true });
-    if (!parsedEmail.ok) { toast.error(parsedEmail.error); return; }
-    const parsedPhone = validatePhone(form.phone);
+    let email = "";
+    if (!generatesLogins) {
+      const parsedEmail = validateEmail(form.email, { required: true });
+      if (!parsedEmail.ok) { toast.error(parsedEmail.error); return; }
+      email = parsedEmail.value;
+    }
+    const parsedPhone = validatePhone(form.phone, { required: generatesLogins });
     if (!parsedPhone.ok) { toast.error(parsedPhone.error); return; }
+    if (preview && !preview.ok) { toast.error(preview.error); return; }
     if (form.password.length < 8) { toast.error("Password must be at least 8 characters."); return; }
 
     try {
       setSaving(true);
-      await rentMasterFetch("/api/admin/building/owners", {
+      const res = await rentMasterFetch("/api/admin/building/owners", {
         method: "POST",
         body: JSON.stringify({
           ...form,
-          email: parsedEmail.value,
+          email,
           phone: parsedPhone.value,
           defaultServiceCharge: Number(form.defaultServiceCharge || 0),
         }),
       });
+      const name = form.name;
       setForm(empty);
       await onCreated();
-      onClose();
-      toast.success("Owner created. Give them the password out of band.");
+
+      // A generated login has to be copied off the screen and passed on by hand, so the modal
+      // holds it instead of closing behind a toast that fades.
+      if (generatesLogins && res?.data?.email) {
+        setIssued({ name, loginId: res.data.email });
+      } else {
+        onClose();
+        toast.success("Owner created. Give them the password out of band.");
+      }
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -430,26 +527,67 @@ function CreateOwnerModal({
     }
   }
 
+  if (issued) {
+    return (
+      <Modal open={open} onClose={close} title="Owner created" subtitle="Pass these on — nothing was emailed.">
+        <div className="space-y-4">
+          <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+            <p className="text-[11px] uppercase tracking-wide text-muted">Login ID for {issued.name}</p>
+            <p className="mt-1 font-mono text-sm break-all text-heading">{issued.loginId}</p>
+          </div>
+          <p className="text-sm text-muted">
+            This is what they sign in with, together with the password you set. It has no inbox —
+            if they forget the password, reset it from their row on the roster.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="secondary" onClick={() => {
+              navigator.clipboard?.writeText(issued.loginId);
+              toast.success("Copied.");
+            }}>Copy login ID</Button>
+            <Button onClick={close}>Done</Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="Add an owner"
+    <Modal open={open} onClose={close} title="Add an owner"
       subtitle="They get an ordinary owner login, covered by this building's plan.">
       <form onSubmit={submit} className="space-y-4">
         <Field label="Full name" required>
           <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <EmailField label="Email" required value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
-          <PhoneField label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+          {generatesLogins ? (
+            <Field label="Flat number" required hint="Printed on their statements, and part of their login.">
+              <TextInput required value={form.unitLabel} placeholder="3B"
+                onChange={(e) => setForm({ ...form, unitLabel: e.target.value })} />
+            </Field>
+          ) : (
+            <EmailField label="Email" required value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
+          )}
+          <PhoneField label="Phone" required={generatesLogins} value={form.phone}
+            onChange={(v) => setForm({ ...form, phone: v })} />
         </div>
+        {preview?.ok && (
+          <div className="rounded-lg border border-line/[0.08] bg-overlay/[0.02] px-3 py-2 text-sm">
+            <span className="text-muted">Login: </span>
+            <span className="font-mono break-all text-heading">{preview.value}</span>
+            <span className="block text-xs text-muted">Confirmed when the account is created.</span>
+          </div>
+        )}
         <Field label="Temporary password" required hint="At least 8 characters. Send it to them separately.">
           <PasswordInput required minLength={8} value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Flat / unit" hint="Printed on their statements.">
-            <TextInput value={form.unitLabel} placeholder="Flat 4B"
-              onChange={(e) => setForm({ ...form, unitLabel: e.target.value })} />
-          </Field>
+          {!generatesLogins && (
+            <Field label="Flat / unit" hint="Printed on their statements.">
+              <TextInput value={form.unitLabel} placeholder="Flat 4B"
+                onChange={(e) => setForm({ ...form, unitLabel: e.target.value })} />
+            </Field>
+          )}
           <Field label="Monthly service charge" hint="Pre-fills each invoice; editable per month.">
             <TextInput type="number" min="0" step="0.01" value={form.defaultServiceCharge}
               onChange={(e) => setForm({ ...form, defaultServiceCharge: e.target.value })} />
@@ -519,7 +657,7 @@ function EditOwnerModal({
           <PhoneField label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Flat / unit">
+          <Field label="Flat / unit" hint="Changing this does not change how they sign in.">
             <TextInput value={form.unitLabel} onChange={(e) => setForm({ ...form, unitLabel: e.target.value })} />
           </Field>
           <Field label="Monthly service charge">
@@ -537,7 +675,7 @@ function EditOwnerModal({
 
 function SettingsTab({ building, onSaved }: { building: Building | null; onSaved: () => Promise<void> }) {
   const [form, setForm] = useState({
-    name: "", address: "", city: "", signatoryName: "", signatoryTitle: "", notes: "",
+    name: "", houseNo: "", address: "", city: "", signatoryName: "", signatoryTitle: "", notes: "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -545,6 +683,7 @@ function SettingsTab({ building, onSaved }: { building: Building | null; onSaved
     if (!building) return;
     setForm({
       name: building.name || "",
+      houseNo: building.house_no || "",
       address: building.address || "",
       city: building.city || "",
       signatoryName: building.signatory_name || "",
@@ -578,6 +717,13 @@ function SettingsTab({ building, onSaved }: { building: Building | null; onSaved
         <form onSubmit={submit} className="space-y-4">
           <Field label="Building name" required>
             <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </Field>
+          <Field
+            label="House number"
+            hint="Once set, every NEW owner you add gets a login built from it instead of an email address. Logins already issued keep the number they were created with."
+          >
+            <TextInput value={form.houseNo} placeholder="12/A"
+              onChange={(e) => setForm({ ...form, houseNo: e.target.value })} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Address">

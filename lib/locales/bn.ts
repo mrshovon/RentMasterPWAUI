@@ -41,6 +41,7 @@ export const bn: Record<string, string> = {
     "পরামর্শ: আপনার পাসকোড বাড়ির মালিক দিয়েছেন।",
   "Enter resident portal": "ভাড়াটিয়া পোর্টালে প্রবেশ করুন",
   Email: "ইমেইল",
+  "Email or login ID": "ইমেইল বা লগইন আইডি",
   Password: "পাসওয়ার্ড",
   "Sign in": "সাইন ইন",
   "Forgot password?": "পাসওয়ার্ড ভুলে গেছেন?",
@@ -62,6 +63,15 @@ export const bn: Record<string, string> = {
     "নতুন পাসওয়ার্ড তৈরি করার জন্য আমরা আপনাকে একটি নিরাপদ লিংক ইমেইল করব।",
   "Account email": "অ্যাকাউন্টের ইমেইল",
   "Send reset link": "রিসেট লিংক পাঠান",
+  // A building account signs in with a system-issued identifier that has no inbox, so the
+  // self-service reset explains rather than promising a link.
+  "Building accounts can't reset their own password.":
+    "ভবনের অ্যাকাউন্ট নিজে থেকে পাসওয়ার্ড রিসেট করতে পারে না।",
+  "Ask your building administrator to set a new one for you — or the platform administrator, if you run the building.":
+    "আপনার ভবন প্রশাসককে নতুন একটি পাসওয়ার্ড সেট করে দিতে বলুন — আর ভবনটি যদি আপনি নিজেই পরিচালনা করেন, তাহলে প্ল্যাটফর্ম প্রশাসককে বলুন।",
+  "Login ID": "লগইন আইডি",
+  "This is what you sign in with. Your building administrator can reset your password.":
+    "এটি দিয়েই আপনি সাইন ইন করেন। আপনার ভবন প্রশাসক আপনার পাসওয়ার্ড রিসেট করে দিতে পারবেন।",
   Done: "সম্পন্ন",
   "If an account exists for": "যদি এই ঠিকানায় কোনো অ্যাকাউন্ট থাকে —",
   ", a password reset link is on its way. Check your inbox (and spam folder).":

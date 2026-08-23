@@ -346,6 +346,9 @@ export interface Building {
   building_no?: number;
   admin_id: string;
   name: string;
+  /** Street/holding number. Null on a building created before system login identifiers —
+   * which is exactly what keeps its owners signing in with a typed email. */
+  house_no: string | null;
   address: string | null;
   city: string | null;
   letterhead_url: string | null;
@@ -501,6 +504,8 @@ export interface BuildingOwner {
   building_id: string;
   owner_id: string;
   unit_label: string | null;
+  /** The normalised flat token that went into their login ("4b"). Display uses unit_label. */
+  flat_no: string | null;
   default_service_charge: number;
   joined_at: string;
   is_active: boolean;

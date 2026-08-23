@@ -37,7 +37,7 @@ import {
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
   EmailField, PhoneField,
 } from "../../components/ui";
-import { validateEmail, validatePhone } from "../../lib/validate";
+import { validateEmail, validatePhone, buildingAdminLoginId, isSystemLogin } from "../../lib/validate";
 import { PLAN_ADDONS, AddonKey, addonsOnTier, FREE_TIER_ID } from "../../lib/addons";
 
 const ticketStatusTone: Record<TicketStatus, "slate" | "indigo" | "cyan" | "emerald"> = {
@@ -2955,17 +2955,36 @@ function CirculateTab({ owners }: { owners: AdminOwner[] }) {
 
 /* ============================================================ CREATE OWNER */
 function CreateOwnerModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
-  const empty = { email: "", pass: "", name: "", phone: "", role: "owner", buildingName: "" };
+  const empty = { email: "", pass: "", name: "", phone: "", role: "owner", buildingName: "", buildingHouseNo: "" };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  // The login that was actually issued. Held after a successful create instead of closing
+  // straight away: a toast would take the only copy of it with it when it faded.
+  const [issued, setIssued] = useState<{ name: string; loginId: string } | null>(null);
   const isBuildingAdmin = form.role === "building_admin";
+
+  // Live preview of the generated identifier. Shown as they type so the normalisation is never
+  // a surprise — "Ground floor left" visibly collapses to "groundfl" before anyone commits.
+  const preview = isBuildingAdmin ? buildingAdminLoginId(form.buildingHouseNo, form.phone) : null;
+
+  function close() {
+    setIssued(null);
+    onClose();
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const parsedEmail = validateEmail(form.email, { required: true });
-    if (!parsedEmail.ok) { toast.error(parsedEmail.error); return; }
-    const parsedPhone = validatePhone(form.phone);
+    // A building admin never types an address — theirs is derived from the house number and
+    // mobile, both of which the backend re-derives and re-validates.
+    let email = "";
+    if (!isBuildingAdmin) {
+      const parsedEmail = validateEmail(form.email, { required: true });
+      if (!parsedEmail.ok) { toast.error(parsedEmail.error); return; }
+      email = parsedEmail.value;
+    }
+    const parsedPhone = validatePhone(form.phone, { required: isBuildingAdmin });
     if (!parsedPhone.ok) { toast.error(parsedPhone.error); return; }
+    if (isBuildingAdmin && preview && !preview.ok) { toast.error(preview.error); return; }
     // Same floor the public signup enforces. This path used to accept any password at all,
     // which meant the weakest accounts in the system were the ones an admin created.
     if (form.pass.length < 8) { toast.error("Password must be at least 8 characters."); return; }
@@ -2973,34 +2992,80 @@ function CreateOwnerModal({ open, onClose, onCreated }: { open: boolean; onClose
       setSaving(true);
       const res = await rentMasterFetch("/api/super-admin/owners", {
         method: "POST", role: "admin",
-        body: JSON.stringify({ ...form, email: parsedEmail.value, phone: parsedPhone.value }),
+        body: JSON.stringify({ ...form, email, phone: parsedPhone.value }),
       });
       if (res.success) {
+        const name = form.name;
         setForm(empty);
         onCreated();
-        onClose();
         // The backend creates the building and assigns the Whole Building plan best-effort, and
         // reports anything it could not finish. Surfacing those is the difference between "the
         // account exists" and "the account works".
         if (res.warnings?.length) res.warnings.forEach((w: string) => toast.warning(w));
-        else toast.success(isBuildingAdmin ? "Building admin account created." : "Owner account created.");
+
+        // A generated login has to be read off the screen and passed on by hand, so the modal
+        // stays open holding it. A typed email is already known to the admin — close as before.
+        if (isBuildingAdmin && res.loginId) {
+          setIssued({ name, loginId: res.loginId });
+        } else {
+          onClose();
+          if (!res.warnings?.length) toast.success("Owner account created.");
+        }
       }
     } catch (e: any) { toast.error(e.message); }
     finally { setSaving(false); }
   }
 
+  if (issued) {
+    return (
+      <Modal open={open} onClose={close} title="Account created" subtitle="Pass these on — the login is not emailed.">
+        <div className="space-y-4">
+          <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+            <p className="text-[11px] uppercase tracking-wide text-muted">Login ID for {issued.name}</p>
+            <p className="mt-1 font-mono text-sm break-all text-heading">{issued.loginId}</p>
+          </div>
+          <p className="text-sm text-muted">
+            This is what they sign in with. It has no inbox, so nothing was sent to it — give them
+            this and the password you set, and reset the password from their row if they lose it.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Button variant="secondary" onClick={() => {
+              navigator.clipboard?.writeText(issued.loginId);
+              toast.success("Copied.");
+            }}>Copy login ID</Button>
+            <Button onClick={close}>Done</Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="Create owner account" subtitle="A new login is provisioned immediately.">
+    <Modal open={open} onClose={close} title="Create owner account" subtitle="A new login is provisioned immediately.">
       <form onSubmit={submit} className="space-y-4">
         <Field label="Full name" required>
           <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </Field>
         <div className="grid grid-cols-2 gap-4">
-          <EmailField label="Email" required value={form.email}
-            onChange={(v) => setForm({ ...form, email: v })} />
-          <PhoneField label="Phone" value={form.phone}
+          {isBuildingAdmin ? (
+            <Field label="House number" required hint="Every login in this building starts with it.">
+              <TextInput required placeholder="12/A" value={form.buildingHouseNo}
+                onChange={(e) => setForm({ ...form, buildingHouseNo: e.target.value })} />
+            </Field>
+          ) : (
+            <EmailField label="Email" required value={form.email}
+              onChange={(v) => setForm({ ...form, email: v })} />
+          )}
+          <PhoneField label="Phone" required={isBuildingAdmin} value={form.phone}
             onChange={(v) => setForm({ ...form, phone: v })} />
         </div>
+        {isBuildingAdmin && preview?.ok && (
+          <div className="rounded-lg border border-line/[0.08] bg-overlay/[0.02] px-3 py-2 text-sm">
+            <span className="text-muted">Login: </span>
+            <span className="font-mono break-all text-heading">{preview.value}</span>
+            <span className="block text-xs text-muted">Confirmed when the account is created.</span>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-4">
           <Field label="Temporary password" required hint="At least 8 characters.">
             <TextInput required minLength={8} value={form.pass} onChange={(e) => setForm({ ...form, pass: e.target.value })} />
@@ -3200,6 +3265,12 @@ function OwnerDetailModal({
               <Button size="sm" icon={KeyRound} variant="secondary" loading={busy} disabled={!newPass}
                 onClick={() => patch({ password: newPass }, () => setNewPass(""))}>Reset</Button>
             </div>
+            {isSystemLogin(detail.email) && (
+              <p className="mt-2 text-xs text-muted">
+                This account signs in with a system login ID and has no inbox, so it cannot reset
+                its own password — this is the only way. Send the new one to them yourself.
+              </p>
+            )}
           </Section>
 
           {/* Paid add-ons */}
