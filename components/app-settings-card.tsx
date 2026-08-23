@@ -10,6 +10,7 @@ import { ensurePushSubscription, getPushPermission, type PushPermission } from "
 import { getSessionToken, rentMasterFetch } from "../lib/api-service";
 import { isNativeApp } from "../lib/platform";
 import { APP_VERSION } from "../lib/app-config";
+import { LegalLinks } from "./legal-links";
 import { useT } from "../lib/i18n";
 import {
   DEFAULT_NOTIFICATION_SOUND,
@@ -181,6 +182,8 @@ export function AppSettingsCard() {
             ? t("Android app — updates install from the in-app prompt.")
             : `${t("Web app")} v${APP_VERSION} — ${t("it updates automatically when you reload.")}`}
         </p>
+
+        <LegalLinks />
       </div>
     </Card>
   );
