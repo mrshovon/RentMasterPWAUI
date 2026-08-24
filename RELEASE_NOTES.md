@@ -1,4 +1,5 @@
-- Notifications now arrive with the Bari360 tone, so you can tell them apart from everything else on your phone.
-- You choose the sound. In Settings, under App and notifications, pick the Bari360 tone, your phone's own tone, or silent. Your choice follows you to every device you sign in on.
-- Silent still means you get the notification. It appears in your notification tray as usual, it just does not make a noise.
-- Bari360 can now show you an announcement when you open the app, so important news reaches you without you having to go looking for it.
+- Service charges you collect now land in your books straight away. If you had not set up an account yet, a Cash in Hand account is created for you and the money goes there, so nothing is missed again.
+- Rent you receive from the building's own spaces is recorded the same way, as income against the same account.
+- Add a bank or mobile money account later and mark it as default, and new income follows it. Everything already recorded in Cash in Hand stays where it is.
+- Printed building reports and notice letters now keep a clear margin on the page, even when your printer is set to no margins.
+- A notice from your building admin now shows up as a Building notice in your notice list, instead of being labelled a payment update.

@@ -2091,12 +2091,26 @@ function RaiseTicketModal({
 function NoticesTab({ notices, onCreate }: { notices: Notice[]; onCreate: () => void }) {
   const t = useT();
   const lang = useLang();
-  const scopeLabel: Record<string, string> = {
-    all_tenants: "All tenants", individual_tenant: "One tenant", all_owners: "All owners",
-    individual_owner: "Payment update",
+  // The badges read off scope AND sender together, never scope alone. `individual_owner` began
+  // life meaning "a tenant flagged their rent as sent" and was labelled accordingly, but five
+  // different things write it now — most visibly a building admin's notice fanned out to every
+  // flat owner, which was showing up as "Payment update / You". The pair is unambiguous: the
+  // owner's own NoticeModal can only pick tenant scopes (individual_owner is admin-only, see
+  // ADMIN_ONLY_SCOPES in /api/admin/notices), so owner + individual_owner is the building admin.
+  const scopeLabel = (n: Notice): string => {
+    if (n.target_scope !== "individual_owner") {
+      return ({ all_tenants: "All tenants", individual_tenant: "One tenant",
+        all_owners: "All owners" } as Record<string, string>)[n.target_scope] ?? n.target_scope;
+    }
+    if (n.sender_type === "owner") return "Building notice";
+    if (n.sender_type === "tenant") return "Payment update";
+    return "For you";
   };
-  const senderLabel = (s: Notice["sender_type"]) =>
-    s === "system_admin" ? "System" : s === "tenant" ? "Tenant" : "You";
+  const senderLabel = (n: Notice): string => {
+    if (n.sender_type === "system_admin") return "System";
+    if (n.sender_type === "tenant") return "Tenant";
+    return n.target_scope === "individual_owner" ? "Building admin" : "You";
+  };
   return (
     <div className="space-y-6">
       <PageHeader title="Notices" subtitle="Broadcast announcements to your tenants."
@@ -2114,8 +2128,8 @@ function NoticesTab({ notices, onCreate }: { notices: Notice[]; onCreate: () => 
               </div>
               <p className="text-sm leading-relaxed text-fg">{translateNoticeText(n.content, t)}</p>
               <div className="flex items-center gap-2 pt-1">
-                <Badge tone="indigo">{t(scopeLabel[n.target_scope] ?? n.target_scope)}</Badge>
-                <Badge tone="slate">{t(senderLabel(n.sender_type))}</Badge>
+                <Badge tone="indigo">{t(scopeLabel(n))}</Badge>
+                <Badge tone="slate">{t(senderLabel(n))}</Badge>
               </div>
             </Card>
           ))}

@@ -276,9 +276,12 @@ export const bn: Record<string, string> = {
   "One tenant": "একজন ভাড়াটিয়া",
   "All owners": "সব মালিক",
   "Payment update": "পেমেন্ট আপডেট",
+  "Building notice": "ভবনের নোটিশ",
+  "For you": "আপনার জন্য",
   System: "সিস্টেম",
   Tenant: "ভাড়াটিয়া",
   You: "আপনি",
+  "Building admin": "ভবন প্রশাসক",
 
   // Screen-reader label on the crown marking a locked add-on in the nav.
   "Paid add-on": "পেইড অ্যাড-অন",

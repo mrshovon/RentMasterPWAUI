@@ -73,10 +73,13 @@ tr.net td{font-weight:800;background:#111;color:#fff;border-color:#111}
 .sign .role{font-size:12px;color:#444}
 .foot{margin-top:26px;padding-top:10px;border-top:1px solid #dcdfe4;font-size:11px;color:#888;
   display:flex;justify-content:space-between}
-@page{size:A4 portrait;margin:14mm}
+@page{size:A4 portrait;margin:12mm}
 @media print{
   body{background:#fff;padding:0}
-  .sheet{max-width:none;width:auto;margin:0;padding:0;box-shadow:none}
+  /* The sheet keeps an inner padding in print. @page margin alone is not enough: the browser's
+     own Margins dropdown ("None") overrides it and the document then prints hard against the
+     paper edge. Same belt-and-braces as lib/receipt.ts. */
+  .sheet{max-width:none;width:auto;margin:0 auto;padding:6mm 8mm;box-shadow:none}
   tr{page-break-inside:avoid}
 }
 `;
