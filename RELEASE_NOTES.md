@@ -1,4 +1,4 @@
-- Every payment you record now gives you a receipt. It opens as soon as you save, and a Receipt button stays on each row so you can bring it back any time.
-- Service charge receipts carry your building name, the flat, and the flat owner's name, and you can print, download or send them on WhatsApp.
-- Rent you collect on the building's own spaces gets the same receipt your tenants already know, itemised when the rent was paid in parts.
-- Service charge income now says which flat it came from in your accounts, so a month of collections is no longer a list of identical lines.
+- You can now upload your signature. Go to Settings, under Authorised signature, and pick an image of it. A transparent PNG looks best.
+- Once uploaded, your signature is printed on every receipt you issue, just above the signature line.
+- Notices now have a Print signed button beside Print, so you decide notice by notice whether your signature goes on it.
+- Receipts have more room above the signature line, so there is space to sign one by hand.

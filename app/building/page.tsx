@@ -18,6 +18,7 @@ import { Building, BuildingOwner, Property } from "../../types/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AppSettingsCard } from "../../components/app-settings-card";
+import { SignatureCard } from "../../components/signature-card";
 import { BuildingInvoicesTab } from "../../components/building-invoices-tab";
 import { BuildingSpacesTab } from "../../components/building-spaces-tab";
 import { BuildingSetupTab } from "../../components/building-setup-tab";
@@ -88,8 +89,9 @@ export default function BuildingAdminDashboard() {
 
   // Its own effect, not a fourth entry in load(): load() re-runs on window focus and on every
   // change the tabs report, and a signature never changes. Mirrors app/owner/page.tsx.
-  // Usually null — the building console has no signature upload — and that is fine: the receipt
-  // prints the rule with no image above it.
+  // Uploaded from the Settings tab (SignatureCard), which calls setSignatureUrl directly so a
+  // new signature reaches the receipts without a refetch. Null is fine: the documents print the
+  // rule with no image above it.
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!session) return;
@@ -180,10 +182,19 @@ export default function BuildingAdminDashboard() {
           onContact={contactSupport}
         />
       )}
-      {tab === "notices" && <BuildingNoticesTab building={building} owners={owners} />}
+      {tab === "notices" && (
+        <BuildingNoticesTab building={building} owners={owners} signatureUrl={signatureUrl} />
+      )}
       {tab === "reports" && <BuildingReportsTab owners={owners} />}
       {tab === "setup" && <BuildingSetupTab />}
-      {tab === "settings" && <SettingsTab building={building} onSaved={load} />}
+      {tab === "settings" && (
+        <SettingsTab
+          building={building}
+          onSaved={load}
+          signatureUrl={signatureUrl}
+          onSignatureSaved={setSignatureUrl}
+        />
+      )}
 
       <CreateOwnerModal
         open={createOpen}
@@ -694,7 +705,14 @@ function EditOwnerModal({
 
 /* ============================================================ SETTINGS */
 
-function SettingsTab({ building, onSaved }: { building: Building | null; onSaved: () => Promise<void> }) {
+function SettingsTab({
+  building, onSaved, signatureUrl, onSignatureSaved,
+}: {
+  building: Building | null;
+  onSaved: () => Promise<void>;
+  signatureUrl: string | null;
+  onSignatureSaved: (url: string) => void;
+}) {
   const [form, setForm] = useState({
     name: "", houseNo: "", address: "", city: "", signatoryName: "", signatoryTitle: "", notes: "",
   });
@@ -770,6 +788,15 @@ function SettingsTab({ building, onSaved }: { building: Building | null; onSaved
           <Button type="submit" loading={saving}>Save building</Button>
         </form>
       </Card>
+
+      {/* Its own card, not a field inside the form above: the upload is a separate API call and
+          does not belong behind "Save building". It sits next to the TYPED signatory fields it
+          complements. */}
+      <SignatureCard
+        signatureUrl={signatureUrl}
+        onSaved={onSignatureSaved}
+        subtitle="Printed on receipts, and on notices you choose to send signed."
+      />
 
       <AppSettingsCard />
     </div>

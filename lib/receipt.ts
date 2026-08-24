@@ -196,7 +196,9 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#eef2f6;color:#1
 .t-lbl{font-weight:800;font-size:19px}.t-val{font-weight:800;font-size:22px}
 .notes{margin-top:8px}
 .note-line{font-style:italic;font-size:12px;margin-top:2px}
-.bottom{display:flex;justify-content:space-between;align-items:flex-end;margin-top:24px}
+/* Deliberately roomy: the rule below is signed by hand on a printed receipt, and an uploaded
+   signature image sits on top of it. At zoom:.45 in print this lands as a ~34px gap. */
+.bottom{display:flex;justify-content:space-between;align-items:flex-end;margin-top:76px}
 .ref{color:#8a8a8a;font-size:12px}
 .sign{text-align:center;min-width:200px}
 .sig-img{max-height:44px;max-width:160px;object-fit:contain;display:block;margin:0 auto 4px}
@@ -211,7 +213,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#eef2f6;color:#1
 <div class="divider"></div>
 ${rowsHtml}
 <div class="total-box"><div class="t-lbl">${totalLabel}:</div><div class="t-val">${money(o.total)}</div></div>
-<div class="notes">${notesHtml}</div>
+${notesHtml ? `<div class="notes">${notesHtml}</div>` : ""}
 <div class="bottom">
 <div class="ref">${esc(tr("Ref"))}: ${esc(o.refNo || "")}</div>
 <div class="sign">${sigImg}<div class="sig-line"></div><div class="sig-role">${esc(tr(o.signatureCaption || "Landlord’s Signature"))}</div></div>

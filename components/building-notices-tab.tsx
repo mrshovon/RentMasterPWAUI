@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Megaphone, Printer, Trash2, Users, Home } from "lucide-react";
+import { Plus, Megaphone, PenLine, Printer, Trash2, Users, Home } from "lucide-react";
 import { rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
 import { confirmDialog } from "./confirm";
@@ -37,14 +37,18 @@ const AUDIENCE_LABEL: Record<string, string> = {
 export function BuildingNoticesTab({
   building,
   owners,
+  signatureUrl,
 }: {
   building: Building | null;
   owners: BuildingOwner[];
+  /** Uploaded in Settings. Absent means "Print signed" is not offered at all. */
+  signatureUrl?: string | null;
 }) {
   const [notices, setNotices] = useState<BuildingNotice[]>([]);
   const [loading, setLoading] = useState(true);
   const [composing, setComposing] = useState(false);
-  const [printing, setPrinting] = useState<{ html: string; name: string } | null>(null);
+  const [printing, setPrinting] =
+    useState<{ html: string; name: string; signed: boolean } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -60,7 +64,9 @@ export function BuildingNoticesTab({
 
   useEffect(() => { load(); }, [load]);
 
-  function printNotice(n: BuildingNotice) {
+  // `signed` only decides whether the signature image travels on the header. There is no flag in
+  // the document builder — the unsigned copy is simply one with no signatureUrl on it.
+  function printNotice(n: BuildingNotice, signed: boolean) {
     if (!building) { toast.error("Your building details are still loading."); return; }
     const target = n.target_owner_id ? owners.find((o) => o.owner_id === n.target_owner_id) : null;
     const html = buildNoticeLetterHtml({
@@ -71,6 +77,7 @@ export function BuildingNoticesTab({
         letterheadUrl: building.letterhead_url,
         signatoryName: building.signatory_name,
         signatoryTitle: building.signatory_title,
+        signatureUrl: signed ? signatureUrl || null : null,
       },
       title: n.title,
       content: n.content,
@@ -83,7 +90,9 @@ export function BuildingNoticesTab({
     });
     setPrinting({
       html,
-      name: `notice-${n.reference_no || n.notice_no || n.issued_on}`.replace(/[^\w.-]+/g, "-"),
+      name: `notice-${signed ? "signed-" : ""}${n.reference_no || n.notice_no || n.issued_on}`
+        .replace(/[^\w.-]+/g, "-"),
+      signed,
     });
   }
 
@@ -140,7 +149,13 @@ export function BuildingNoticesTab({
                   <p className="mt-3 whitespace-pre-wrap text-sm text-fg">{n.content}</p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <Button size="sm" icon={Printer} onClick={() => printNotice(n)}>Print</Button>
+                  <Button size="sm" icon={Printer} onClick={() => printNotice(n, false)}>Print</Button>
+                  {/* Only when there IS a signature — without one this would produce a document
+                      identical to the plain Print beside it. */}
+                  {signatureUrl && (
+                    <Button size="sm" variant="secondary" icon={PenLine}
+                      onClick={() => printNotice(n, true)}>Print signed</Button>
+                  )}
                   <Button size="sm" variant="danger" icon={Trash2} onClick={() => remove(n)}>Delete</Button>
                 </div>
               </div>
@@ -159,8 +174,12 @@ export function BuildingNoticesTab({
         open={!!printing}
         onClose={() => setPrinting(null)}
         html={printing?.html || ""}
-        title="Notice"
-        subtitle="On your building's letterhead, with a signature line."
+        title={printing?.signed ? "Signed notice" : "Notice"}
+        subtitle={
+          printing?.signed
+            ? "On your building's letterhead, with your signature."
+            : "On your building's letterhead, with a blank signature line."
+        }
         fileName={printing?.name}
       />
     </div>

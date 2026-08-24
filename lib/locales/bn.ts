@@ -684,6 +684,12 @@ export const bn: Record<string, string> = {
   "Save signature": "স্বাক্ষর সংরক্ষণ করুন",
   "Signature saved.": "স্বাক্ষর সংরক্ষিত হয়েছে।",
   "Transparent PNG recommended": "স্বচ্ছ PNG দেওয়াই ভালো",
+  // components/signature-card.tsx — the upload card.
+  "Authorised signature": "অনুমোদিত স্বাক্ষর",
+  Signature: "স্বাক্ষর",
+  "Upload signature image": "স্বাক্ষরের ছবি আপলোড করুন",
+  "Replace signature image": "স্বাক্ষরের ছবি বদলান",
+  "Uploading…": "আপলোড হচ্ছে…",
 
   // ---- Whole Building: the PRINTED documents (lib/building-print.ts) + print modal ----
   // These leave the app and land in an owner's hands on paper, so the language must not revert

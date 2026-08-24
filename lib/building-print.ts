@@ -41,6 +41,9 @@ export interface BuildingHeader {
   letterheadUrl?: string | null;
   signatoryName?: string | null;
   signatoryTitle?: string | null;
+  /** The signature IMAGE. Omit it and the document prints the rule alone, which is the unsigned
+   *  copy — that is how "Print" and "Print signed" differ, with no flag anywhere. */
+  signatureUrl?: string | null;
 }
 
 const CSS = `
@@ -68,6 +71,8 @@ tr.net td{font-weight:800;background:#111;color:#fff;border-color:#111}
 .empty{font-size:13px;color:#777;font-style:italic;padding:10px 0}
 .sign{margin-top:46px;display:flex;justify-content:flex-end}
 .sign .box{text-align:center;min-width:230px}
+/* Scoped to .sign: an unscoped img rule would also catch the letterhead at .lh img. */
+.sign img{max-height:56px;max-width:200px;object-fit:contain;display:block;margin:0 auto 6px}
 .sign .line{border-top:1.5px solid #111;margin-bottom:6px}
 .sign .who{font-size:13.5px;font-weight:700}
 .sign .role{font-size:12px;color:#444}
@@ -103,6 +108,11 @@ function shell(o: {
     : `<div class="bname">${esc(o.building.name)}</div>` +
       (addressLine ? `<div class="baddr">${esc(addressLine)}</div>` : "");
 
+  // Above the rule, exactly as lib/receipt.ts orders it.
+  const sigImg = o.building.signatureUrl
+    ? `<img src="${esc(o.building.signatureUrl)}" alt="">`
+    : "";
+
   const signatory = o.building.signatoryName
     ? `<div class="who">${esc(o.building.signatoryName)}</div>` +
       (o.building.signatoryTitle ? `<div class="role">${esc(o.building.signatoryTitle)}</div>` : "")
@@ -118,7 +128,7 @@ function shell(o: {
       : ""}
   <div class="doctitle">${esc(o.docTitle)}</div>
   ${o.bodyHtml}
-  <div class="sign"><div class="box"><div class="line"></div>${signatory}</div></div>
+  <div class="sign"><div class="box">${sigImg}<div class="line"></div>${signatory}</div></div>
   <div class="foot">
     <span>${esc(o.building.name)}</span>
     <span>${esc(tr("Generated on"))} ${esc(printDate(new Date().toISOString()))}</span>
