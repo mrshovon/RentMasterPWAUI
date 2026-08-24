@@ -8,7 +8,10 @@ import { rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
 import { confirmDialog } from "./confirm";
 import { formatCurrency, formatDate, formatMonth } from "../lib/format";
-import { Property, Tenant, BillingLedger } from "../types/api";
+import { Building, Property, Tenant, BillingLedger, BillingPayment } from "../types/api";
+import { buildReceiptHtml } from "../lib/receipt";
+import { resolveReceiptMessage } from "../lib/whatsapp";
+import { ReceiptModal } from "./receipt-modal";
 import { validatePhone } from "../lib/validate";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, Select, PageHeader, EmptyState,
@@ -38,11 +41,24 @@ function currentMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export function BuildingSpacesTab({ onChanged }: { onChanged?: () => void }) {
+export function BuildingSpacesTab({
+  onChanged, building, signatureUrl,
+}: {
+  onChanged?: () => void;
+  building: Building | null;
+  signatureUrl?: string | null;
+}) {
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [ledgers, setLedgers] = useState<BillingLedger[]>([]);
+  const [payments, setPayments] = useState<BillingPayment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [receipt, setReceipt] = useState<
+    { html: string; phone: string | null; message: string; fileName: string } | null
+  >(null);
+  // Set by RecordRentModal after its reload resolves; the effect below turns it into a receipt.
+  // Never the ledger object itself — that one is pre-payment. See openReceipt.
+  const [pendingReceiptId, setPendingReceiptId] = useState<string | null>(null);
 
   const [spaceOpen, setSpaceOpen] = useState(false);
   const [tenantFor, setTenantFor] = useState<Property | null>(null);
@@ -53,15 +69,19 @@ export function BuildingSpacesTab({ onChanged }: { onChanged?: () => void }) {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [p, t, l] = await Promise.allSettled([
+      const [p, t, l, bp] = await Promise.allSettled([
         rentMasterFetch<{ data: Property[] }>("/api/admin/properties"),
         rentMasterFetch<{ data: Tenant[] }>("/api/admin/tenants"),
         rentMasterFetch<{ data: BillingLedger[] }>("/api/admin/billing"),
+        // The installment log. A receipt for rent paid in two parts has to itemise both, and
+        // without this it would silently print a single "Date:" row.
+        rentMasterFetch<{ data: BillingPayment[] }>("/api/admin/billing/payments"),
       ]);
       if (p.status === "fulfilled") setProperties(p.value.data || []);
       else toast.error((p.reason as Error).message);
       if (t.status === "fulfilled") setTenants(t.value.data || []);
       if (l.status === "fulfilled") setLedgers(l.value.data || []);
+      if (bp.status === "fulfilled") setPayments(bp.value.data || []);
     } finally {
       setLoading(false);
     }
@@ -73,6 +93,71 @@ export function BuildingSpacesTab({ onChanged }: { onChanged?: () => void }) {
     await load();
     onChanged?.();
   }
+
+  const paymentsFor = useCallback(
+    (ledgerId: string) =>
+      payments
+        .filter((x) => x.ledger_id === ledgerId)
+        .sort((x, y) => x.paid_on.localeCompare(y.paid_on)),
+    [payments]
+  );
+
+  // An ordinary rent receipt — the building's own space is let exactly like any other property,
+  // so this is the same call app/owner/page.tsx makes, with none of the service-charge overrides.
+  const openReceipt = useCallback(
+    (l: BillingLedger) => {
+      const tenant = tenants.find((x) => x.id === l.tenant_id);
+      const prop = properties.find((x) => x.id === l.property_id);
+      const tenantName = l.tenants?.name || tenant?.name || "Tenant";
+      const html = buildReceiptHtml({
+        copyLabel: "Tenant Copy",
+        // The space's own receipt name wins (a ground-floor shop may be let under a trading
+        // name); the building is the fallback, never the admin's personal account name.
+        ownerName: prop?.receipt_name || building?.name || "Owner",
+        propertyAddress: prop?.address || building?.address || null,
+        refNo: l.property_id,
+        billingMonth: l.billing_month,
+        tenantName,
+        houseRent: l.rent_amount,
+        serviceCharge: l.service_charge,
+        extraCharge: l.extra_charge,
+        discount: l.discount,
+        total: l.total_payable,
+        paymentStatus: l.payment_status,
+        paidAt: l.paid_at,
+        dueDay: tenant?.due_date,
+        payments: paymentsFor(l.id).map((x) => ({ paidOn: x.paid_on, amount: Number(x.amount) })),
+        amountPaid: Number(l.amount_paid || 0),
+        note: l.extra_charge_remarks,
+        signatureUrl,
+      });
+      setReceipt({
+        html,
+        phone: l.tenants?.phone || tenant?.phone || null,
+        // The default sentence, not the admin's own WhatsApp template — that is an owner setting
+        // about their own tenants, and this console does not load it.
+        message: resolveReceiptMessage(null, {
+          tenant: tenantName,
+          month: formatMonth(l.billing_month),
+          amount: formatCurrency(Number(l.total_payable || 0)),
+          status: l.payment_status,
+          property: prop?.name || "",
+        }),
+        fileName: `rent-receipt-${l.billing_month}`,
+      });
+    },
+    [tenants, properties, building, signatureUrl, paymentsFor]
+  );
+
+  // Resolved here rather than inside RecordRentModal so the receipt is built from the RELOADED
+  // ledger and payment list. The modal's own copy of the ledger is pre-payment — using it would
+  // print DUE, a stale Balance Due, and omit the installment just recorded.
+  useEffect(() => {
+    if (!pendingReceiptId) return;
+    const l = ledgers.find((x) => x.id === pendingReceiptId);
+    setPendingReceiptId(null);
+    if (l) openReceipt(l);
+  }, [pendingReceiptId, ledgers, openReceipt]);
 
   const tenantByProperty = useMemo(() => {
     const m: Record<string, Tenant> = {};
@@ -206,10 +291,17 @@ export function BuildingSpacesTab({ onChanged }: { onChanged?: () => void }) {
                     </Badge>
                     {l.paid_at && <div className="mt-1 text-xs text-muted">{formatDate(l.paid_at)}</div>}
                   </td>
-                  <td className="p-4 text-right">
-                    {l.payment_status !== "paid" && (
-                      <Button size="sm" icon={Wallet} onClick={() => setPayFor(l)}>Record</Button>
-                    )}
+                  <td className="p-4">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {l.payment_status !== "paid" && (
+                        <Button size="sm" icon={Wallet} onClick={() => setPayFor(l)}>Record</Button>
+                      )}
+                      {/* Offered at every status, like the owner dashboard: a receipt for a
+                          part-paid invoice is a legitimate document, and it prints its balance. */}
+                      <Button size="sm" variant="ghost" icon={ReceiptText} onClick={() => openReceipt(l)}>
+                        Receipt
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -226,8 +318,23 @@ export function BuildingSpacesTab({ onChanged }: { onChanged?: () => void }) {
         onPasscode={(name, code) => setPasscode({ name, code })}
       />
       <BillRentModal tenant={invoiceFor} onClose={() => setInvoiceFor(null)} onSaved={reload} />
-      <RecordRentModal ledger={payFor} onClose={() => setPayFor(null)} onSaved={reload} />
+      <RecordRentModal
+        ledger={payFor}
+        onClose={() => setPayFor(null)}
+        onSaved={reload}
+        onReceipt={setPendingReceiptId}
+      />
       <PasscodeModal info={passcode} onClose={() => setPasscode(null)} />
+      {/* A sibling of the record modal, never a child of it — nested, it would unmount the
+          instant payFor went null. */}
+      <ReceiptModal
+        open={!!receipt}
+        onClose={() => setReceipt(null)}
+        html={receipt?.html || ""}
+        phone={receipt?.phone}
+        message={receipt?.message}
+        fileName={receipt?.fileName}
+      />
     </div>
   );
 }
@@ -480,8 +587,15 @@ function BillRentModal({
 }
 
 function RecordRentModal({
-  ledger, onClose, onSaved,
-}: { ledger: BillingLedger | null; onClose: () => void; onSaved: () => Promise<void> }) {
+  ledger, onClose, onSaved, onReceipt,
+}: {
+  ledger: BillingLedger | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+  /** Hands the parent the LEDGER ID once the reload has landed, so it can build a receipt from
+   *  the refreshed row. Deliberately not the ledger object — this one is pre-payment. */
+  onReceipt: (ledgerId: string) => void;
+}) {
   const outstanding = ledger
     ? Math.max(0, Number(ledger.total_payable || 0) - Number(ledger.amount_paid || 0))
     : 0;
@@ -515,6 +629,8 @@ function RecordRentModal({
       await onSaved();
       onClose();
       toast.success("Payment recorded.");
+      // After onSaved(), so the parent's ledger and payment lists already carry this payment.
+      onReceipt(ledger.id);
     } catch (e: any) {
       toast.error(e.message);
     } finally {

@@ -85,6 +85,23 @@ export default function BuildingAdminDashboard() {
   useEffect(() => {
     if (session) load();
   }, [session, load]);
+
+  // Its own effect, not a fourth entry in load(): load() re-runs on window focus and on every
+  // change the tabs report, and a signature never changes. Mirrors app/owner/page.tsx.
+  // Usually null — the building console has no signature upload — and that is fine: the receipt
+  // prints the rule with no image above it.
+  const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!session) return;
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ signatureUrl?: string | null }>("/api/admin/owner/signature");
+        setSignatureUrl(res.signatureUrl || null);
+      } catch {
+        /* non-fatal — a receipt without a signature image is still a receipt */
+      }
+    })();
+  }, [session]);
   useRevalidateOnFocus(load);
 
   const metrics = useMemo(() => {
@@ -141,8 +158,12 @@ export default function BuildingAdminDashboard() {
           onReload={load}
         />
       )}
-      {tab === "invoices" && <BuildingInvoicesTab owners={owners} />}
-      {tab === "spaces" && <BuildingSpacesTab onChanged={load} />}
+      {tab === "invoices" && (
+        <BuildingInvoicesTab owners={owners} building={building} signatureUrl={signatureUrl} />
+      )}
+      {tab === "spaces" && (
+        <BuildingSpacesTab onChanged={load} building={building} signatureUrl={signatureUrl} />
+      )}
       {/* Mounted, not rebuilt: these are the same components the owner dashboard uses, and the
           routes behind them already scope on owner_id — which for this caller is the building. */}
       {tab === "staff" && (

@@ -8,7 +8,9 @@ import { rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
 import { confirmDialog } from "./confirm";
 import { formatCurrency, formatDate, formatMonth } from "../lib/format";
-import { BuildingOwner, BuildingServiceInvoice, BuildingServicePayment } from "../types/api";
+import { Building, BuildingOwner, BuildingServiceInvoice, BuildingServicePayment } from "../types/api";
+import { buildReceiptHtml } from "../lib/receipt";
+import { ReceiptModal } from "./receipt-modal";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, Select, PageHeader, EmptyState,
 } from "./ui";
@@ -36,7 +38,13 @@ function statusTone(status: string): "emerald" | "amber" | "slate" {
   return status === "paid" ? "emerald" : status === "partial" ? "amber" : "slate";
 }
 
-export function BuildingInvoicesTab({ owners }: { owners: BuildingOwner[] }) {
+export function BuildingInvoicesTab({
+  owners, building, signatureUrl,
+}: {
+  owners: BuildingOwner[];
+  building: Building | null;
+  signatureUrl?: string | null;
+}) {
   const [month, setMonth] = useState(currentBillingMonth());
   const [invoices, setInvoices] = useState<BuildingServiceInvoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +53,13 @@ export function BuildingInvoicesTab({ owners }: { owners: BuildingOwner[] }) {
   const [paying, setPaying] = useState<BuildingServiceInvoice | null>(null);
   const [history, setHistory] = useState<BuildingServiceInvoice | null>(null);
   const [editing, setEditing] = useState<BuildingServiceInvoice | null>(null);
+  const [receipt, setReceipt] = useState<
+    { html: string; phone: string | null; message: string; fileName: string } | null
+  >(null);
+  const [receiptBusy, setReceiptBusy] = useState<string | null>(null);
+  // Set by RecordPaymentModal once its reload has landed. An id, never the invoice object — that
+  // one is pre-payment and would print DUE on a receipt for money just received.
+  const [pendingReceiptId, setPendingReceiptId] = useState<string | null>(null);
 
   // owner_id -> roster row, so the table shows a name rather than a uuid.
   const ownerById = useMemo(() => {
@@ -52,6 +67,77 @@ export function BuildingInvoicesTab({ owners }: { owners: BuildingOwner[] }) {
     owners.forEach((o) => { m[o.owner_id] = o; });
     return m;
   }, [owners]);
+
+  // A service charge is billed to a FLAT OWNER, not a tenant, and carries no house rent — hence
+  // the label overrides on buildReceiptHtml rather than a second template. See lib/receipt.ts.
+  const openReceipt = useCallback(
+    async (inv: BuildingServiceInvoice) => {
+      if (!building) {
+        toast.error("Your building details are still loading — try again in a moment.");
+        return;
+      }
+      const owner = ownerById[inv.owner_id];
+
+      // Installments, best-effort: the list endpoint does not carry payments, and the receipt
+      // itemises a history only when there is more than one. A failure here degrades to the
+      // plain "Date:" row rather than blocking the receipt.
+      setReceiptBusy(inv.id);
+      let paid: { paidOn: string; amount: number }[] = [];
+      try {
+        const res = await rentMasterFetch<{ data: BuildingServicePayment[] }>(
+          `/api/admin/building/invoices/${inv.id}/payments`
+        );
+        paid = (res.data || []).map((x) => ({ paidOn: x.paid_on, amount: Number(x.amount || 0) }));
+      } catch {
+        /* non-fatal */
+      } finally {
+        setReceiptBusy(null);
+      }
+
+      const partyName = owner?.name || owner?.email || "Flat Owner";
+      const html = buildReceiptHtml({
+        copyLabel: "Owner Copy",
+        ownerName: building.name,
+        propertyAddress: [building.address, building.city].filter(Boolean).join(", ") || null,
+        refNo: inv.invoice_no ? `#${inv.invoice_no}` : null,
+        billingMonth: inv.billing_month,
+        unitLabel: owner?.unit_label || null,
+        partyLabel: "Flat Owner",
+        tenantName: partyName,
+        houseRent: 0,
+        serviceCharge: Number(inv.service_charge || 0),
+        extraCharge: Number(inv.extra_charge || 0),
+        discount: Number(inv.discount || 0),
+        total: Number(inv.total_payable || 0),
+        paymentStatus: inv.payment_status,
+        paidAt: inv.paid_at,
+        payments: paid,
+        amountPaid: Number(inv.amount_paid || 0),
+        note: inv.extra_charge_remarks || inv.note,
+        signatureUrl,
+        // The three that make this a service charge rather than rent.
+        hideZeroLines: true,
+        signatureCaption: "Authorised Signature",
+        fixedNote: null,
+      });
+
+      setReceipt({
+        html,
+        phone: owner?.phone || null,
+        message: `Here is your service charge receipt for ${formatMonth(inv.billing_month)} — ${formatCurrency(Number(inv.total_payable || 0))}.`,
+        fileName: `service-charge-receipt-${inv.billing_month}`,
+      });
+    },
+    [building, ownerById, signatureUrl]
+  );
+
+  // Built from the RELOADED invoice, not the record modal's copy of it. See pendingReceiptId.
+  useEffect(() => {
+    if (!pendingReceiptId) return;
+    const inv = invoices.find((x) => x.id === pendingReceiptId);
+    setPendingReceiptId(null);
+    if (inv) void openReceipt(inv);
+  }, [pendingReceiptId, invoices, openReceipt]);
 
   const load = useCallback(async () => {
     try {
@@ -207,6 +293,11 @@ export function BuildingInvoicesTab({ owners }: { owners: BuildingOwner[] }) {
                     <td className="p-4">
                       <div className="flex flex-wrap justify-end gap-2">
                         {!settled && <Button size="sm" icon={Wallet} onClick={() => setPaying(inv)}>Record</Button>}
+                        {/* Offered at every status: a receipt for a part-paid invoice is a
+                            legitimate document, and it prints its own Balance Due row. */}
+                        <Button size="sm" variant="ghost" icon={ReceiptText}
+                          loading={receiptBusy === inv.id}
+                          onClick={() => void openReceipt(inv)}>Receipt</Button>
                         <Button size="sm" variant="ghost" icon={History} onClick={() => setHistory(inv)}>History</Button>
                         {!settled && (
                           <Button size="sm" variant="secondary" icon={Pencil} onClick={() => setEditing(inv)}>Edit</Button>
@@ -237,6 +328,19 @@ export function BuildingInvoicesTab({ owners }: { owners: BuildingOwner[] }) {
         ownerName={paying ? ownerById[paying.owner_id]?.name || null : null}
         onClose={() => setPaying(null)}
         onRecorded={load}
+        onReceipt={setPendingReceiptId}
+      />
+      {/* A sibling of the record modal, never a child — nested, it would unmount with it. */}
+      <ReceiptModal
+        open={!!receipt}
+        onClose={() => setReceipt(null)}
+        html={receipt?.html || ""}
+        phone={receipt?.phone}
+        message={receipt?.message}
+        fileName={receipt?.fileName}
+        title="Service charge receipt"
+        noPhoneToast="This owner has no valid phone number for WhatsApp."
+        noPhoneHint="No valid WhatsApp number on file for this owner."
       />
       <PaymentHistoryModal
         invoice={history}
@@ -456,12 +560,15 @@ function TotalRow({ total }: { total: number }) {
 /* ---------------------------------------------------------------- money */
 
 function RecordPaymentModal({
-  invoice, ownerName, onClose, onRecorded,
+  invoice, ownerName, onClose, onRecorded, onReceipt,
 }: {
   invoice: BuildingServiceInvoice | null;
   ownerName: string | null;
   onClose: () => void;
   onRecorded: () => Promise<void>;
+  /** Hands the parent the INVOICE ID once the reload has landed, so the receipt is built from the
+   *  refreshed row rather than this modal's pre-payment copy of it. */
+  onReceipt: (invoiceId: string) => void;
 }) {
   const outstanding = invoice
     ? Math.max(0, Number(invoice.total_payable || 0) - Number(invoice.amount_paid || 0))
@@ -494,6 +601,8 @@ function RecordPaymentModal({
       await onRecorded();
       onClose();
       toast.success("Payment recorded.");
+      // After onRecorded(), so the parent's invoice list already carries the new figures.
+      onReceipt(invoice.id);
     } catch (e: any) {
       toast.error(e.message);
     } finally {

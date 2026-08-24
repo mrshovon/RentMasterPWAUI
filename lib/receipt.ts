@@ -31,6 +31,23 @@ export interface ReceiptOptions {
   amountPaid?: number;               // total received so far
   note?: string | null;              // owner's free-text note
   signatureUrl?: string | null;
+
+  // ---- Opt-in overrides, all defaulting to the rent receipt this file was written for.
+  // A building service charge is billed to a FLAT OWNER, has no house rent, and is signed by the
+  // building admin rather than a landlord. Rather than fork the template, the parts that differ
+  // are parameterised. Every one is optional and its default reproduces the previous output
+  // exactly, so the live rent receipts are untouched.
+  /** Label on the party row. Default "Tenant Name". */
+  partyLabel?: string;
+  /** Renders a "Flat:" row above the party row. Building service charges only. */
+  unitLabel?: string | null;
+  /** Drop House Rent / Extra Charge rows that are zero instead of printing "0". */
+  hideZeroLines?: boolean;
+  /** Caption under the signature rule. Default "Landlord's Signature". */
+  signatureCaption?: string;
+  /** The standing note at the foot. null removes it — it is rent wording and a service charge
+   *  must not carry it. Undefined keeps the existing dueDay-driven sentence. */
+  fixedNote?: string | null;
 }
 
 function esc(s: unknown): string {
@@ -126,24 +143,34 @@ export function buildReceiptHtml(o: ReceiptOptions): string {
   // part-payment needs it printed just as much as several do.
   const balanceRowHtml = balance > 0 ? row(`${tr("Balance Due")}:`, money(balance), true, overdueBalance) : "";
 
+  // A charge line is dropped only when the caller asked AND it is zero. Rent receipts pass
+  // nothing, so they keep printing every charge row exactly as before.
+  const chargeRow = (label: string, amount: number) =>
+    o.hideZeroLines && !Number(amount) ? "" : row(`${tr(label)}:`, money(amount));
+
   let rowsHtml =
     paymentRowsHtml +
     balanceRowHtml +
     row(`${tr("Month")}:`, esc(monthLabel)) +
-    row(`${tr("Tenant Name")}:`, esc(o.tenantName || tr("Tenant")), true) +
-    row(`${tr("House Rent")}:`, money(o.houseRent)) +
-    row(`${tr("Service Charge")}:`, money(o.serviceCharge)) +
-    row(`${tr("Extra Charge")}:`, money(o.extraCharge));
+    (o.unitLabel ? row(`${tr("Flat")}:`, esc(o.unitLabel)) : "") +
+    row(`${tr(o.partyLabel || "Tenant Name")}:`, esc(o.tenantName || tr("Tenant")), true) +
+    chargeRow("House Rent", o.houseRent) +
+    chargeRow("Service Charge", o.serviceCharge) +
+    chargeRow("Extra Charge", o.extraCharge);
   if (Number(o.discount) > 0) rowsHtml += row(`${tr("Discount")}:`, "−" + money(o.discount || 0));
 
   // Interpolated, so it cannot be an exact-match dictionary key: the day is spliced into a
   // translated template instead, the same technique lib/notice-i18n.ts uses for backend strings.
-  const fixedNote = o.dueDay
+  // `fixedNote: null` removes the standing line outright. It is rent wording, and it is NOT
+  // gated on dueDay — the else branch prints it regardless — so a service-charge receipt would
+  // otherwise tell a flat owner to pay their rent on time.
+  const rentNote = o.dueDay
     ? tr("Note: Please pay the rent by or on the {0} of the month.").replace("{0}", ordinal(o.dueDay))
     : tr("Note: Please pay the rent by or on the due date of the month.");
+  const fixedNote = o.fixedNote !== undefined ? o.fixedNote : rentNote;
   const notesHtml =
     (o.note ? `<div class="note-line">${esc(o.note)}</div>` : "") +
-    `<div class="note-line">${esc(fixedNote)}</div>`;
+    (fixedNote ? `<div class="note-line">${esc(fixedNote)}</div>` : "");
 
   const sigImg = o.signatureUrl
     ? `<img class="sig-img" src="${esc(o.signatureUrl)}" alt="Signature" />`
@@ -187,7 +214,7 @@ ${rowsHtml}
 <div class="notes">${notesHtml}</div>
 <div class="bottom">
 <div class="ref">${esc(tr("Ref"))}: ${esc(o.refNo || "")}</div>
-<div class="sign">${sigImg}<div class="sig-line"></div><div class="sig-role">${esc(tr("Landlord’s Signature"))}</div></div>
+<div class="sign">${sigImg}<div class="sig-line"></div><div class="sig-role">${esc(tr(o.signatureCaption || "Landlord’s Signature"))}</div></div>
 </div>
 </div></body></html>`
   );

@@ -1,5 +1,4 @@
-- Service charges you collect now land in your books straight away. If you had not set up an account yet, a Cash in Hand account is created for you and the money goes there, so nothing is missed again.
-- Rent you receive from the building's own spaces is recorded the same way, as income against the same account.
-- Add a bank or mobile money account later and mark it as default, and new income follows it. Everything already recorded in Cash in Hand stays where it is.
-- Printed building reports and notice letters now keep a clear margin on the page, even when your printer is set to no margins.
-- A notice from your building admin now shows up as a Building notice in your notice list, instead of being labelled a payment update.
+- Every payment you record now gives you a receipt. It opens as soon as you save, and a Receipt button stays on each row so you can bring it back any time.
+- Service charge receipts carry your building name, the flat, and the flat owner's name, and you can print, download or send them on WhatsApp.
+- Rent you collect on the building's own spaces gets the same receipt your tenants already know, itemised when the rent was paid in parts.
+- Service charge income now says which flat it came from in your accounts, so a month of collections is no longer a list of identical lines.

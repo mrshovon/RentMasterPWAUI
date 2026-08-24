@@ -877,6 +877,10 @@ export const bn: Record<string, string> = {
   "Total Due": "মোট বকেয়া",
   "Balance Due": "বকেয়া",
   "Tenant Name": "ভাড়াটিয়ার নাম",
+  // The party row's label on a building service-charge receipt, which is made out to a flat
+  // owner rather than a tenant. Not enforced by check-i18n (it is passed in from the English-only
+  // building console) but the receipt itself leaves the app, so it is translated anyway.
+  "Flat Owner": "ফ্ল্যাট মালিক",
   "House Rent": "বাড়ি ভাড়া",
   "Service Charge": "সার্ভিস চার্জ",
   "Extra Charge": "অতিরিক্ত চার্জ",

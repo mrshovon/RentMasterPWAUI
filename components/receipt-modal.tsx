@@ -22,7 +22,9 @@ import { useT } from "../lib/i18n";
 // hands the user a file therefore branches on isNativeApp() and goes through lib/native-file.ts
 // (Filesystem + FileOpener) instead. Keep that branch when adding a new export.
 export function ReceiptModal({
-  open, onClose, html, phone, message, fileName,
+  open, onClose, html, phone, message, fileName, title,
+  noPhoneToast = "This tenant has no valid phone number for WhatsApp.",
+  noPhoneHint = "No valid WhatsApp number on file for this tenant.",
 }: {
   open: boolean;
   onClose: () => void;
@@ -30,6 +32,14 @@ export function ReceiptModal({
   phone?: string | null;     // tenant phone for the WhatsApp target (raw; normalized here)
   message?: string;          // resolved WhatsApp message body (from the owner's template)
   fileName?: string;         // base name for saved files, e.g. "rent-receipt-2026-07"
+  /** Heading on the modal. Defaults to "Rent receipt"; a building service charge is not rent. */
+  title?: string;
+  // Whole sentences rather than an interpolated noun: a building service charge is addressed to a
+  // flat owner, not a tenant, and splicing the word in would fragment the string for translation.
+  /** Toast when WhatsApp is pressed with no usable number. */
+  noPhoneToast?: string;
+  /** Standing hint under the buttons when there is no usable number. */
+  noPhoneHint?: string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [rasterizing, setRasterizing] = useState(false);
@@ -182,20 +192,20 @@ export function ReceiptModal({
 
   function sendWhatsapp() {
     if (!waPhone) {
-      toast.error("This tenant has no valid phone number for WhatsApp.");
+      toast.error(t(noPhoneToast));
       return;
     }
     openWhatsapp(waPhone, waText);
   }
 
   return (
-    <Modal open={open} onClose={onClose} size="lg" title="Rent receipt"
+    <Modal open={open} onClose={onClose} size="lg" title={title || "Rent receipt"}
       subtitle={native
         ? "Share to WhatsApp, or save the receipt as an image."
         : "Share to WhatsApp, send as an image, or download / print."}>
       <div className="space-y-4">
         <div className="overflow-hidden rounded-xl border border-line/[0.08] bg-white">
-          <iframe ref={iframeRef} srcDoc={html} title="Rent receipt" className="h-[52vh] w-full" />
+          <iframe ref={iframeRef} srcDoc={html} title={title || "Rent receipt"} className="h-[52vh] w-full" />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Button icon={MessageCircle} variant="success" onClick={sendWhatsapp} disabled={!waPhone}>
@@ -223,7 +233,7 @@ export function ReceiptModal({
         )}
         {!waPhone && phone !== undefined && (
           <p className="text-center text-[11px] text-subtle">
-            {t("No valid WhatsApp number on file for this tenant.")}
+            {t(noPhoneHint)}
           </p>
         )}
       </div>
