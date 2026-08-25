@@ -296,6 +296,15 @@ export interface PlanState {
    * free limits. Check this field, not `status`, to know a plan ended.
    */
   downgradedFrom: { tierId: string; tierName: string; endedAt: string | null } | null;
+  /**
+   * Whole Building only. The building has never paid and is still inside its pay-by window:
+   * full access, with a countdown. Set on the building admin and inherited by its flat owners.
+   */
+  unpaidWindow?: boolean;
+  /** Whole Building only. Days left to pay before the first lock. Null once payment has landed. */
+  daysToPay?: number | null;
+  /** Whole Building only. The pay-by deadline, so the UI can name the date, not just the count. */
+  payBy?: string | null;
 }
 
 /** A lifecycle transition the owner has not acknowledged yet. Drives the one-time modal. */
@@ -516,6 +525,160 @@ export interface BuildingOwner {
   name: string | null;
   phone: string | null;
   suspended: boolean;
+}
+
+/* ---------- Whole Building: the commercial contract ---------- */
+
+/** The stored facts of a building's contract. Status is never stored — see BuildingPlanState. */
+export interface BuildingSubscription {
+  building_id: string;
+  admin_id: string;
+  term_months: number;
+  /** Both null until the first payment: the term starts the day money is recorded. */
+  term_starts_on: string | null;
+  expiry_date: string | null;
+  /** Deadline to pay while the building has never paid. Past it, with nothing paid, it locks. */
+  pay_by: string;
+  first_paid_at: string | null;
+  grace_days: number;
+  warn_days: number;
+  canceled_at: string | null;
+  notes: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Derived from the row above at read time, by the same function the backend gates on. */
+export interface BuildingPlanState {
+  status: "active" | "grace" | "locked";
+  lockReason: "expired" | "revoked" | null;
+  expiryDate: string | null;
+  daysUntilExpiry: number | null;
+  graceEndsAt: string | null;
+  daysLeftInGrace: number | null;
+  warnExpiringSoon: boolean;
+  unpaidWindow: boolean;
+  daysToPay: number | null;
+  payBy: string | null;
+}
+
+export type BuildingPlanInvoiceKind = "initial" | "renewal";
+export type BuildingPlanInvoiceStatus = "draft" | "sent" | "settled" | "void";
+export type BuildingPlanPaymentStatus = "unpaid" | "partial" | "paid";
+export type BuildingPlanMethod = "cash" | "bkash" | "nagad" | "bank" | "card" | "other";
+
+/** One priced line on a quote. The line items ARE the pricing model — see ADD_BUILDING_PLANS.sql. */
+export interface BuildingPlanInvoiceItem {
+  id: string;
+  label: string;
+  amount: number;
+  sort_order: number;
+}
+
+export interface BuildingPlanInvoice {
+  id: string;
+  invoice_no: number;
+  building_id: string;
+  admin_id: string;
+  kind: BuildingPlanInvoiceKind;
+  term_months: number;
+  period_start: string | null;
+  period_end: string | null;
+  currency: string;
+  subtotal: number;
+  discount: number;
+  total_payable: number;
+  /** Derived from the payments — never written by hand. */
+  amount_paid: number;
+  payment_status: BuildingPlanPaymentStatus;
+  paid_at: string | null;
+  terms: string | null;
+  /** Optional link we attach so the building can pay itself. No gateway sits behind it. */
+  payment_url: string | null;
+  status: BuildingPlanInvoiceStatus;
+  issued_at: string | null;
+  due_on: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+  items?: BuildingPlanInvoiceItem[];
+  /** Server-computed money still owed. Never negative. */
+  balance?: number;
+}
+
+export interface BuildingPlanPayment {
+  id: string;
+  payment_no: number;
+  invoice_id: string;
+  building_id: string;
+  admin_id: string;
+  amount: number;
+  paid_on: string;
+  method: BuildingPlanMethod;
+  reference: string | null;
+  /** Null when the money came from confirming the building's own claim rather than our entry. */
+  recorded_by: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export type BuildingPlanRequestKind = "renewal" | "payment_claim";
+export type BuildingPlanRequestStatus = "new" | "in_progress" | "quoted" | "closed" | "rejected";
+
+export interface BuildingPlanRequest {
+  id: string;
+  request_no: number;
+  building_id: string;
+  admin_id: string;
+  kind: BuildingPlanRequestKind;
+  message: string | null;
+  /** Populated on a payment_claim only. A claim is not a payment until an admin confirms it. */
+  claim_amount: number | null;
+  claim_method: string | null;
+  claim_reference: string | null;
+  status: BuildingPlanRequestStatus;
+  /** Visible to the building, not an internal note. */
+  admin_notes: string | null;
+  invoice_id: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** GET /api/admin/building/plan — the building's own view of its contract. */
+export interface BuildingPlanResponse {
+  subscription: BuildingSubscription | null;
+  state: BuildingPlanState | null;
+  currentInvoiceId?: string | null;
+  invoices: BuildingPlanInvoice[];
+  payments: BuildingPlanPayment[];
+  requests: BuildingPlanRequest[];
+}
+
+/** One row of the super admin's Buildings menu. */
+export interface AdminBuildingRow extends Building {
+  owner_count: number;
+  amount_owed: number;
+  open_requests: number;
+  admin_login: string | null;
+  admin_name: string | null;
+  admin_phone: string | null;
+  subscription: BuildingSubscription | null;
+  state: BuildingPlanState | null;
+}
+
+/** GET /api/super-admin/buildings/[id] — everything about one building's contract. */
+export interface AdminBuildingDetail {
+  building: Building;
+  admin_login: string | null;
+  admin_name: string | null;
+  admin_phone: string | null;
+  subscription: BuildingSubscription | null;
+  state: BuildingPlanState | null;
+  invoices: BuildingPlanInvoice[];
+  payments: BuildingPlanPayment[];
+  requests: BuildingPlanRequest[];
 }
 
 export interface AdminOwner {

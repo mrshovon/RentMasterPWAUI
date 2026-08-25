@@ -518,7 +518,8 @@ function TxnRow({ txn: t, busy, onDelete }: { txn: AccountTransaction; busy: boo
                 <Building2 className="h-3 w-3" />{t.properties.name} · {t.properties.flat_no}
               </span>
             )}
-            {t.note && <span className="truncate">{t.note}</span>}
+            {/* wraps rather than truncates: auto-booked notes name a person and can be long */}
+            {t.note && <span className="min-w-0 break-words">{t.note}</span>}
           </div>
         </div>
       </div>

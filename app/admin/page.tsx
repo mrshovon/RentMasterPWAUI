@@ -25,6 +25,7 @@ import {
   PaymentSubmission, PaymentSubmissionStatus, PaymentConfig,
   MaintenanceMode, NoticeScope, AccountProfile, AnalyticsSummary, DayCount,
   LogRecord, LogLevel, LogSource, LogsResponse,
+  AdminBuildingRow, AdminBuildingDetail, BuildingPlanInvoice, BuildingPlanRequest,
 } from "../../types/api";
 import { formatCurrency, formatDate, formatDateTime } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
@@ -68,6 +69,7 @@ export default function AdminDashboard() {
   const [resets, setResets] = useState<PasswordResetRecord[]>([]);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [payments, setPayments] = useState<PaymentSubmission[]>([]);
+  const [buildings, setBuildings] = useState<AdminBuildingRow[]>([]);
   const [account, setAccount] = useState<AccountProfile | null>(null);
   // Platform-wide counts for the Overview tiles (tenants + online). The Analytics tab fetches
   // its own copy with a date range; this one is just the default window.
@@ -79,6 +81,7 @@ export default function AdminDashboard() {
   const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null);
   const [activeMessage, setActiveMessage] = useState<ContactMessage | null>(null);
   const [activePayment, setActivePayment] = useState<PaymentSubmission | null>(null);
+  const [activeBuildingId, setActiveBuildingId] = useState<string | null>(null);
 
   async function refreshOwners() {
     const res = await rentMasterFetch("/api/super-admin/owners", { role: "admin" });
@@ -88,19 +91,24 @@ export default function AdminDashboard() {
     const res = await rentMasterFetch("/api/super-admin/tiers", { role: "admin" });
     setTiers(res.data || []);
   }
+  async function refreshBuildings() {
+    const res = await rentMasterFetch("/api/super-admin/buildings", { role: "admin" });
+    setBuildings(res.data || []);
+  }
 
   // `first` blanks the screen with a spinner; a background revalidation must not.
   const loadAll = useCallback(async (first = false) => {
     {
       try {
         if (first) setLoading(true);
-        const [o, t, s, r, c, p] = await Promise.allSettled([
+        const [o, t, s, r, c, p, b] = await Promise.allSettled([
           rentMasterFetch("/api/super-admin/owners", { role: "admin" }),
           rentMasterFetch("/api/super-admin/tiers", { role: "admin" }),
           rentMasterFetch("/api/super-admin/support-tickets", { role: "admin" }),
           rentMasterFetch("/api/super-admin/password-resets", { role: "admin" }),
           rentMasterFetch("/api/super-admin/contact-messages", { role: "admin" }),
           rentMasterFetch("/api/super-admin/payments", { role: "admin" }),
+          rentMasterFetch("/api/super-admin/buildings", { role: "admin" }),
         ]);
         if (o.status === "fulfilled") setOwners(o.value.data || []);
         if (t.status === "fulfilled") setTiers(t.value.data || []);
@@ -108,6 +116,7 @@ export default function AdminDashboard() {
         if (r.status === "fulfilled") setResets(r.value.data || []);
         if (c.status === "fulfilled") setMessages(c.value.data || []);
         if (p.status === "fulfilled") setPayments(p.value.data || []);
+        if (b.status === "fulfilled") setBuildings(b.value.data || []);
         const err = [o, t, s].find((r) => r.status === "rejected");
         if (err && err.status === "rejected") setError((err.reason as Error).message);
       } finally {
@@ -154,6 +163,16 @@ export default function AdminDashboard() {
     openTickets: tickets.filter((t) => t.status !== "done").length,
     newMessages: messages.filter((m) => m.status === "new").length,
     pendingPayments: payments.filter((p) => p.status === "pending").length,
+    // Renewal requests and payment claims waiting on us, plus any building already locked or
+    // counting down — the badge is "needs a human", not just "unread".
+    buildingsNeedingAttention: buildings.filter(
+      (b) =>
+        b.open_requests > 0 ||
+        b.state?.status === "locked" ||
+        b.state?.status === "grace" ||
+        b.state?.unpaidWindow ||
+        b.state?.warnExpiringSoon
+    ).length,
     // Owners/admins with the app open right now. The Analytics tab reports platform-wide
     // online counts including tenants; this one is scoped to the accounts in this list.
     onlineOwners: owners.filter((o) => o.online).length,
@@ -165,6 +184,7 @@ export default function AdminDashboard() {
     { key: "owners", label: "Owners", icon: Users, badge: owners.length },
     { key: "subscriptions", label: "Plans", icon: CreditCard },
     { key: "payments", label: "Payments", icon: CircleDollarSign, badge: metrics.pendingPayments },
+    { key: "buildings", label: "Buildings", icon: Building2, badge: metrics.buildingsNeedingAttention },
     { key: "payment-setup", label: "Payment setup", icon: Wallet },
     { key: "notices", label: "Circulate", icon: Megaphone },
     { key: "tickets", label: "Tickets", icon: LifeBuoy, badge: metrics.openTickets },
@@ -354,6 +374,8 @@ export default function AdminDashboard() {
 
       {tab === "payments" && <PaymentsTab payments={payments} onOpen={setActivePayment} />}
 
+      {tab === "buildings" && <BuildingsTab buildings={buildings} onOpen={setActiveBuildingId} />}
+
       {tab === "payment-setup" && <PaymentSetupTab />}
 
       {tab === "notices" && <CirculateTab owners={owners} />}
@@ -392,6 +414,11 @@ export default function AdminDashboard() {
         payment={activePayment}
         onClose={() => setActivePayment(null)}
         onSaved={applyPaymentUpdate}
+      />
+      <BuildingPlanModal
+        buildingId={activeBuildingId}
+        onClose={() => setActiveBuildingId(null)}
+        onChanged={refreshBuildings}
       />
     </DashboardShell>
   );
@@ -1382,6 +1409,754 @@ function PaymentDecisionModal({
         </div>
       )}
     </Modal>
+  );
+}
+
+/* ============================================================ BUILDINGS TAB */
+
+// The Whole Building book of business: who is on contract, who owes money, who is about to lock,
+// and who has asked us for something. See ADD_BUILDING_PLANS.sql for the model — in short, a
+// building's term is its own contract, and the line items on its invoice are the pricing.
+
+const BUILDING_FILTERS = [
+  { key: "attention", label: "Needs attention" },
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "locked", label: "Locked" },
+];
+
+const BUILDING_METHODS = [
+  { value: "bkash", label: "bKash" },
+  { value: "nagad", label: "Nagad" },
+  { value: "bank", label: "Bank transfer" },
+  { value: "cash", label: "Cash" },
+  { value: "card", label: "Card" },
+  { value: "other", label: "Other" },
+];
+
+/** The one badge that answers "what is this building's situation right now". */
+function buildingStatusBadge(b: { state: AdminBuildingRow["state"] }) {
+  const st = b.state;
+  if (!st) return { tone: "slate" as const, label: "No contract" };
+  if (st.status === "locked") {
+    return { tone: "rose" as const, label: st.lockReason === "revoked" ? "Suspended" : "Locked" };
+  }
+  if (st.unpaidWindow) return { tone: "amber" as const, label: `Unpaid · ${st.daysToPay}d` };
+  if (st.status === "grace") return { tone: "amber" as const, label: `Grace · ${st.daysLeftInGrace}d` };
+  if (st.warnExpiringSoon) return { tone: "amber" as const, label: `Expiring · ${st.daysUntilExpiry}d` };
+  return { tone: "emerald" as const, label: "Active" };
+}
+
+function needsAttention(b: AdminBuildingRow): boolean {
+  return (
+    b.open_requests > 0 ||
+    !b.state ||
+    b.state.status === "locked" ||
+    b.state.status === "grace" ||
+    b.state.unpaidWindow ||
+    b.state.warnExpiringSoon
+  );
+}
+
+function BuildingsTab({
+  buildings,
+  onOpen,
+}: {
+  buildings: AdminBuildingRow[];
+  onOpen: (id: string) => void;
+}) {
+  // Defaults to the ones that need a human, not to everything — this is a work queue, and a
+  // hundred healthy contracts scrolling past the two that lapsed is how one gets missed.
+  const [filter, setFilter] = useState("attention");
+  const [query, setQuery] = useState("");
+
+  const rows = buildings.filter((b) => {
+    if (filter === "attention" && !needsAttention(b)) return false;
+    if (filter === "active" && !(b.state && b.state.status === "active" && !b.state.unpaidWindow)) return false;
+    if (filter === "locked" && b.state?.status !== "locked") return false;
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return [b.name, b.admin_login, b.admin_name, b.admin_phone, b.city, b.house_no]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(q));
+  });
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Buildings"
+        subtitle="Whole Building contracts: terms, invoices, payments and renewal requests."
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        {BUILDING_FILTERS.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={
+              "rounded-lg px-3 py-1.5 text-xs font-bold transition " +
+              (filter === f.key
+                ? "bg-accent text-on-accent"
+                : "bg-overlay/[0.04] text-muted hover:text-fg")
+            }
+          >
+            {f.label}
+          </button>
+        ))}
+        <div className="ml-auto w-full sm:w-64">
+          <SearchInput value={query} onChange={setQuery} placeholder="Search buildings" />
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={Building2}
+          title="Nothing here"
+          hint={filter === "attention" ? "Every building is paid up and nobody is waiting on us." : "No buildings match."}
+        />
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] text-left text-sm">
+              <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
+                <tr>
+                  <th className="p-4">#</th>
+                  <th className="p-4">Building</th>
+                  <th className="p-4">Admin login</th>
+                  <th className="p-4">Owners</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Expires</th>
+                  <th className="p-4">Owed</th>
+                  <th className="p-4">Requests</th>
+                  <th className="p-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line/[0.04]">
+                {rows.map((b) => {
+                  const badge = buildingStatusBadge(b);
+                  return (
+                    <tr key={b.id} className="hover:bg-overlay/[0.02]">
+                      <td className="p-4 text-xs text-muted">#{b.building_no}</td>
+                      <td className="p-4">
+                        <div className="font-semibold text-heading">{b.name}</div>
+                        <div className="text-xs text-muted">
+                          {[b.house_no, b.city].filter(Boolean).join(" · ") || "—"}
+                        </div>
+                      </td>
+                      <td className="p-4 font-mono text-xs text-fg">{b.admin_login || "—"}</td>
+                      <td className="p-4 text-xs">{b.owner_count}</td>
+                      <td className="p-4"><Badge tone={badge.tone}>{badge.label}</Badge></td>
+                      <td className="p-4 text-xs">
+                        {b.state?.expiryDate ? formatDate(b.state.expiryDate) : "—"}
+                      </td>
+                      <td className="p-4 text-xs font-bold">
+                        {b.amount_owed > 0 ? formatCurrency(b.amount_owed) : "—"}
+                      </td>
+                      <td className="p-4">
+                        {b.open_requests > 0
+                          ? <Badge tone="amber">{String(b.open_requests)}</Badge>
+                          : <span className="text-xs text-muted">—</span>}
+                      </td>
+                      <td className="p-4">
+                        <IconBtn title="Manage" tone="indigo" icon={Eye} onClick={() => onOpen(b.id)} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ BUILDING PLAN MODAL */
+
+// Everything about one building's contract in one place: the term, the invoice builder, the
+// money, and the request thread. Deliberately one modal rather than four screens — handling a
+// renewal means reading the request, quoting it, and recording the payment, and each hop between
+// screens is a chance to quote the wrong building.
+
+function BuildingPlanModal({
+  buildingId,
+  onClose,
+  onChanged,
+}: {
+  buildingId: string | null;
+  onClose: () => void;
+  onChanged: () => Promise<void> | void;
+}) {
+  const [detail, setDetail] = useState<AdminBuildingDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [section, setSection] = useState<"contract" | "invoice" | "requests">("contract");
+
+  const load = useCallback(async () => {
+    if (!buildingId) return;
+    try {
+      setLoading(true);
+      const res = await rentMasterFetch(`/api/super-admin/buildings/${buildingId}`, { role: "admin" });
+      setDetail(res.data || null);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [buildingId]);
+
+  useEffect(() => {
+    if (buildingId) { setSection("contract"); void load(); }
+    else setDetail(null);
+  }, [buildingId, load]);
+
+  async function patchContract(body: Record<string, unknown>, okMsg: string) {
+    if (!buildingId) return;
+    try {
+      setBusy(true);
+      await rentMasterFetch(`/api/super-admin/buildings/${buildingId}`, {
+        role: "admin",
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      toast.success(okMsg);
+      await load();
+      await onChanged();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const openInvoice =
+    detail?.invoices.find((i) => i.payment_status !== "paid" && i.status !== "void") || null;
+
+  return (
+    <Modal
+      open={!!buildingId}
+      onClose={onClose}
+      title={detail?.building.name || "Building"}
+      subtitle={detail?.admin_login ? `Signs in as ${detail.admin_login}` : undefined}
+      size="lg"
+    >
+      {loading || !detail ? (
+        <div className="p-6 text-center text-sm text-muted">Loading…</div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {(["contract", "invoice", "requests"] as const).map((k) => (
+              <button
+                key={k}
+                onClick={() => setSection(k)}
+                className={
+                  "rounded-lg px-3 py-1.5 text-xs font-bold capitalize transition " +
+                  (section === k ? "bg-accent text-on-accent" : "bg-overlay/[0.04] text-muted hover:text-fg")
+                }
+              >
+                {k === "requests" && detail.requests.some((r) => ["new", "in_progress", "quoted"].includes(r.status))
+                  ? `requests (${detail.requests.filter((r) => ["new", "in_progress", "quoted"].includes(r.status)).length})`
+                  : k}
+              </button>
+            ))}
+          </div>
+
+          {section === "contract" && (
+            <ContractSection detail={detail} busy={busy} onPatch={patchContract} />
+          )}
+
+          {section === "invoice" && (
+            <InvoiceSection
+              detail={detail}
+              buildingId={buildingId!}
+              openInvoice={openInvoice}
+              onReload={async () => { await load(); await onChanged(); }}
+            />
+          )}
+
+          {section === "requests" && (
+            <RequestsSection
+              detail={detail}
+              onReload={async () => { await load(); await onChanged(); }}
+            />
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function ContractSection({
+  detail,
+  busy,
+  onPatch,
+}: {
+  detail: AdminBuildingDetail;
+  busy: boolean;
+  onPatch: (body: Record<string, unknown>, okMsg: string) => Promise<void>;
+}) {
+  const sub = detail.subscription;
+  const [termMonths, setTermMonths] = useState(String(sub?.term_months ?? 12));
+  const [payBy, setPayBy] = useState(sub?.pay_by || "");
+  const [expiry, setExpiry] = useState(sub?.expiry_date || "");
+  const [graceDays, setGraceDays] = useState(String(sub?.grace_days ?? 15));
+  const [warnDays, setWarnDays] = useState(String(sub?.warn_days ?? 30));
+  const [notes, setNotes] = useState(sub?.notes || "");
+
+  useEffect(() => {
+    setTermMonths(String(sub?.term_months ?? 12));
+    setPayBy(sub?.pay_by || "");
+    setExpiry(sub?.expiry_date || "");
+    setGraceDays(String(sub?.grace_days ?? 15));
+    setWarnDays(String(sub?.warn_days ?? 30));
+    setNotes(sub?.notes || "");
+  }, [sub]);
+
+  if (!sub) {
+    return <Alert>No contract row for this building. Has ADD_BUILDING_PLANS.sql been run?</Alert>;
+  }
+
+  const st = detail.state;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MiniFact label="Status" value={buildingStatusBadge({ state: st }).label} />
+        <MiniFact label="Term start" value={sub.term_starts_on ? formatDate(sub.term_starts_on) : "Not started"} />
+        <MiniFact label="First paid" value={sub.first_paid_at ? formatDate(sub.first_paid_at) : "Never"} />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Term length (months)" hint="12 by default. Change it for a special arrangement.">
+          <TextInput type="number" value={termMonths} onChange={(e) => setTermMonths(e.target.value)} />
+        </Field>
+        <Field label="Pay by" hint="While unpaid, they keep full access until this date, then lock.">
+          <TextInput type="date" value={payBy} onChange={(e) => setPayBy(e.target.value)} />
+        </Field>
+        <Field label="Expiry date" hint="Set directly only to correct a term. Recording a payment moves it automatically.">
+          <TextInput type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Grace days">
+            <TextInput type="number" value={graceDays} onChange={(e) => setGraceDays(e.target.value)} />
+          </Field>
+          <Field label="Warn days">
+            <TextInput type="number" value={warnDays} onChange={(e) => setWarnDays(e.target.value)} />
+          </Field>
+        </div>
+      </div>
+
+      <Field label="Internal notes">
+        <TextArea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </Field>
+
+      <div className="flex flex-wrap justify-between gap-2">
+        <div className="flex gap-2">
+          {sub.canceled_at ? (
+            <Button
+              variant="secondary"
+              loading={busy}
+              onClick={() => onPatch({ action: "reinstate" }, "Contract reinstated.")}
+            >
+              Reinstate
+            </Button>
+          ) : (
+            <Button
+              variant="danger"
+              loading={busy}
+              onClick={() => onPatch({ action: "cancel" }, "Contract suspended.")}
+            >
+              Suspend contract
+            </Button>
+          )}
+          {!sub.first_paid_at && (
+            <Button
+              variant="secondary"
+              loading={busy}
+              onClick={() => onPatch({ markPaid: true }, "Marked as paid.")}
+            >
+              Mark first payment received
+            </Button>
+          )}
+        </div>
+        <Button
+          loading={busy}
+          onClick={() =>
+            onPatch(
+              {
+                termMonths: Number(termMonths),
+                payBy,
+                expiryDate: expiry || null,
+                graceDays: Number(graceDays),
+                warnDays: Number(warnDays),
+                notes,
+              },
+              "Contract saved."
+            )
+          }
+        >
+          Save contract
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function MiniFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-overlay/[0.03] p-3">
+      <div className="text-[11px] uppercase tracking-wider text-muted">{label}</div>
+      <div className="mt-0.5 text-sm font-bold text-heading">{value}</div>
+    </div>
+  );
+}
+
+/** The quote builder + the money against it. */
+function InvoiceSection({
+  detail,
+  buildingId,
+  openInvoice,
+  onReload,
+}: {
+  detail: AdminBuildingDetail;
+  buildingId: string;
+  openInvoice: BuildingPlanInvoice | null;
+  onReload: () => Promise<void>;
+}) {
+  const [items, setItems] = useState<{ label: string; amount: string }[]>([
+    { label: "Whole Building plan (12 months)", amount: "" },
+  ]);
+  const [discount, setDiscount] = useState("");
+  const [termMonths, setTermMonths] = useState(String(detail.subscription?.term_months ?? 12));
+  const [terms, setTerms] = useState("");
+  const [paymentUrl, setPaymentUrl] = useState("");
+  const [dueOn, setDueOn] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  // Recording money against the open invoice.
+  const [payAmount, setPayAmount] = useState("");
+  const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
+  const [payMethod, setPayMethod] = useState("bank");
+  const [payRef, setPayRef] = useState("");
+
+  useEffect(() => {
+    if (openInvoice) {
+      setPayAmount(String(openInvoice.balance ?? openInvoice.total_payable ?? ""));
+    }
+  }, [openInvoice]);
+
+  const subtotal = items.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+  const total = Math.max(0, subtotal - (Number(discount) || 0));
+
+  // Last year's bill is almost always this year's bill plus a line. Retyping it is how a figure
+  // quietly changes by a digit.
+  function copyLastInvoice() {
+    const last = detail.invoices.find((i) => (i.items || []).length);
+    if (!last) { toast.info("No previous invoice to copy."); return; }
+    setItems((last.items || []).map((i) => ({ label: i.label, amount: String(i.amount) })));
+    setDiscount(String(last.discount || ""));
+    setTerms(last.terms || "");
+    setTermMonths(String(last.term_months || 12));
+    toast.success(`Copied the lines from invoice #${last.invoice_no}.`);
+  }
+
+  async function raise() {
+    const clean = items.filter((i) => i.label.trim());
+    if (!clean.length) { toast.error("Add at least one line."); return; }
+    try {
+      setBusy(true);
+      await rentMasterFetch(`/api/super-admin/buildings/${buildingId}/invoices`, {
+        role: "admin",
+        method: "POST",
+        body: JSON.stringify({
+          kind: detail.subscription?.first_paid_at ? "renewal" : "initial",
+          termMonths: Number(termMonths),
+          items: clean.map((i) => ({ label: i.label.trim(), amount: Number(i.amount) || 0 })),
+          discount: Number(discount) || 0,
+          terms: terms.trim(),
+          paymentUrl: paymentUrl.trim(),
+          dueOn: dueOn || null,
+          send: true,
+        }),
+      });
+      toast.success("Invoice sent to the building.");
+      setItems([{ label: "Whole Building plan (12 months)", amount: "" }]);
+      setDiscount(""); setTerms(""); setPaymentUrl(""); setDueOn("");
+      await onReload();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recordPayment() {
+    if (!openInvoice) return;
+    const n = Number(payAmount);
+    if (!Number.isFinite(n) || n <= 0) { toast.error("Enter an amount."); return; }
+    try {
+      setBusy(true);
+      await rentMasterFetch(
+        `/api/super-admin/buildings/${buildingId}/invoices/${openInvoice.id}/payments`,
+        {
+          role: "admin",
+          method: "POST",
+          body: JSON.stringify({ amount: n, paidOn: payDate, method: payMethod, reference: payRef.trim() }),
+        }
+      );
+      toast.success("Payment recorded.");
+      setPayRef("");
+      await onReload();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {openInvoice && (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-bold text-heading">
+                Open invoice #{openInvoice.invoice_no}
+              </div>
+              <div className="text-xs text-muted">
+                {formatCurrency(Number(openInvoice.total_payable))} total ·{" "}
+                {formatCurrency(Number(openInvoice.amount_paid))} received ·{" "}
+                <b>{formatCurrency(Number(openInvoice.balance ?? 0))} due</b>
+              </div>
+            </div>
+            <Badge tone={openInvoice.payment_status === "partial" ? "amber" : "rose"}>
+              {openInvoice.payment_status}
+            </Badge>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-4">
+            <Field label="Amount received">
+              <TextInput type="number" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+            </Field>
+            <Field label="Date">
+              <TextInput type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+            </Field>
+            <Field label="Method">
+              <Select value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
+                {BUILDING_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </Select>
+            </Field>
+            <Field label="Reference">
+              <TextInput value={payRef} onChange={(e) => setPayRef(e.target.value)} />
+            </Field>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <Button loading={busy} onClick={recordPayment}>Record payment</Button>
+          </div>
+        </Card>
+      )}
+
+      <Card className="p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-bold text-heading">Raise an invoice</div>
+          <Button size="sm" variant="secondary" onClick={copyLastInvoice}>Copy last invoice</Button>
+        </div>
+
+        <div className="space-y-2">
+          {items.map((item, idx) => (
+            <div key={idx} className="flex gap-2">
+              <TextInput
+                className="flex-1"
+                value={item.label}
+                placeholder="e.g. Maintenance & support"
+                onChange={(e) =>
+                  setItems((xs) => xs.map((x, i) => (i === idx ? { ...x, label: e.target.value } : x)))
+                }
+              />
+              <TextInput
+                className="w-32"
+                type="number"
+                value={item.amount}
+                placeholder="0"
+                onChange={(e) =>
+                  setItems((xs) => xs.map((x, i) => (i === idx ? { ...x, amount: e.target.value } : x)))
+                }
+              />
+              <IconBtn
+                title="Remove"
+                icon={Trash2}
+                tone="rose"
+                onClick={() => setItems((xs) => (xs.length > 1 ? xs.filter((_, i) => i !== idx) : xs))}
+              />
+            </div>
+          ))}
+          <Button size="sm" variant="ghost" icon={Plus} onClick={() => setItems((xs) => [...xs, { label: "", amount: "" }])}>
+            Add line
+          </Button>
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <Field label="Discount">
+            <TextInput type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+          </Field>
+          <Field label="Term (months)">
+            <TextInput type="number" value={termMonths} onChange={(e) => setTermMonths(e.target.value)} />
+          </Field>
+          <Field label="Due by">
+            <TextInput type="date" value={dueOn} onChange={(e) => setDueOn(e.target.value)} />
+          </Field>
+        </div>
+
+        <Field label="Payment link" hint="Optional. Shown to the building as a 'Pay online' button.">
+          <TextInput value={paymentUrl} onChange={(e) => setPaymentUrl(e.target.value)} placeholder="https://…" />
+        </Field>
+
+        <Field label="Terms" hint="Shown on their Plan tab and printed on the invoice.">
+          <TextArea rows={3} value={terms} onChange={(e) => setTerms(e.target.value)} />
+        </Field>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm">
+            <span className="text-muted">Total payable </span>
+            <span className="font-extrabold text-heading">{formatCurrency(total)}</span>
+          </div>
+          <Button loading={busy} onClick={raise}>Send invoice</Button>
+        </div>
+      </Card>
+
+      {detail.payments.length > 0 && (
+        <Card className="overflow-hidden">
+          <div className="border-b border-line/[0.06] p-4 text-sm font-bold text-heading">Payments</div>
+          <div className="divide-y divide-line/[0.04]">
+            {detail.payments.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-2 text-xs">
+                <span>
+                  #{p.payment_no} · {formatDate(p.paid_on)} · {p.method}
+                  {p.reference ? ` · ${p.reference}` : ""}
+                  {p.recorded_by ? "" : " · from their claim"}
+                </span>
+                <span className="font-bold text-success">{formatCurrency(Number(p.amount))}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/** The queue thread: renewal requests and payment claims, with the accept path for a claim. */
+function RequestsSection({
+  detail,
+  onReload,
+}: {
+  detail: AdminBuildingDetail;
+  onReload: () => Promise<void>;
+}) {
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState("");
+
+  const openInvoice =
+    detail.invoices.find((i) => i.payment_status !== "paid" && i.status !== "void") || null;
+
+  async function patch(r: BuildingPlanRequest, body: Record<string, unknown>, okMsg: string) {
+    try {
+      setBusy(r.id);
+      await rentMasterFetch(`/api/super-admin/building-requests/${r.id}`, {
+        role: "admin",
+        method: "PATCH",
+        body: JSON.stringify({ adminNotes: notes[r.id] ?? r.admin_notes ?? "", ...body }),
+      });
+      toast.success(okMsg);
+      await onReload();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  if (!detail.requests.length) {
+    return <div className="p-4 text-sm text-muted">This building has not asked us for anything.</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {detail.requests.map((r) => (
+        <Card key={r.id} className="p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-bold text-heading">
+              {r.kind === "renewal" ? "Renewal" : "Payment claim"} #{r.request_no}
+            </span>
+            <Badge tone={r.status === "closed" ? "emerald" : r.status === "rejected" ? "rose" : "amber"}>
+              {r.status}
+            </Badge>
+            <span className="text-xs text-muted">{formatDate(r.created_at)}</span>
+          </div>
+
+          {r.kind === "payment_claim" && (
+            <div className="mt-1 text-xs text-muted">
+              Claims {formatCurrency(Number(r.claim_amount || 0))} by {r.claim_method} · ref {r.claim_reference}
+            </div>
+          )}
+          {r.message && <p className="mt-2 whitespace-pre-wrap text-xs text-fg">{r.message}</p>}
+
+          <div className="mt-3">
+            <Field label="Reply to the building" hint="They can read this. Required to decline.">
+              <TextArea
+                rows={2}
+                value={notes[r.id] ?? r.admin_notes ?? ""}
+                onChange={(e) => setNotes((n) => ({ ...n, [r.id]: e.target.value }))}
+              />
+            </Field>
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-2">
+            {r.status !== "closed" && r.status !== "rejected" && (
+              <>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={busy === r.id}
+                  onClick={() => patch(r, { status: "in_progress" }, "Marked in progress.")}
+                >
+                  In progress
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  loading={busy === r.id}
+                  onClick={() => patch(r, { status: "rejected" }, "Request declined.")}
+                >
+                  Decline
+                </Button>
+                {r.kind === "payment_claim" ? (
+                  <Button
+                    size="sm"
+                    loading={busy === r.id}
+                    onClick={() => {
+                      if (!openInvoice) { toast.error("Raise an invoice before accepting a payment against it."); return; }
+                      void patch(r, { action: "accept", invoiceId: openInvoice.id }, "Payment confirmed.");
+                    }}
+                  >
+                    Confirm payment
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    loading={busy === r.id}
+                    onClick={() => patch(r, { status: "closed" }, "Request closed.")}
+                  >
+                    Close
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </Card>
+      ))}
+    </div>
   );
 }
 

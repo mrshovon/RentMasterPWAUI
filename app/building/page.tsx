@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, Users, Settings, Plus, Pencil, KeyRound, Ban, ShieldCheck,
   Unlink, Building2, CircleDollarSign, ReceiptText, Home, HardHat, Wallet, Wrench,
-  Megaphone, FileText,
+  Megaphone, FileText, CreditCard,
 } from "lucide-react";
 import { rentMasterFetch } from "../../lib/api-service";
 import { toast } from "../../components/toast";
@@ -14,7 +14,7 @@ import { usePresenceHeartbeat } from "../../lib/presence";
 import { useTabState } from "../../lib/use-tab";
 import { usePlan } from "../../lib/use-plan";
 import { useRevalidateOnFocus } from "../../lib/use-revalidate";
-import { Building, BuildingOwner, Property } from "../../types/api";
+import { Building, BuildingOwner, BuildingPlanState, Property } from "../../types/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AppSettingsCard } from "../../components/app-settings-card";
@@ -24,6 +24,7 @@ import { BuildingSpacesTab } from "../../components/building-spaces-tab";
 import { BuildingSetupTab } from "../../components/building-setup-tab";
 import { BuildingNoticesTab } from "../../components/building-notices-tab";
 import { BuildingReportsTab } from "../../components/building-reports-tab";
+import { BuildingPlanTab, BuildingPlanBanner } from "../../components/building-plan-tab";
 import { StaffTab } from "../../components/staff-tab";
 import { AccountsTab } from "../../components/accounts-tab";
 import {
@@ -104,6 +105,21 @@ export default function BuildingAdminDashboard() {
       }
     })();
   }, [session]);
+  // The contract's live state, for the banner that rides above EVERY tab. Someone whose building
+  // is days from locking should not have to open the Plan tab to discover that.
+  const [planState, setPlanState] = useState<BuildingPlanState | null>(null);
+  const loadPlanState = useCallback(async () => {
+    try {
+      const res = await rentMasterFetch<{ data: { state: BuildingPlanState | null } }>(
+        "/api/admin/building/plan"
+      );
+      setPlanState(res.data?.state || null);
+    } catch {
+      /* non-fatal — no banner is better than a broken dashboard */
+    }
+  }, []);
+  useEffect(() => { if (session) void loadPlanState(); }, [session, loadPlanState]);
+
   useRevalidateOnFocus(load);
 
   const metrics = useMemo(() => {
@@ -117,6 +133,7 @@ export default function BuildingAdminDashboard() {
 
   const nav: NavItem[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
+    { key: "plan", label: "Plan", icon: CreditCard },
     { key: "owners", label: "Owners", icon: Users, badge: owners.length },
     { key: "invoices", label: "Service charge", icon: ReceiptText },
     { key: "spaces", label: "Spaces", icon: Home, badge: properties.length },
@@ -149,9 +166,12 @@ export default function BuildingAdminDashboard() {
       onNavigate={setTab}
       onLogout={logout}
     >
+      <BuildingPlanBanner state={planState} onOpen={() => setTab("plan")} />
+
       {tab === "overview" && (
         <OverviewTab building={building} metrics={metrics} onAdd={() => setCreateOpen(true)} />
       )}
+      {tab === "plan" && <BuildingPlanTab building={building} />}
       {tab === "owners" && (
         <OwnersTab
           owners={owners}

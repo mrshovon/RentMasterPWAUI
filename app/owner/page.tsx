@@ -749,6 +749,40 @@ function PlanBanner({ plan, onRenew }: { plan: SubscriptionResponse; onRenew: ()
   const s = plan.subscription;
   let tone: "rose" | "amber" | null = null;
   let msg = "";
+
+  // A flat owner inside a Whole Building plan inherits their building's billing state, lock
+  // included — the building is the paying customer (lib/subscription.ts). So they need the same
+  // warnings, but never the same instruction: telling someone to "renew your plan" when the
+  // route to do it is 403'd for them (BUILDING_MANAGED_PLAN) is a dead end. Point them at their
+  // building administrator instead.
+  const managed = !!plan.building;
+  const building = plan.building?.name || "your building";
+
+  if (managed && (s.status === "locked" || s.status === "grace" || s.warnExpiringSoon || s.unpaidWindow)) {
+    if (s.status === "locked") {
+      tone = "rose";
+      msg = `${building}'s plan has lapsed, so your account is view-only. Ask your building administrator to renew it — nothing has been deleted.`;
+    } else if (s.status === "grace") {
+      tone = "amber";
+      msg = `${building}'s plan has expired. ${s.daysLeftInGrace} day${s.daysLeftInGrace === 1 ? "" : "s"} left before your account becomes view-only.`;
+    } else if (s.unpaidWindow) {
+      tone = "amber";
+      msg = `${building}'s plan is awaiting payment. ${s.daysToPay} day${s.daysToPay === 1 ? "" : "s"} left before your account becomes view-only.`;
+    } else {
+      tone = "amber";
+      msg = `${building}'s plan expires in ${s.daysUntilExpiry} day${s.daysUntilExpiry === 1 ? "" : "s"}. Your building administrator renews it.`;
+    }
+    const cls = tone === "rose"
+      ? "border-danger/30 bg-danger/10 text-danger"
+      : "border-warning/30 bg-warning/10 text-warning";
+    return (
+      <div className={`mb-6 flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${cls}`}>
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>{msg}</span>
+      </div>
+    );
+  }
+
   if (s.status === "locked") {
     tone = "rose";
     msg = s.lockReason === "revoked"

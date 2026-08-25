@@ -711,6 +711,22 @@ export const bn: Record<string, string> = {
   "The document isn't ready yet — try again in a moment.": "ডকুমেন্টটি এখনও প্রস্তুত নয় — একটু পরে আবার চেষ্টা করুন।",
   "Could not turn the document into an image on this device.": "এই ডিভাইসে ডকুমেন্টটিকে ছবিতে রূপান্তর করা যায়নি।",
 
+  // ---- Whole Building: the PLAN invoice & payment receipt (lib/building-print.ts) ----
+  // Bari360's own bill to a building, and the receipt for what it paid. Unlike the documents
+  // above these come FROM us, not from the building — but they still land on paper in a
+  // building committee's file, so they translate like everything else here.
+  "Plan Invoice": "প্ল্যান চালান",
+  "Payment Receipt": "পেমেন্ট রসিদ",
+  "Billed to": "বিল প্রাপক",
+  "Received from": "যার কাছ থেকে প্রাপ্ত",
+  "Due by": "পরিশোধের শেষ তারিখ",
+  "Subtotal": "উপমোট",
+  "Payment date": "পেমেন্টের তারিখ",
+  "Amount received": "প্রাপ্ত পরিমাণ",
+  "Against invoice": "যে চালানের বিপরীতে",
+  "Reference": "রেফারেন্স",
+  "No lines on this invoice.": "এই চালানে কোনো খাত নেই।",
+
   // ---- Whole Building: the flat owner's service-charge tab (components/service-charge-tab.tsx) ----
   // Read-only on purpose — the building administrator issues these and records the money.
   "Service charge invoice": "সার্ভিস চার্জ ইনভয়েস",

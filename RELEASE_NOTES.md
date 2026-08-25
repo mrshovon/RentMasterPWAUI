@@ -1,4 +1,7 @@
-- You can now upload your signature. Go to Settings, under Authorised signature, and pick an image of it. A transparent PNG looks best.
-- Once uploaded, your signature is printed on every receipt you issue, just above the signature line.
-- Notices now have a Print signed button beside Print, so you decide notice by notice whether your signature goes on it.
-- Receipts have more room above the signature line, so there is space to sign one by hand.
+- When you log a salary payment, the matching expense in Accounts now names the staff member, so a month with several staff is no longer a column of identical Salary rows.
+- Building administrators have a new Plan tab. It shows your subscription, how long is left on it, your current invoice with every line itemised, and the terms.
+- You can settle a building invoice through the payment link on it, or tell us you have paid and we will confirm it against our records.
+- Every payment we record now produces a printable receipt in your Plan tab.
+- You can request a renewal from the same tab, including maintenance and support or extra modules, and we will reply with an itemised quote.
+- Your building is warned in the app well before its plan expires, and again during the grace period afterwards, so a lapse is never a surprise.
+- If a building plan goes unpaid, the building and its flat owners become read only until it is renewed. Nothing is deleted, and everything can still be viewed and printed.

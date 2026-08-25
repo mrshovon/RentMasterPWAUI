@@ -190,6 +190,119 @@ ${table("Expenses", o.expense.lines, o.expense.total)}
   });
 }
 
+/* ------------------------------------------------------- plan invoice & payment receipt */
+
+// These two are the ONLY documents in this file that do not come FROM the building. A service
+// charge is the building billing its flat owners; a plan invoice is Bari360 billing the building.
+// So they deliberately do NOT use the building's letterhead or its signatory — printing our
+// invoice on their letterhead would misattribute who is asking for the money. The header is the
+// platform's, and the building is named as the party being billed.
+const PLATFORM_HEADER: BuildingHeader = { name: "Bari360" };
+
+export interface PlanInvoiceOptions {
+  buildingName: string;
+  buildingAddress?: string | null;
+  invoiceNo: number | string;
+  kind: string;
+  issuedOn?: string | null;
+  dueOn?: string | null;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  items: { label: string; amount: number }[];
+  subtotal: number;
+  discount: number;
+  total: number;
+  amountPaid?: number;
+  terms?: string | null;
+}
+
+export function buildPlanInvoiceHtml(o: PlanInvoiceOptions): string {
+  const due = Math.max(0, Number(o.total || 0) - Number(o.amountPaid || 0));
+
+  const lines = o.items.length
+    ? o.items
+        .map((i) => `<tr><td>${esc(i.label)}</td><td class="n">${esc(money(i.amount))}</td></tr>`)
+        .join("")
+    : `<tr><td colspan="2" class="empty">${esc(tr("No lines on this invoice."))}</td></tr>`;
+
+  const period =
+    o.periodStart && o.periodEnd
+      ? `<div class="sub"><b>${esc(tr("Period"))}:</b> ${esc(printDate(o.periodStart))} &ndash; ${esc(printDate(o.periodEnd))}</div>`
+      : "";
+
+  const body = `
+<div class="sub"><b>${esc(tr("Billed to"))}:</b> ${esc(o.buildingName)}${o.buildingAddress ? " — " + esc(o.buildingAddress) : ""}</div>
+${period}
+${o.dueOn ? `<div class="sub"><b>${esc(tr("Due by"))}:</b> ${esc(printDate(o.dueOn))}</div>` : ""}
+<table>
+  <thead><tr><th>${esc(tr("Description"))}</th><th class="n">${esc(tr("Amount"))}</th></tr></thead>
+  <tbody>
+    ${lines}
+    <tr class="sum"><td>${esc(tr("Subtotal"))}</td><td class="n">${esc(money(o.subtotal))}</td></tr>
+    ${Number(o.discount || 0) > 0
+      ? `<tr><td>${esc(tr("Discount"))}</td><td class="n">- ${esc(money(o.discount))}</td></tr>`
+      : ""}
+    <tr class="net"><td>${esc(tr("Total payable"))}</td><td class="n">${esc(money(o.total))}</td></tr>
+    ${Number(o.amountPaid || 0) > 0
+      ? `<tr class="sum"><td>${esc(tr("Received"))}</td><td class="n">${esc(money(o.amountPaid || 0))}</td></tr>
+         <tr class="net"><td>${esc(tr("Balance due"))}</td><td class="n">${esc(money(due))}</td></tr>`
+      : ""}
+  </tbody>
+</table>
+${o.terms ? `<div class="section">${esc(tr("Terms"))}</div><div class="sub">${esc(o.terms).replace(/\n/g, "<br>")}</div>` : ""}`;
+
+  return shell({
+    building: PLATFORM_HEADER,
+    docTitle: tr("Plan Invoice") + ` #${esc(o.invoiceNo)}`,
+    metaLeft: `${esc(tr("Invoice"))} #${esc(o.invoiceNo)}`,
+    metaRight: `${esc(tr("Issued"))}: ${esc(printDate(o.issuedOn || new Date().toISOString()))}`,
+    bodyHtml: body,
+    signatureCaption: tr("Authorised Signature"),
+  });
+}
+
+export interface PlanReceiptOptions {
+  buildingName: string;
+  receiptNo: number | string;
+  paidOn: string;
+  amount: number;
+  method: string;
+  reference?: string | null;
+  invoiceNo?: number | string | null;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  note?: string | null;
+}
+
+/** The proof of one payment. Deliberately one payment per receipt, not a statement: this is the
+ *  document a building files against its own books, and it must match a single bank line. */
+export function buildPlanReceiptHtml(o: PlanReceiptOptions): string {
+  const body = `
+<div class="sub"><b>${esc(tr("Received from"))}:</b> ${esc(o.buildingName)}</div>
+<table>
+  <tbody>
+    <tr><td>${esc(tr("Payment date"))}</td><td class="n">${esc(printDate(o.paidOn))}</td></tr>
+    <tr><td>${esc(tr("Method"))}</td><td class="n">${esc(tr(o.method))}</td></tr>
+    ${o.reference ? `<tr><td>${esc(tr("Reference"))}</td><td class="n">${esc(o.reference)}</td></tr>` : ""}
+    ${o.invoiceNo ? `<tr><td>${esc(tr("Against invoice"))}</td><td class="n">#${esc(o.invoiceNo)}</td></tr>` : ""}
+    ${o.periodStart && o.periodEnd
+      ? `<tr><td>${esc(tr("Period"))}</td><td class="n">${esc(printDate(o.periodStart))} &ndash; ${esc(printDate(o.periodEnd))}</td></tr>`
+      : ""}
+    <tr class="net"><td>${esc(tr("Amount received"))}</td><td class="n">${esc(money(o.amount))}</td></tr>
+  </tbody>
+</table>
+${o.note ? `<div class="sub">${esc(o.note)}</div>` : ""}`;
+
+  return shell({
+    building: PLATFORM_HEADER,
+    docTitle: tr("Payment Receipt"),
+    metaLeft: `${esc(tr("Receipt"))} #${esc(o.receiptNo)}`,
+    metaRight: `${esc(tr("Issued"))}: ${esc(printDate(new Date().toISOString()))}`,
+    bodyHtml: body,
+    signatureCaption: tr("Authorised Signature"),
+  });
+}
+
 /* ---------------------------------------------------------------- owner statement */
 
 export interface OwnerStatementInvoice {

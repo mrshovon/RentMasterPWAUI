@@ -39,6 +39,7 @@ const EXCLUDE = [
   "components/building-setup-tab.tsx",
   "components/building-notices-tab.tsx",
   "components/building-reports-tab.tsx",
+  "components/building-plan-tab.tsx",
   "app/global-error.tsx",   // runs with the LanguageProvider gone; English by necessity
   "app/sw.ts",              // service worker: no React context at all
 ];
