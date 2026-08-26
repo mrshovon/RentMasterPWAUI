@@ -24,6 +24,12 @@ import { Card, StatCard, Button, Field, TextInput, Select, PageHeader } from "./
 //
 // English-only, like the rest of the building console. The PRINTED documents are translated —
 // see lib/building-print.ts, which is in the i18n check's scope.
+//
+// ✍️ Both documents carry the building's AUTHORISED SIGNATURE. The server's report payload
+// deliberately does not include it — the signature lives on the admin's auth user_metadata, not
+// on the buildings row (ADD_BUILDINGS.sql:46) — so the page loads it once and passes it down,
+// exactly as it does for the invoices and notices tabs. Without it these two printed on a bare
+// rule while every other building document was signed.
 // =====================================================================================
 
 /** First and last day of the current calendar month, in local time. */
@@ -36,7 +42,14 @@ function thisMonthRange(): { from: string; to: string } {
   return { from: `${y}-${pad(m + 1)}-01`, to: `${y}-${pad(m + 1)}-${pad(last)}` };
 }
 
-export function BuildingReportsTab({ owners }: { owners: BuildingOwner[] }) {
+export function BuildingReportsTab({
+  owners,
+  signatureUrl,
+}: {
+  owners: BuildingOwner[];
+  /** The building admin's signature image, loaded once by app/building/page.tsx. */
+  signatureUrl?: string | null;
+}) {
   const initial = thisMonthRange();
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
@@ -69,7 +82,7 @@ export function BuildingReportsTab({ owners }: { owners: BuildingOwner[] }) {
       title: "Income & expense statement",
       name: `income-expense-${report.period.from}-to-${report.period.to}`,
       html: buildPeriodStatementHtml({
-        building: report.building,
+        building: { ...report.building, signatureUrl },
         period: report.period,
         income: report.income,
         expense: report.expense,
@@ -89,7 +102,7 @@ export function BuildingReportsTab({ owners }: { owners: BuildingOwner[] }) {
         title: "Service charge statement",
         name: `service-charge-${(res.owner.unitLabel || res.owner.name || "owner").replace(/[^\w.-]+/g, "-")}`,
         html: buildOwnerStatementHtml({
-          building: res.building,
+          building: { ...res.building, signatureUrl },
           owner: res.owner,
           invoices: res.invoices,
           totals: res.totals,
@@ -106,7 +119,7 @@ export function BuildingReportsTab({ owners }: { owners: BuildingOwner[] }) {
     <div className="space-y-6">
       <PageHeader
         title="Reports"
-        subtitle="Printable statements on your building's letterhead, with a signature line."
+        subtitle={signatureUrl ? "Printable statements on your building's letterhead, with your signature." : "Printable statements on your building's letterhead. Add a signature in Settings to sign them."}
       />
 
       {/* ---------------- income & expense ---------------- */}

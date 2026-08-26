@@ -1,12 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ReceiptText, Wallet, CircleDollarSign, Building2 } from "lucide-react";
+import { ReceiptText, Wallet, CircleDollarSign, Building2, FileText } from "lucide-react";
 import { rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
 import { useT } from "../lib/i18n";
 import { formatCurrency, formatDate, formatMonth } from "../lib/format";
 import { BuildingServiceInvoice, BuildingStatementResponse } from "../types/api";
+import { buildReceiptHtml } from "../lib/receipt";
+import { buildOwnerStatementHtml, BuildingHeader } from "../lib/building-print";
+import { ReceiptModal } from "./receipt-modal";
+import { PrintModal } from "./print-modal";
 import { Card, StatCard, Badge, Button, Modal, PageHeader, EmptyState } from "./ui";
 
 // =====================================================================================
@@ -19,6 +23,16 @@ import { Card, StatCard, Badge, Button, Modal, PageHeader, EmptyState } from "./
 //
 // Unlike components/building-invoices-tab.tsx (an operator screen, English), this is end-user
 // facing and every string goes through t(). See lib/locales/bn.ts.
+//
+// ✍️ THE RECEIPT AND THE STATEMENT ARE THE SAME DOCUMENTS THE BUILDING ADMIN PRINTS, deliberately
+// built by the same two builders with the same arguments — buildReceiptHtml() carrying the three
+// service-charge overrides from building-invoices-tab.tsx, and buildOwnerStatementHtml() from the
+// admin's Reports tab. Two documents describing one invoice must not be able to disagree, and the
+// owner's copy is the one that leaves the app. Both carry the building admin's AUTHORISED
+// SIGNATURE, which /api/admin/building/statement returns alongside the letterhead.
+//
+// Unlike the admin's copy there is no WhatsApp button: this is the owner's own copy of their own
+// bill, so there is no counterparty to send it to. Hence hideWhatsapp on ReceiptModal.
 // =====================================================================================
 
 const statusTone = (s: string): "emerald" | "amber" | "rose" =>
@@ -32,6 +46,8 @@ export function ServiceChargeTab() {
   const [res, setRes] = useState<BuildingStatementResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<BuildingServiceInvoice | null>(null);
+  const [receipt, setReceipt] = useState<{ html: string; fileName: string; month: string } | null>(null);
+  const [statement, setStatement] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -54,6 +70,83 @@ export function ServiceChargeTab() {
     return { billed, paid, due: Math.max(0, billed - paid) };
   }, [invoices]);
 
+  /** The letterhead block both documents print under. Shared so a receipt and a statement issued
+   *  minutes apart cannot show a different building. */
+  const header: BuildingHeader | null = useMemo(() => {
+    const b = res?.building;
+    if (!b) return null;
+    return {
+      name: b.name,
+      address: b.address,
+      city: b.city,
+      letterheadUrl: b.letterheadUrl,
+      signatoryName: b.signatoryName,
+      signatoryTitle: b.signatoryTitle,
+      signatureUrl: b.signatureUrl,
+    };
+  }, [res]);
+
+  function openReceipt(inv: BuildingServiceInvoice) {
+    const b = res?.building;
+    if (!b) {
+      toast.error("Your building details are still loading — try again in a moment.");
+      return;
+    }
+    const html = buildReceiptHtml({
+      copyLabel: "Owner Copy",
+      // The building is the issuing party here, not the reader — same as the admin's copy.
+      ownerName: b.name,
+      propertyAddress: [b.address, b.city].filter(Boolean).join(", ") || null,
+      refNo: inv.invoice_no ? `#${inv.invoice_no}` : null,
+      billingMonth: inv.billing_month,
+      unitLabel: b.unitLabel,
+      partyLabel: "Flat Owner",
+      tenantName: res?.owner?.name || b.unitLabel || "Flat Owner",
+      houseRent: 0,
+      serviceCharge: Number(inv.service_charge || 0),
+      extraCharge: Number(inv.extra_charge || 0),
+      discount: Number(inv.discount || 0),
+      total: Number(inv.total_payable || 0),
+      paymentStatus: inv.payment_status,
+      paidAt: inv.paid_at,
+      // Already on the row — the statement endpoint returns the installments per invoice, which
+      // is why this needs no extra fetch where the admin's copy does one.
+      payments: (inv.payments || []).map((p) => ({ paidOn: p.paid_on, amount: Number(p.amount || 0) })),
+      amountPaid: Number(inv.amount_paid || 0),
+      note: inv.extra_charge_remarks || inv.note,
+      signatureUrl: b.signatureUrl,
+      // The three that make this a service charge rather than rent.
+      hideZeroLines: true,
+      signatureCaption: "Authorised Signature",
+      fixedNote: null,
+    });
+    setReceipt({ html, fileName: `service-charge-receipt-${inv.billing_month}`, month: inv.billing_month });
+  }
+
+  function openStatement() {
+    if (!header) {
+      toast.error("Your building details are still loading — try again in a moment.");
+      return;
+    }
+    setStatement(
+      buildOwnerStatementHtml({
+        building: header,
+        owner: { name: res?.owner?.name || null, unitLabel: res?.building?.unitLabel || null },
+        // Oldest first: the running balance in the statement only reads correctly forwards, and
+        // the table above is newest-first.
+        invoices: [...invoices]
+          .sort((a, b) => String(a.billing_month).localeCompare(String(b.billing_month)))
+          .map((i) => ({
+            billing_month: i.billing_month,
+            total_payable: Number(i.total_payable || 0),
+            amount_paid: Number(i.amount_paid || 0),
+            payment_status: i.payment_status,
+          })),
+        totals: { billed: totals.billed, received: totals.paid, due: totals.due },
+      })
+    );
+  }
+
   if (loading) {
     return <Card className="p-8 text-center text-sm text-muted">{t("Loading…")}</Card>;
   }
@@ -63,6 +156,13 @@ export function ServiceChargeTab() {
       <PageHeader
         title="Service charge"
         subtitle="What your building bills you each month, and what has been received."
+        action={
+          invoices.length > 0 ? (
+            <Button variant="secondary" icon={FileText} onClick={openStatement}>
+              Print statement
+            </Button>
+          ) : undefined
+        }
       />
 
       {res?.building && (
@@ -121,7 +221,13 @@ export function ServiceChargeTab() {
                     <Badge tone={statusTone(inv.payment_status)}>{statusLabel(inv.payment_status)}</Badge>
                   </td>
                   <td className="p-4 text-right">
-                    <Button size="sm" variant="secondary" onClick={() => setOpen(inv)}>View</Button>
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => setOpen(inv)}>View</Button>
+                      {/* Offered at every status, exactly as the building admin's copy is: an
+                          unpaid invoice still prints a receipt showing what is owed, and that is
+                          the document an owner takes to their building office. */}
+                      <Button size="sm" icon={ReceiptText} onClick={() => openReceipt(inv)}>Receipt</Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -131,6 +237,24 @@ export function ServiceChargeTab() {
       )}
 
       <InvoiceDetailModal invoice={open} onClose={() => setOpen(null)} />
+
+      <ReceiptModal
+        open={!!receipt}
+        onClose={() => setReceipt(null)}
+        html={receipt?.html || ""}
+        title="Service charge receipt"
+        fileName={receipt?.fileName}
+        hideWhatsapp
+      />
+
+      <PrintModal
+        open={!!statement}
+        onClose={() => setStatement(null)}
+        html={statement || ""}
+        title="Service charge statement"
+        subtitle="Every month you have been billed, and the balance after each."
+        fileName={`service-charge-statement-${new Date().toISOString().slice(0, 10)}`}
+      />
     </div>
   );
 }

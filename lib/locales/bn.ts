@@ -690,6 +690,19 @@ export const bn: Record<string, string> = {
   "Upload signature image": "স্বাক্ষরের ছবি আপলোড করুন",
   "Replace signature image": "স্বাক্ষরের ছবি বদলান",
   "Uploading…": "আপলোড হচ্ছে…",
+  // components/signature-pad.tsx — draw it instead of uploading a scan.
+  // ⚠️ check-i18n CANNOT SEE the first three: the tab labels and the save caption reach t() as
+  // variables (`t(label)`, and a Button child bound to a prop), which the scanner has no way to
+  // resolve. They are listed here by hand, and a rename in either component has to be repeated
+  // here or the control silently goes back to English.
+  Draw: "আঁকুন",
+  // Upload is already defined at the top of the file (the shared action label) — do not re-add it.
+  "Replace signature": "স্বাক্ষর বদলান",
+  Undo: "আগেরটায় ফিরুন",
+  Clear: "মুছে ফেলুন",
+  "Sign above the line": "রেখার উপরে স্বাক্ষর করুন",
+  "Use your finger, a stylus or the mouse. Your signature is saved as a transparent image.":
+    "আঙুল, স্টাইলাস বা মাউস দিয়ে স্বাক্ষর করুন। স্বাক্ষরটি স্বচ্ছ ছবি হিসেবে সংরক্ষিত হবে।",
 
   // ---- Whole Building: the PRINTED documents (lib/building-print.ts) + print modal ----
   // These leave the app and land in an owner's hands on paper, so the language must not revert
@@ -742,6 +755,13 @@ export const bn: Record<string, string> = {
   "Still due": "এখনও বকেয়া",
   "Details": "বিস্তারিত",
   "Invoice": "ইনভয়েস",
+  // The owner's own printable copies — the same two documents their building administrator
+  // issues, so the wording matches the printed headings above.
+  "Print statement": "বিবরণী প্রিন্ট করুন",
+  "Service charge receipt": "সার্ভিস চার্জ রসিদ",
+  "Service charge statement": "সার্ভিস চার্জ বিবরণী",
+  "Every month you have been billed, and the balance after each.": "প্রতি মাসের দাবি এবং প্রতিটির পরে অবশিষ্ট বকেয়া।",
+  "Your building details are still loading — try again in a moment.": "আপনার ভবনের তথ্য এখনও লোড হচ্ছে — একটু পরে আবার চেষ্টা করুন।",
 
   // ---- plan and payment ----
   // Whole Building: what a flat owner sees instead of a price list, because their building

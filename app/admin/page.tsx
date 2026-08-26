@@ -7,12 +7,12 @@ import {
   RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User,
   Wallet, Upload, Image as ImageIcon, X, Check, HardHat, Settings, Wrench,
   BarChart3, Radio, Smartphone, Globe, TrendingUp, TrendingDown, Minus, EyeOff,
-  ScrollText, ChevronDown, ChevronRight, RefreshCw,
+  ScrollText, ChevronDown, ChevronRight, RefreshCw, Archive,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
 import { toast } from "../../components/toast";
-import { confirmDialog } from "../../components/confirm";
+import { confirmDialog, confirmChoice } from "../../components/confirm";
 import { useSessionGuard } from "../../lib/use-session";
 import { usePresenceHeartbeat } from "../../lib/presence";
 import { useTabState } from "../../lib/use-tab";
@@ -25,13 +25,19 @@ import {
   PaymentSubmission, PaymentSubmissionStatus, PaymentConfig,
   MaintenanceMode, NoticeScope, AccountProfile, AnalyticsSummary, DayCount,
   LogRecord, LogLevel, LogSource, LogsResponse,
-  AdminBuildingRow, AdminBuildingDetail, BuildingPlanInvoice, BuildingPlanRequest,
+  AdminBuildingRow, AdminBuildingDetail, AdminArchivedBuilding, BuildingPlanInvoice, BuildingPlanRequest,
 } from "../../types/api";
 import { formatCurrency, formatDate, formatDateTime } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { AppSettingsCard } from "../../components/app-settings-card";
 import { AnnouncementModal, type Announcement } from "../../components/announcement-gate";
+// The legal editor previews through the REAL renderer and the REAL parser, so what an admin
+// approves is literally what /terms and /privacy will show. LEGAL_DOCS is the compiled fallback
+// the editor publishes when its textarea is left empty.
+import { LegalDocument } from "../../components/legal-document";
+import { LEGAL_DOCS, type LegalDoc } from "../../content/legal/generated";
+import { extract } from "../../lib/legal-markdown.mjs";
 import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
@@ -229,10 +235,17 @@ export default function AdminDashboard() {
   }
 
   async function deleteOwner(o: AdminOwner) {
-    // Deleting an owner now cascades through every property, tenant and invoice they own,
-    // so say how much is about to go. The list payload carries no counts — fetch the detail
-    // first. If that lookup fails, fall back to a generic warning rather than blocking.
+    // Deleting an owner cascades through every property, tenant and invoice they own, so say how
+    // much is about to go. The list payload carries no counts — fetch the detail first. If that
+    // lookup fails, fall back to a generic warning rather than blocking.
+    //
+    // The same call answers the harder question: is this a BUILDING ADMIN with flat owners under
+    // it? Those are other people's accounts, and the server refuses (409 BUILDING_HAS_MEMBERS)
+    // unless we say which of the two things to do with them. Asking here rather than reacting to
+    // the 409 means the admin sees the count before they commit to anything.
     let scope = "";
+    let members = 0;
+    let buildingName = "";
     try {
       const res = await rentMasterFetch<{ data: AdminOwnerDetail }>(
         `/api/super-admin/owners/${o.id}`, { role: "admin" });
@@ -241,19 +254,53 @@ export default function AdminDashboard() {
       if (p || t) {
         scope = ` This also permanently deletes ${p} propert${p === 1 ? "y" : "ies"} and ${t} tenant${t === 1 ? "" : "s"}, with all their invoices, documents and records.`;
       }
+      if (res.data?.building?.role === "admin") {
+        members = res.data.building.ownerCount || 0;
+        buildingName = res.data.building.name || "";
+      }
     } catch { /* non-fatal — the confirm still warns, just without numbers */ }
 
-    if (!(await confirmDialog({
+    // What survives, in both dialogs. This is a deliberate promise, not a caveat: payments made
+    // to Bari360 are kept on purpose so the books still balance after an account is gone.
+    const kept = " Payments made to Bari360 are kept for financial audit.";
+
+    let membersMode: string | null = null;
+    if (members > 0) {
+      membersMode = await confirmChoice({
+        title: "Delete this building account?",
+        message: `"${buildingName}" has ${members} flat owner${members === 1 ? "" : "s"} attached. Deleting this account removes the building, its service charge invoices, its notices and its setup.${kept} What should happen to the flat owners?`,
+        confirmLabel: "Delete",
+        danger: true,
+        // Safe option first — it is also the default, so an admin who clicks straight through
+        // does not wipe other people's accounts by accident.
+        choices: [
+          {
+            value: "detach",
+            label: "Detach them, keep their logins",
+            hint: "Each flat owner keeps their account, their properties and their tenants, and falls back to the Free plan.",
+          },
+          {
+            value: "delete",
+            label: "Delete their accounts too",
+            hint: `Permanently deletes all ${members} flat owner account${members === 1 ? "" : "s"} and everything in them — properties, tenants, documents and rent records.`,
+          },
+        ],
+      });
+      if (!membersMode) return;
+    } else if (!(await confirmDialog({
       title: "Delete owner account?",
-      message: `Permanently delete ${o.name || o.email}?${scope} This cannot be undone.`,
+      message: `Permanently delete ${o.name || o.email}?${scope}${kept} This cannot be undone.`,
       confirmLabel: "Delete",
       danger: true,
     }))) return;
+
     await run(`owner-delete:${o.id}`, async () => {
       try {
-        await rentMasterFetch(`/api/super-admin/owners/${o.id}`, { method: "DELETE", role: "admin" });
+        const query = membersMode ? `?members=${membersMode}` : "";
+        const res = await rentMasterFetch<{ message?: string }>(
+          `/api/super-admin/owners/${o.id}${query}`, { method: "DELETE", role: "admin" });
         await refreshOwners();
-        toast.success("Owner account deleted.");
+        toast.success(res.message || "Owner account deleted.");
       } catch (e: any) { toast.error(e.message); }
     });
   }
@@ -1308,7 +1355,11 @@ function PaymentsTab({
                       <tr key={p.id} className="hover:bg-overlay/[0.02]">
                         <td className="p-4 font-mono text-xs text-subtle">#{p.payment_no}</td>
                         <td className="p-4">
-                          <div className="font-semibold text-heading">{p.owner?.name || "—"}</div>
+                          {/* The payment outlives the account — it is kept for audit — so a row
+                              with no live owner is expected, not a data fault. */}
+                          <div className="font-semibold text-heading">
+                            {p.owner?.name || (p.owner?.deleted ? "Account deleted" : "—")}
+                          </div>
                           <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {p.owner?.email || p.owner_email || "unknown"}</div>
                         </td>
                         <td className="p-4"><div className="max-w-[180px] truncate font-medium text-fg">{p.tier_name || p.tier_id}</div></td>
@@ -1379,7 +1430,7 @@ function PaymentDecisionModal({
           </div>
 
           <div className="grid gap-2 rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm sm:grid-cols-2">
-            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Owner</div><div className="text-fg">{payment.owner?.name || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Owner</div><div className="text-fg">{payment.owner?.name || (payment.owner?.deleted ? "Account deleted" : "—")}</div></div>
             <div><div className="text-[11px] uppercase tracking-wider text-subtle">Email</div><div className="text-fg">{payment.owner?.email || payment.owner_email || "—"}</div></div>
             <div><div className="text-[11px] uppercase tracking-wider text-subtle">Plan</div><div className="text-fg">{payment.tier_name || payment.tier_id}</div></div>
             <div><div className="text-[11px] uppercase tracking-wider text-subtle">Amount</div><div className="font-semibold text-heading">{formatCurrency(Number(payment.amount || 0))}</div></div>
@@ -1568,7 +1619,103 @@ function BuildingsTab({
           </div>
         </Card>
       )}
+
+      <ArchivedBuildings />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------ DELETED BUILDINGS (AUDIT) */
+
+// The plan invoices and payments of buildings that no longer exist.
+//
+// ADD_DELETION_AUDIT.sql drops the buildings foreign key so that what we billed a building and
+// what they paid us survives the building's deletion. That preserved the data and made it
+// INVISIBLE: every other building screen reads by joining to `buildings`, and there is no row
+// left to join to. This is the one place that reads the other way round, which is what turns
+// "the rows are still in the database" into an answer someone can actually give an auditor.
+//
+// Collapsed by default and loaded only when opened: it is a reference, not a work queue, and
+// most weeks it is empty.
+function ArchivedBuildings() {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<AdminArchivedBuilding[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (!next || rows) return;
+    try {
+      setLoading(true);
+      const res = await rentMasterFetch<{ data: AdminArchivedBuilding[] }>(
+        "/api/super-admin/buildings/archived", { role: "admin" });
+      setRows(res.data || []);
+    } catch (e: any) {
+      toast.error(e.message);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <button
+        onClick={toggle}
+        className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-overlay/[0.02]"
+      >
+        <Archive className="h-4 w-4 text-muted" />
+        <span className="text-sm font-semibold text-heading">Deleted buildings (audit)</span>
+        <span className="text-xs text-muted">
+          Plan invoices and payments kept after a building account was deleted
+        </span>
+        <ChevronDown className={"ml-auto h-4 w-4 text-muted transition " + (open ? "rotate-180" : "")} />
+      </button>
+
+      {open && (
+        <div className="border-t border-line/[0.06] p-4">
+          {loading && <div className="text-sm text-muted">Loading…</div>}
+          {!loading && rows && rows.length === 0 && (
+            <div className="text-sm text-muted">
+              Nothing archived — no deleted building has a payment record against it.
+            </div>
+          )}
+          {!loading && rows && rows.length > 0 && (
+            <div className="space-y-4">
+              {rows.map((b) => (
+                <div key={b.buildingId} className="rounded-xl border border-line/[0.08] p-4">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="font-semibold text-heading">{b.buildingName || "Unnamed building"}</span>
+                    <span className="font-mono text-[11px] text-subtle">{b.buildingId}</span>
+                    {b.adminEmail && <span className="text-xs text-muted">{b.adminEmail}</span>}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+                    <span className="text-muted">Billed <b className="text-fg">{formatCurrency(b.totals.billed)}</b></span>
+                    <span className="text-muted">Received <b className="text-fg">{formatCurrency(b.totals.received)}</b></span>
+                    <span className="text-muted">Due <b className="text-fg">{formatCurrency(b.totals.due)}</b></span>
+                    <span className="text-muted">{b.invoices.length} invoice(s) · {b.payments.length} payment(s)</span>
+                  </div>
+                  {b.payments.length > 0 && (
+                    <div className="mt-3 space-y-1">
+                      {b.payments.map((p) => (
+                        <div key={p.id} className="flex flex-wrap gap-x-4 text-xs text-muted">
+                          <span className="font-mono text-subtle">#{p.payment_no}</span>
+                          <span className="font-semibold text-fg">{formatCurrency(Number(p.amount || 0))}</span>
+                          <span>{formatDate(p.paid_on)}</span>
+                          <span>{p.method}</span>
+                          {p.reference && <span className="font-mono">{p.reference}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -2967,6 +3114,7 @@ function AdminSettingsTab() {
       <OwnerProfileCard />
       <AnnouncementCard />
       <MaintenanceCard />
+      <LegalDocsCard />
       <BrevoConfigCard />
       <AnalyticsConfigCard />
       {/* NB: AppSettingsCard is this DEVICE's push/update preferences — despite the name it
@@ -3370,6 +3518,224 @@ function AnnouncementCard() {
       )}
 
       {previewing && <AnnouncementModal announcement={draft} onClose={() => setPreviewing(false)} />}
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------ LEGAL DOCUMENTS */
+
+// Edit the Terms and the Privacy Policy without a developer, a build step and a deploy.
+//
+// WHAT IS SAVED IS AN OVERRIDE. The authored markdown in ../legal/ is compiled into the app
+// (content/legal/generated.ts) and remains the built-in fallback: an empty editor means "the
+// compiled text is what the public sees", and Reset puts it back. That is why the textarea shows
+// the compiled markdown as its PLACEHOLDER rather than pre-filling it — pre-filling would make
+// "never edited" and "edited to exactly the same words" indistinguishable, and the first save
+// would then silently freeze a snapshot that no longer tracks the .md files.
+//
+// The preview renders through the real LegalDocument component and the real parser, so what the
+// admin approves is literally what /terms will show. Same reasoning as AnnouncementCard importing
+// AnnouncementModal from the runtime component.
+//
+// ⚠️ The EFFECTIVE DATE is not decoration. It is written to app_settings.terms_version, which is
+// what /api/app/terms-version serves and what every terms_acceptances row records. Until this
+// card existed nothing in either repo wrote that key. Whether a change is material enough to
+// warrant a new edition is a judgement, so it is a field the admin sets rather than an automatic
+// stamp: a typo fix should be able to keep the old date.
+const LEGAL_EDITOR_DOCS = [
+  { doc: "terms" as const, lang: "en" as const, label: "Terms — English", key: "termsEn" as const },
+  { doc: "terms" as const, lang: "bn" as const, label: "Terms — Bangla", key: "termsBn" as const },
+  { doc: "privacy" as const, lang: "en" as const, label: "Privacy — English", key: "privacyEn" as const },
+  { doc: "privacy" as const, lang: "bn" as const, label: "Privacy — Bangla", key: "privacyBn" as const },
+];
+
+function LegalDocsCard() {
+  const [saved, setSaved] = useState<Record<string, { markdown: string | null; updatedAt: string }>>({});
+  const [termsVersion, setTermsVersion] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [which, setWhich] = useState(0);
+  const [draft, setDraft] = useState("");
+  const [previewing, setPreviewing] = useState(false);
+
+  const active = LEGAL_EDITOR_DOCS[which];
+  const settingsKey = `${active.doc}_${active.lang}`;
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await rentMasterFetch<{
+        data: { docs: Record<string, { markdown: string | null; updatedAt: string }>; termsVersion: string };
+      }>("/api/super-admin/legal", { role: "admin" });
+      setSaved(res.data?.docs || {});
+      setTermsVersion(res.data?.termsVersion || "");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+  // Switching documents re-seeds the editor from what is stored for THAT one; an unsaved draft
+  // for the previous document is discarded rather than carried across and saved onto the wrong
+  // one, which for these four files would be an expensive mistake.
+  useEffect(() => { setDraft(saved[settingsKey]?.markdown || ""); }, [saved, settingsKey]);
+
+  const compiled = LEGAL_DOCS[active.key];
+  const hasOverride = !!saved[settingsKey]?.markdown;
+  // What the public would see if this draft were published: the draft when there is one, the
+  // compiled document when there is not.
+  const previewDoc: LegalDoc = draft.trim() ? (extract(draft) as LegalDoc) : compiled;
+
+  async function save(markdown: string | null) {
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ message?: string }>("/api/super-admin/legal", {
+        method: "PATCH",
+        role: "admin",
+        body: JSON.stringify({ doc: active.doc, lang: active.lang, markdown }),
+      });
+      toast.success(res.message || "Saved.");
+      await load();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveVersion() {
+    try {
+      setSaving(true);
+      await rentMasterFetch("/api/super-admin/legal", {
+        method: "PATCH",
+        role: "admin",
+        body: JSON.stringify({ effectiveDate: termsVersion }),
+      });
+      toast.success("Effective date updated.");
+      await load();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function reset() {
+    const ok = await confirmDialog({
+      title: "Revert to the built-in text?",
+      message: `The saved ${active.label} will be deleted and the version compiled into the app will be published instead. This cannot be undone.`,
+      confirmLabel: "Revert",
+      danger: true,
+    });
+    if (!ok) return;
+    setDraft("");
+    await save(null);
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="mb-1 flex items-center gap-2">
+        <ScrollText className="h-4 w-4 text-primary" />
+        <h3 className="text-sm font-bold text-heading">Terms &amp; Privacy Policy</h3>
+      </div>
+      <p className="mb-5 text-xs text-muted">
+        Published at /terms and /privacy, readable without an account. Leave a document empty to
+        publish the version built into the app.
+      </p>
+
+      {loading ? (
+        <p className="text-sm text-muted">Loading…</p>
+      ) : (
+        <div className="space-y-4">
+          {/* The effective date governs all four documents, so it sits above the selector. */}
+          <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+            <Field label="Effective date (the edition consent is recorded against)">
+              <div className="flex gap-2">
+                <TextInput
+                  value={termsVersion}
+                  maxLength={60}
+                  placeholder="2026-08-26"
+                  onChange={(e) => setTermsVersion(e.target.value)}
+                />
+                <Button variant="secondary" loading={saving} onClick={saveVersion}>Save date</Button>
+              </div>
+            </Field>
+            <p className="mt-2 text-[11px] text-subtle">
+              Shown on the signup consent line and stored on every acceptance. Change it when the
+              wording changes materially; leave it alone for a typo fix.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-1 rounded-xl bg-overlay/[0.04] p-1">
+            {LEGAL_EDITOR_DOCS.map((d, i) => (
+              <button
+                key={d.label}
+                type="button"
+                onClick={() => setWhich(i)}
+                className={
+                  "flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition " +
+                  (which === i ? "bg-primary text-btn-ink shadow-sm" : "text-muted hover:text-fg")
+                }
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px]">
+            {hasOverride ? (
+              <>
+                <Badge tone="emerald">Edited</Badge>
+                <span className="text-subtle">
+                  Saved {saved[settingsKey]?.updatedAt ? formatDate(saved[settingsKey].updatedAt) : "—"}
+                </span>
+              </>
+            ) : (
+              <>
+                <Badge tone="slate">Built-in</Badge>
+                <span className="text-subtle">Publishing the version compiled into the app.</span>
+              </>
+            )}
+          </div>
+
+          <TextArea
+            rows={18}
+            value={draft}
+            spellCheck={false}
+            placeholder="Leave empty to publish the built-in text. Paste markdown here to replace it."
+            onChange={(e) => setDraft(e.target.value)}
+            className="font-mono text-xs leading-relaxed"
+          />
+          <p className="text-[11px] text-subtle">
+            Markdown: <code>#</code> headings, <code>**bold**</code>, <code>[links](/terms)</code>,
+            <code>- bullets</code>, <code>1. numbered</code>, <code>|tables|</code> and{" "}
+            <code>---</code> rules. Anything else is a paragraph.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <Button loading={saving} disabled={!draft.trim()} onClick={() => save(draft)}>
+              Publish
+            </Button>
+            <Button variant="secondary" onClick={() => setPreviewing(true)}>Preview</Button>
+            {hasOverride && (
+              <Button variant="danger" loading={saving} onClick={reset}>
+                Revert to built-in
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {previewing && (
+        <Modal open onClose={() => setPreviewing(false)} size="lg" title="Preview"
+          subtitle="Rendered exactly as the public page renders it.">
+          <div className="max-h-[65vh] overflow-y-auto pr-1">
+            <LegalDocument doc={previewDoc} />
+          </div>
+        </Modal>
+      )}
     </Card>
   );
 }

@@ -14,6 +14,7 @@
 
 import { reportClientError } from "./client-log";
 import { LEGAL_VERSION } from "../content/legal/generated";
+import type { PublicPlan } from "../types/api";
 
 export const BACKEND_API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
@@ -257,6 +258,63 @@ export async function apiTermsVersion(): Promise<string> {
     return typeof version === "string" && version.trim() ? version.trim() : LEGAL_VERSION;
   } catch {
     return LEGAL_VERSION;
+  }
+}
+
+// The admin's edited text for one legal document, or null when nothing has been saved and the
+// compiled edition in content/legal/generated.ts is still what should be shown.
+//
+// Public endpoint — /privacy and /terms are readable signed out, which Google Play requires. Every
+// failure path returns null rather than throwing, because the caller already holds a complete
+// document: a backend that is down must leave the published policy readable, not blank.
+export async function apiLegalDoc(
+  doc: "privacy" | "terms",
+  lang: "en" | "bn",
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${BACKEND_API_BASE}/api/app/legal?doc=${doc}&lang=${lang}`,
+      { cache: "no-store" },
+    );
+    const json = await res.json().catch(() => ({}));
+    const markdown = json?.markdown;
+    return typeof markdown === "string" && markdown.trim() ? markdown : null;
+  } catch {
+    return null;
+  }
+}
+
+// The publicly listed plans, for /plans. Public endpoint — a prospect has no account. Returns an
+// empty list on any failure; the page renders its own "unavailable" state rather than an error,
+// which is a better public face and still leaves the contact route open.
+export async function apiPublicPlans(): Promise<PublicPlan[]> {
+  try {
+    const res = await fetch(`${BACKEND_API_BASE}/api/app/plans`, { cache: "no-store" });
+    const json = await res.json().catch(() => ({}));
+    return Array.isArray(json?.data) ? (json.data as PublicPlan[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+// A "Contact us" enquiry from the public pricing page. Unlike the two helpers above this one
+// THROWS: a person filling in a form has to be told whether it was sent.
+export async function apiPublicContact(payload: {
+  name: string; email: string; phone: string; tierId?: string; message: string;
+}): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${BACKEND_API_BASE}/api/app/contact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error(`Cannot reach backend at ${BACKEND_API_BASE}. Is the API server running on :3000?`);
+  }
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.success) {
+    throw new ApiError(json.error || "Could not send your message.", res.status, json.code);
   }
 }
 

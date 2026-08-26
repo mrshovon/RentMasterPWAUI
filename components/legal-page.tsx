@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { LegalDocument } from "./legal-document";
 import { ThemeToggle } from "./theme-toggle";
 import { LanguageToggle } from "./language-toggle";
 import { useLang, useT } from "../lib/i18n";
+import { apiLegalDoc } from "../lib/api-service";
+import { extract } from "../lib/legal-markdown.mjs";
 import type { LegalDoc } from "../content/legal/generated";
 
 // =====================================================================================
@@ -17,12 +20,49 @@ import type { LegalDoc } from "../content/legal/generated";
 //
 // Language follows the app-wide rentmaster-lang toggle, so a Bangla user gets the Bangla edition
 // of the document rather than a translated English one.
+//
+// ✍️ THE COMPILED DOCUMENT IS THE FALLBACK, NOT THE ONLY SOURCE. An admin can now edit both
+// documents from the console; the saved markdown is fetched here and parsed by the SAME functions
+// that produced the compiled version (lib/legal-markdown.mjs), so an edited document renders
+// identically to a built one.
+//
+// The compiled text renders FIRST and is replaced only once an override actually arrives. That
+// ordering is the safety property: there is no loading state, no flash of an empty page, and a
+// backend that is down or a settings row that never existed both leave the published policy fully
+// readable — which is what Google Play requires of the privacy URL and what anyone deciding
+// whether to sign up needs.
 // =====================================================================================
 
-export function LegalPage({ en, bn }: { en: LegalDoc; bn: LegalDoc }) {
+export function LegalPage({
+  en, bn, doc: docName,
+}: {
+  en: LegalDoc;
+  bn: LegalDoc;
+  /** Which document this page is, so the override can be looked up. */
+  doc: "privacy" | "terms";
+}) {
   const lang = useLang();
   const t = useT();
-  const doc = lang === "bn" ? bn : en;
+  const compiled = lang === "bn" ? bn : en;
+
+  // Keyed by language: switching the toggle must not show the Bangla page with English overrides
+  // still on screen. Null means "nothing saved" — render the compiled edition.
+  const [override, setOverride] = useState<Record<string, LegalDoc | null>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    // Re-fetched per language rather than cached across both, because only one is ever on screen
+    // and these documents run to tens of kilobytes.
+    apiLegalDoc(docName, lang === "bn" ? "bn" : "en").then((markdown) => {
+      if (cancelled) return;
+      // extract() drops the H1 into `title`, exactly as the build script does, so a saved
+      // document keeps the same heading structure as a compiled one.
+      setOverride((prev) => ({ ...prev, [lang]: markdown ? (extract(markdown) as LegalDoc) : null }));
+    });
+    return () => { cancelled = true; };
+  }, [docName, lang]);
+
+  const doc = override[lang] ?? compiled;
 
   return (
     <main className="min-h-screen bg-bg">

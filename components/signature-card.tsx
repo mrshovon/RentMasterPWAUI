@@ -6,25 +6,34 @@ import { rentMasterFetch, uploadFile } from "../lib/api-service";
 import { toast } from "./toast";
 import { useT } from "../lib/i18n";
 import { Card } from "./ui";
+import { SignaturePad } from "./signature-pad";
 
 // =====================================================================================
-// ✍️ AUTHORISED SIGNATURE — upload the image that goes on printed documents.
+// ✍️ AUTHORISED SIGNATURE — draw it, or upload the image that goes on printed documents.
 //
 // A SIBLING of the owner dashboard's SignatureModal (app/owner/page.tsx), not a replacement for
 // it. That one is a modal opened from the Billing tab header and is live in the rent flow;
 // lifting it out to be shared would have been a refactor of a working screen for no gain. What
 // IS shared is everything that matters — the same uploads route, the same folder, the same
 // /api/admin/owner/signature endpoint, which keys off the bearer token and so already accepts a
-// building admin (PLAN_GOVERNED_ROLES includes building_admin).
+// building admin (PLAN_GOVERNED_ROLES includes building_admin) — and now components/signature-pad
+// as well, which is the part that would genuinely have been duplicated.
 //
-// Uploads on pick rather than behind a submit button, like ImageField in staff-tab.tsx: there is
-// one field here, and a "Save" for a single file is a step with nothing to decide.
+// Draw is the DEFAULT tab: uploading requires already owning a scanned transparent PNG, which is
+// exactly the thing most people do not have, and it is why signatures went unset.
+//
+// Upload still uploads on pick rather than behind a submit button, like ImageField in
+// staff-tab.tsx: there is one field there and a "Save" for a single file is a step with nothing
+// to decide. Drawing has its own Save, because a drawing has a natural end and a stray first
+// stroke must not be committed.
 // =====================================================================================
 
 /** Mirrors the server's own ceiling — app/api/admin/uploads/route.ts rejects anything larger with
  *  a 413, and the middleware caps this path at the same figure. Checked here so the user finds
- *  out before waiting for a big upload to fail. */
+ *  out before waiting for a big upload to fail. (A drawn PNG is a few KB and never approaches it.) */
 const MAX_BYTES = 8 * 1024 * 1024;
+
+type Mode = "draw" | "upload";
 
 export function SignatureCard({
   signatureUrl,
@@ -38,23 +47,10 @@ export function SignatureCard({
 }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<Mode>("draw");
 
-  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    // Cleared immediately so the SAME file can be picked again after a failure — without this,
-    // onChange never fires a second time and the retry looks like a dead control.
-    e.target.value = "";
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.warning("Please choose an image (a transparent PNG works best).");
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      toast.warning("Image must be under 8MB.");
-      return;
-    }
-
+  /** The one save path, shared by both tabs: storage upload, then the metadata write. */
+  async function store(file: File) {
     try {
       setBusy(true);
       const url = await uploadFile(file, { folder: "signatures" });
@@ -71,6 +67,37 @@ export function SignatureCard({
     }
   }
 
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Cleared immediately so the SAME file can be picked again after a failure — without this,
+    // onChange never fires a second time and the retry looks like a dead control.
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.warning("Please choose an image (a transparent PNG works best).");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      toast.warning("Image must be under 8MB.");
+      return;
+    }
+    await store(file);
+  }
+
+  const tab = (value: Mode, label: string) => (
+    <button
+      type="button"
+      onClick={() => setMode(value)}
+      className={
+        "flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition " +
+        (mode === value ? "bg-primary text-btn-ink shadow-sm" : "text-muted hover:text-fg")
+      }
+    >
+      {t(label)}
+    </button>
+  );
+
   return (
     <Card className="p-5">
       <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-heading">
@@ -86,25 +113,38 @@ export function SignatureCard({
         </div>
       )}
 
-      <label
-        className={
-          "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border " +
-          "border-dashed border-line/[0.12] bg-overlay/[0.02] px-4 py-6 text-center text-sm " +
-          "text-muted transition hover:border-primary/40 hover:text-fg " +
-          (busy ? "pointer-events-none opacity-60" : "")
-        }
-      >
-        <Upload className="h-5 w-5" />
-        <span>
-          {busy
-            ? t("Uploading…")
-            : signatureUrl
-              ? t("Replace signature image")
-              : t("Upload signature image")}
-        </span>
-        <span className="text-[11px] text-subtle">{t("Transparent PNG recommended")}</span>
-        <input type="file" accept="image/*" className="hidden" disabled={busy} onChange={pick} />
-      </label>
+      <div className="mb-4 flex gap-1 rounded-xl bg-overlay/[0.04] p-1">
+        {tab("draw", "Draw")}
+        {tab("upload", "Upload")}
+      </div>
+
+      {mode === "draw" ? (
+        <SignaturePad
+          onSave={store}
+          saving={busy}
+          saveLabel={signatureUrl ? "Replace signature" : "Save signature"}
+        />
+      ) : (
+        <label
+          className={
+            "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border " +
+            "border-dashed border-line/[0.12] bg-overlay/[0.02] px-4 py-6 text-center text-sm " +
+            "text-muted transition hover:border-primary/40 hover:text-fg " +
+            (busy ? "pointer-events-none opacity-60" : "")
+          }
+        >
+          <Upload className="h-5 w-5" />
+          <span>
+            {busy
+              ? t("Uploading…")
+              : signatureUrl
+                ? t("Replace signature image")
+                : t("Upload signature image")}
+          </span>
+          <span className="text-[11px] text-subtle">{t("Transparent PNG recommended")}</span>
+          <input type="file" accept="image/*" className="hidden" disabled={busy} onChange={pick} />
+        </label>
+      )}
     </Card>
   );
 }

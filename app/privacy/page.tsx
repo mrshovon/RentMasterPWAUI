@@ -7,5 +7,5 @@ import { LEGAL_DOCS } from "../../content/legal/generated";
 // https://www.bari360.space/privacy. The Android shell loads the hosted site, so it is live in the
 // app as soon as this deploys.
 export default function PrivacyPage() {
-  return <LegalPage en={LEGAL_DOCS.privacyEn} bn={LEGAL_DOCS.privacyBn} />;
+  return <LegalPage doc="privacy" en={LEGAL_DOCS.privacyEn} bn={LEGAL_DOCS.privacyBn} />;
 }

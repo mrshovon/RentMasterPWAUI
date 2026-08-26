@@ -1,7 +1,7 @@
-- When you log a salary payment, the matching expense in Accounts now names the staff member, so a month with several staff is no longer a column of identical Salary rows.
-- Building administrators have a new Plan tab. It shows your subscription, how long is left on it, your current invoice with every line itemised, and the terms.
-- You can settle a building invoice through the payment link on it, or tell us you have paid and we will confirm it against our records.
-- Every payment we record now produces a printable receipt in your Plan tab.
-- You can request a renewal from the same tab, including maintenance and support or extra modules, and we will reply with an itemised quote.
-- Your building is warned in the app well before its plan expires, and again during the grace period afterwards, so a lapse is never a surprise.
-- If a building plan goes unpaid, the building and its flat owners become read only until it is renewed. Nothing is deleted, and everything can still be viewed and printed.
+- You can now sign with your finger, a stylus or the mouse instead of uploading a scan. Open your signature, draw it, and it appears on every receipt, notice and statement you issue from then on.
+- Uploading a signature image still works exactly as before, on its own tab.
+- Flat owners in a building can now print their own service charge receipt for any month, on the building's letterhead and carrying the building's authorised signature.
+- Flat owners can also print a full service charge statement showing every month billed and the balance after each.
+- The building administrator's income and expense statement and owner statements are now signed too, instead of printing on a blank signature line.
+- When a building account is deleted, the building and everything it holds is removed, and you choose whether the flat owners keep their own accounts or go with it.
+- Payments made to Bari360 are kept when an account is deleted, so the financial records stay complete.

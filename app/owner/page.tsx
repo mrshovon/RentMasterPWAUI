@@ -38,6 +38,7 @@ import { StaffTab } from "../../components/staff-tab";
 import { AccountsTab } from "../../components/accounts-tab";
 import { ServiceChargeTab } from "../../components/service-charge-tab";
 import { AppSettingsCard } from "../../components/app-settings-card";
+import { SignaturePad } from "../../components/signature-pad";
 import { useT, useLang } from "../../lib/i18n";
 import { translateNoticeText } from "../../lib/notice-i18n";
 import { useUnreadNotices } from "../../lib/notices-seen";
@@ -3292,12 +3293,17 @@ function PropertyHistoryModal({ property, onClose }: { property: Property | null
 }
 
 /* ============================================================ OWNER SIGNATURE */
+// Two ways in, one artefact: SignaturePad hands back a transparent PNG File, and an uploaded scan
+// is already one, so both go through the same save(). Drawing is the default tab — requiring a
+// scanned PNG is why so many owners had no signature and issued receipts on a bare rule. The
+// building admin's equivalent is components/signature-card.tsx; the pad itself is shared.
 function SignatureModal({
   open, onClose, current, onSaved,
 }: {
   open: boolean; onClose: () => void; current: string | null; onSaved: (url: string) => void;
 }) {
   const t = useT();
+  const [mode, setMode] = useState<"draw" | "upload">("draw");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [saving, setSaving] = useState(false);
@@ -3310,12 +3316,10 @@ function SignatureModal({
     setFile(f);
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!file) return;
+  async function save(f: File) {
     try {
       setSaving(true);
-      const url = await uploadFile(file, { role: "owner", folder: "signatures" });
+      const url = await uploadFile(f, { role: "owner", folder: "signatures" });
       const res = await rentMasterFetch("/api/admin/owner/signature", {
         method: "POST", role: "owner", body: JSON.stringify({ signatureUrl: url }),
       });
@@ -3330,23 +3334,49 @@ function SignatureModal({
     finally { setSaving(false); }
   }
 
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (file) await save(file);
+  }
+
+  const tab = (value: "draw" | "upload", label: string) => (
+    <button type="button" onClick={() => setMode(value)}
+      className={"flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition "
+        + (mode === value ? "bg-primary text-btn-ink shadow-sm" : "text-muted hover:text-fg")}>
+      {t(label)}
+    </button>
+  );
+
   return (
     <Modal open={open} onClose={onClose} title="Your signature"
       subtitle="Attached to every rent receipt you issue.">
-      <form onSubmit={submit} className="space-y-4">
+      <div className="space-y-4">
         {(preview || current) && (
           <div className="rounded-xl border border-line/[0.08] bg-white p-4 text-center">
             <img src={preview || current || ""} alt="Signature" className="mx-auto max-h-24 object-contain" />
           </div>
         )}
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] px-4 py-6 text-center text-sm text-muted transition hover:border-primary/40 hover:text-fg">
-          <Upload className="h-5 w-5" />
-          <span>{current ? "Replace signature image" : "Upload signature image"}</span>
-          <span className="text-[11px] text-subtle">{t("Transparent PNG recommended")}</span>
-          <input type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
-        </label>
-        <Button type="submit" loading={saving} disabled={!file} className="w-full">Save signature</Button>
-      </form>
+
+        <div className="flex gap-1 rounded-xl bg-overlay/[0.04] p-1">
+          {tab("draw", "Draw")}
+          {tab("upload", "Upload")}
+        </div>
+
+        {mode === "draw" ? (
+          <SignaturePad onSave={save} saving={saving}
+            saveLabel={current ? "Replace signature" : "Save signature"} />
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] px-4 py-6 text-center text-sm text-muted transition hover:border-primary/40 hover:text-fg">
+              <Upload className="h-5 w-5" />
+              <span>{current ? "Replace signature image" : "Upload signature image"}</span>
+              <span className="text-[11px] text-subtle">{t("Transparent PNG recommended")}</span>
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+            </label>
+            <Button type="submit" loading={saving} disabled={!file} className="w-full">Save signature</Button>
+          </form>
+        )}
+      </div>
     </Modal>
   );
 }

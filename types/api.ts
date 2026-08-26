@@ -504,7 +504,23 @@ export interface BuildingServiceInvoice {
  *  decides whether to show the tab at all. */
 export interface BuildingStatementResponse {
   success: boolean;
-  building: { id: string; name: string; unitLabel: string | null } | null;
+  /** The building's PRINTABLE identity, not just its name: a flat owner prints their own service
+   *  charge receipt and statement from this screen, and an unsigned one proves nothing.
+   *  `signatureUrl` is the building ADMIN's signature image, exposed downward the same way
+   *  /api/admin/tenants/me exposes an owner's to their tenant. */
+  building: {
+    id: string;
+    name: string;
+    unitLabel: string | null;
+    address: string | null;
+    city: string | null;
+    letterheadUrl: string | null;
+    signatoryName: string | null;
+    signatoryTitle: string | null;
+    signatureUrl: string | null;
+  } | null;
+  /** The caller's own name, for the party row on their receipt. */
+  owner?: { name: string | null };
   count: number;
   data: BuildingServiceInvoice[];
 }
@@ -604,6 +620,11 @@ export interface BuildingPlanInvoice {
   items?: BuildingPlanInvoiceItem[];
   /** Server-computed money still owed. Never negative. */
   balance?: number;
+  /** Identity snapshotted when the invoice was raised. This row OUTLIVES its building — see
+   *  ADD_DELETION_AUDIT.sql — and once the buildings row is gone there is nothing left to join
+   *  to for a name. Null on invoices raised before that migration. */
+  building_name?: string | null;
+  admin_email?: string | null;
 }
 
 export interface BuildingPlanPayment {
@@ -722,6 +743,11 @@ export interface AdminOwnerDetail extends AdminOwner {
   accounts_addon: boolean;
   accounts_addon_granted_at: string | null;
   accounts_included_in_plan: boolean;
+  /** Whole Building context. `admin` = they RUN this building and `ownerCount` is its roster
+   *  size, which is what the delete flow has to ask about; `member` = they are a flat owner in
+   *  someone else's building and `ownerCount` is 0. Null for an ordinary owner. The route has
+   *  returned this since the Whole Building tier shipped. */
+  building?: { id: string; name: string; role: "admin" | "member"; ownerCount: number } | null;
 }
 
 // ---- Staff (owner module; paid add-on) ----
@@ -937,8 +963,10 @@ export interface PaymentSubmission {
   reviewed_at: string | null;
   created_at: string;
   updated_at: string;
-  // Attached by the admin queue endpoint only.
-  owner?: { name: string | null; email: string | null; phone: string | null } | null;
+  // Attached by the admin queue endpoint only. `deleted` means the account is gone but the
+  // payment was KEPT for financial audit (lib/account-purge.ts), so `email` is the snapshot
+  // taken at submit time and there is no name or phone left to show.
+  owner?: { name: string | null; email: string | null; phone: string | null; deleted?: boolean } | null;
   tier_name?: string;
 }
 
@@ -985,4 +1013,47 @@ export interface AnalyticsSummary {
     ownerSeries: DayCount[];
     tenantSeries: DayCount[];
   };
+}
+
+/**
+ * One deleted building's preserved money, from GET /api/super-admin/buildings/archived.
+ *
+ * Grouped by the building it belonged to even though that building no longer exists: the
+ * `building_id` column survives as a plain uuid, which is what keeps a deleted building's
+ * invoices and payments together instead of becoming an undifferentiated heap.
+ */
+export interface AdminArchivedBuilding {
+  buildingId: string;
+  /** The name snapshotted onto the invoice when it was raised; null on pre-migration rows. */
+  buildingName: string | null;
+  adminId: string | null;
+  adminEmail: string | null;
+  invoices: BuildingPlanInvoice[];
+  payments: BuildingPlanPayment[];
+  totals: { billed: number; received: number; due: number };
+}
+
+/**
+ * One plan as the PUBLIC pricing page sees it (GET /api/app/plans).
+ *
+ * Deliberately a narrower type than `SubscriptionTier`: the route is unauthenticated and returns
+ * only what a price card renders — no `is_active`/`is_public` (they are the filter, not content)
+ * and nothing describing how entitlements are enforced.
+ */
+export interface PublicPlan {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  currency: string;
+  /** 'month' | 'year' | 'days' | 'custom'. 'custom' is the "Contact us" tier. */
+  billing_interval: string;
+  duration_days: number | null;
+  discount_percent: number;
+  is_recurring: boolean;
+  staff_included: boolean;
+  accounts_included: boolean;
+  /** -1 means unlimited, matching subscription_tiers. */
+  max_properties_allowed: number;
+  max_tenants_allowed: number;
 }

@@ -205,7 +205,7 @@ export default function BuildingAdminDashboard() {
       {tab === "notices" && (
         <BuildingNoticesTab building={building} owners={owners} signatureUrl={signatureUrl} />
       )}
-      {tab === "reports" && <BuildingReportsTab owners={owners} />}
+      {tab === "reports" && <BuildingReportsTab owners={owners} signatureUrl={signatureUrl} />}
       {tab === "setup" && <BuildingSetupTab />}
       {tab === "settings" && (
         <SettingsTab

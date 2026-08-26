@@ -25,6 +25,7 @@ export function ReceiptModal({
   open, onClose, html, phone, message, fileName, title,
   noPhoneToast = "This tenant has no valid phone number for WhatsApp.",
   noPhoneHint = "No valid WhatsApp number on file for this tenant.",
+  hideWhatsapp = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -40,6 +41,11 @@ export function ReceiptModal({
   noPhoneToast?: string;
   /** Standing hint under the buttons when there is no usable number. */
   noPhoneHint?: string;
+  /** Drop the WhatsApp button entirely. For a receipt the reader is printing for THEMSELVES —
+   *  a flat owner's copy of their own service charge — where there is no counterparty to send it
+   *  to, so the button could only ever be disabled. Default false; every existing caller is a
+   *  sharing surface and is unaffected. */
+  hideWhatsapp?: boolean;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [rasterizing, setRasterizing] = useState(false);
@@ -200,18 +206,25 @@ export function ReceiptModal({
 
   return (
     <Modal open={open} onClose={onClose} size="lg" title={title || "Rent receipt"}
-      subtitle={native
-        ? "Share to WhatsApp, or save the receipt as an image."
-        : "Share to WhatsApp, send as an image, or download / print."}>
+      subtitle={hideWhatsapp
+        ? (native ? "Save the receipt as an image." : "Send as an image, or download / print.")
+        : native
+          ? "Share to WhatsApp, or save the receipt as an image."
+          : "Share to WhatsApp, send as an image, or download / print."}>
       <div className="space-y-4">
         <div className="overflow-hidden rounded-xl border border-line/[0.08] bg-white">
           <iframe ref={iframeRef} srcDoc={html} title={title || "Rent receipt"} className="h-[52vh] w-full" />
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Button icon={MessageCircle} variant="success" onClick={sendWhatsapp} disabled={!waPhone}>
-            {t("WhatsApp")}
-          </Button>
-          <Button icon={ImageDown} onClick={shareImage} loading={rasterizing}>
+          {!hideWhatsapp && (
+            <Button icon={MessageCircle} variant="success" onClick={sendWhatsapp} disabled={!waPhone}>
+              {t("WhatsApp")}
+            </Button>
+          )}
+          {/* Spans the row on its own when WhatsApp is gone, so the 2-column grid does not leave
+              a hole beside it. */}
+          <Button icon={ImageDown} onClick={shareImage} loading={rasterizing}
+            className={hideWhatsapp ? "col-span-2" : undefined}>
             {native ? t("Save image") : t("Share image")}
           </Button>
           <Button icon={Download} variant="secondary" onClick={downloadReceipt} loading={native && rasterizing}>
@@ -231,7 +244,7 @@ export function ReceiptModal({
             {t("Share as HTML file instead")}
           </button>
         )}
-        {!waPhone && phone !== undefined && (
+        {!hideWhatsapp && !waPhone && phone !== undefined && (
           <p className="text-center text-[11px] text-subtle">
             {t(noPhoneHint)}
           </p>
