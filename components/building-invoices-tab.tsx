@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Plus, Pencil, Trash2, ReceiptText, Wallet, History, Sparkles, CircleDollarSign,
+  Plus, Pencil, Trash2, ReceiptText, Wallet, History, Sparkles, CircleDollarSign, Printer,
 } from "lucide-react";
 import { rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
@@ -10,7 +10,9 @@ import { confirmDialog } from "./confirm";
 import { formatCurrency, formatDate, formatMonth } from "../lib/format";
 import { Building, BuildingOwner, BuildingServiceInvoice, BuildingServicePayment } from "../types/api";
 import { buildReceiptHtml } from "../lib/receipt";
+import { buildServiceChargeSheetHtml } from "../lib/service-charge-sheet";
 import { ReceiptModal } from "./receipt-modal";
+import { PrintModal } from "./print-modal";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, Select, PageHeader, EmptyState,
 } from "./ui";
@@ -60,6 +62,12 @@ export function BuildingInvoicesTab({
   // Set by RecordPaymentModal once its reload has landed. An id, never the invoice object — that
   // one is pre-payment and would print DUE on a receipt for money just received.
   const [pendingReceiptId, setPendingReceiptId] = useState<string | null>(null);
+  // The whole month's slips, as a printable A4 document. Null when the sheet is closed.
+  const [sheet, setSheet] = useState<string | null>(null);
+  // Set by generate() so the sheet is built from the RELOADED list rather than the pre-generate
+  // one, which would be missing every invoice that had just been created. Same reasoning as
+  // pendingReceiptId above.
+  const [printAfterLoad, setPrintAfterLoad] = useState(false);
 
   // owner_id -> roster row, so the table shows a name rather than a uuid.
   const ownerById = useMemo(() => {
@@ -131,6 +139,47 @@ export function BuildingInvoicesTab({
     [building, ownerById, signatureUrl]
   );
 
+  // ---------------------------------------------------------------- the cutting sheet
+  // Every invoice in the month as one A4 document: each row is one owner, their building copy
+  // beside their resident copy, with dashed rules to cut along. Built from what is already in
+  // state — no fetch, because the sheet carries no payment history to look up.
+  //
+  // Deliberately PrintModal, not ReceiptModal: the latter's native path does
+  // querySelector(".receipt"), which on a tiled sheet would rasterise only the first slip.
+  const openSheet = useCallback(
+    (rows: BuildingServiceInvoice[], forMonth: string) => {
+      if (!building) {
+        toast.error("Your building details are still loading — try again in a moment.");
+        return;
+      }
+      if (!rows.length) {
+        toast.info("There are no invoices to print for this month.");
+        return;
+      }
+      setSheet(
+        buildServiceChargeSheetHtml({
+          building: { name: building.name, address: building.address, city: building.city },
+          signatureUrl,
+          month: forMonth,
+          rows: rows.map((inv) => {
+            const owner = ownerById[inv.owner_id];
+            return {
+              invoiceNo: inv.invoice_no ?? null,
+              ownerName: owner?.name || owner?.email || "Flat Owner",
+              unitLabel: owner?.unit_label || null,
+              serviceCharge: Number(inv.service_charge || 0),
+              extraCharge: Number(inv.extra_charge || 0),
+              extraChargeRemarks: inv.extra_charge_remarks,
+              discount: Number(inv.discount || 0),
+              total: Number(inv.total_payable || 0),
+            };
+          }),
+        })
+      );
+    },
+    [building, ownerById, signatureUrl]
+  );
+
   // Built from the RELOADED invoice, not the record modal's copy of it. See pendingReceiptId.
   useEffect(() => {
     if (!pendingReceiptId) return;
@@ -155,6 +204,14 @@ export function BuildingInvoicesTab({
 
   useEffect(() => { load(); }, [load]);
 
+  // Fires once after generate()'s reload has replaced `invoices`, so the sheet contains the
+  // invoices that were just created.
+  useEffect(() => {
+    if (!printAfterLoad || loading) return;
+    setPrintAfterLoad(false);
+    openSheet(invoices, month);
+  }, [printAfterLoad, loading, invoices, month, openSheet]);
+
   const totals = useMemo(() => {
     const billed = invoices.reduce((s, i) => s + Number(i.total_payable || 0), 0);
     const collected = invoices.reduce((s, i) => s + Number(i.amount_paid || 0), 0);
@@ -175,8 +232,15 @@ export function BuildingInvoicesTab({
         "/api/admin/building/invoices",
         { method: "POST", body: JSON.stringify({ billingMonth: month, generateAll: true }) }
       );
-      if (res.created > 0) toast.success(`${res.created} invoice(s) issued for ${month}.`);
-      else toast.info(res.message || "Nothing to issue — everyone is already billed.");
+      if (res.created > 0) {
+        toast.success(`${res.created} invoice(s) issued for ${month}.`);
+        // Issuing a month's charges and handing them out is one action, so the sheet opens by
+        // itself rather than waiting to be found. Deferred until the reload lands — see
+        // printAfterLoad.
+        setPrintAfterLoad(true);
+      } else {
+        toast.info(res.message || "Nothing to issue — everyone is already billed.");
+      }
       await load();
     } catch (e: any) {
       toast.error(e.message);
@@ -208,8 +272,18 @@ export function BuildingInvoicesTab({
         title="Service charge"
         subtitle="Bill each owner their monthly share, and record the money as it comes in."
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" icon={Plus} onClick={() => setIssuing(true)}>Issue one</Button>
+            {/* The whole month on one sheet, two copies per owner, ready to cut. Also opens by
+                itself after Generate — this button is for reprinting any other month. */}
+            <Button
+              variant="secondary"
+              icon={Printer}
+              onClick={() => openSheet(invoices, month)}
+              disabled={!invoices.length}
+            >
+              Print all receipts
+            </Button>
             <Button icon={Sparkles} loading={generating} onClick={generate} disabled={!missing.length}>
               {missing.length ? `Generate (${missing.length})` : "Generate"}
             </Button>
@@ -347,6 +421,16 @@ export function BuildingInvoicesTab({
         ownerName={history ? ownerById[history.owner_id]?.name || null : null}
         onClose={() => setHistory(null)}
         onChanged={load}
+      />
+
+      <PrintModal
+        open={!!sheet}
+        onClose={() => setSheet(null)}
+        html={sheet || ""}
+        title="Service charge receipts"
+        subtitle={`${invoices.length} owner(s) — building copy on the left, resident copy on the right. Cut along the dashed lines.`}
+        fileName={`service-charge-receipts-${month}`}
+        nativeNotice="This sheet is several A4 pages and is meant to be printed and cut up, which the app cannot do. Open bari360.space on a computer to print it."
       />
     </div>
   );

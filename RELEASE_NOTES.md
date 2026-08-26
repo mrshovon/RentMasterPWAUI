@@ -2,6 +2,8 @@
 - Uploading a signature image still works exactly as before, on its own tab.
 - Flat owners in a building can now print their own service charge receipt for any month, on the building's letterhead and carrying the building's authorised signature.
 - Flat owners can also print a full service charge statement showing every month billed and the balance after each.
+- Building administrators can print a whole month of service charge receipts on one page. Each row is one flat owner, with the building copy on the left and the resident copy on the right, and dashed lines to cut along. It opens by itself after you generate the month's charges.
 - The building administrator's income and expense statement and owner statements are now signed too, instead of printing on a blank signature line.
+- There is a new plans and pricing page, open to anyone, with sign up and see plans buttons on the front page.
 - When a building account is deleted, the building and everything it holds is removed, and you choose whether the flat owners keep their own accounts or go with it.
 - Payments made to Bari360 are kept when an account is deleted, so the financial records stay complete.

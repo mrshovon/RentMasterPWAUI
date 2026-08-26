@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Phone, Lock, Mail, User } from "lucide-react";
+import { ArrowRight, Phone, Lock, Mail, User, UserPlus, Tag } from "lucide-react";
 import {
   apiLogin, apiForgotPassword, apiSignup, apiTermsVersion,
   getStoredSession, setStoredSession, clearSession, ensureValidToken, sessionRoleFor,
@@ -60,6 +60,18 @@ export default function EntryGatewayPage() {
     if (!hasRecoveryToken()) return;
     const { search, hash } = window.location;
     window.location.replace(`/reset-password${search}${hash}`);
+  }, []);
+
+  // /plans sends people here with ?signup=1 so the pricing page's buttons land straight in the
+  // signup form rather than on a login screen the visitor then has to decode. The parameter is
+  // stripped afterwards so a refresh (or a shared URL) does not reopen the modal.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("signup") !== "1") return;
+    setSignupOpen(true);
+    params.delete("signup");
+    const rest = params.toString();
+    window.history.replaceState({}, "", window.location.pathname + (rest ? `?${rest}` : ""));
   }, []);
 
   // On open: if a session already exists, refresh its token if needed and forward to the
@@ -169,6 +181,8 @@ export default function EntryGatewayPage() {
             <p className="text-sm leading-relaxed text-muted">
               {t("Track occupancy, generate rent invoices, resolve maintenance tickets and broadcast notices from a single, mobile-ready portal.")}
             </p>
+
+            <EntryCtas onSignup={() => setSignupOpen(true)} />
           </div>
 
           <div className="flex items-center gap-3">
@@ -305,6 +319,10 @@ export default function EntryGatewayPage() {
                 The legal links ride along here for the same reason: on a phone the brand panel
                 never renders, so this is the ONLY place an unauthenticated visitor can reach them. */}
             <div className="flex flex-col items-center gap-3 lg:hidden">
+              {/* The brand panel never renders on a phone, so without this second copy the two
+                  calls to action would be invisible to most visitors. Same reason DownloadAndroid
+                  and LegalLinks appear twice on this page. */}
+              <EntryCtas onSignup={() => setSignupOpen(true)} className="w-full" />
               <DownloadAndroid variant="icon" />
               <LegalLinks />
             </div>
@@ -315,6 +333,31 @@ export default function EntryGatewayPage() {
       <ForgotPasswordModal open={forgotOpen} onClose={() => setForgotOpen(false)} initialEmail={email} />
       <SignupModal open={signupOpen} onClose={() => setSignupOpen(false)}
         onSuccess={(id, name, token, refreshToken, expiresAt) => persist("owner", id, name, token, refreshToken, expiresAt)} />
+    </div>
+  );
+}
+
+/**
+ * The two front-page calls to action.
+ *
+ * Rendered TWICE — once in the desktop-only brand panel under the hero, once in the `lg:hidden`
+ * block below the login card — because the brand panel does not exist on a phone and that is
+ * where most visitors arrive. `DownloadAndroid` and `LegalLinks` already do exactly this.
+ *
+ * Sign up opens the modal that is already mounted on this page rather than navigating; "See
+ * plans" is a real link so it can be opened in a new tab, shared, and crawled.
+ */
+function EntryCtas({ onSignup, className = "" }: { onSignup: () => void; className?: string }) {
+  return (
+    <div className={`flex flex-col gap-3 sm:flex-row ${className}`}>
+      <Button icon={UserPlus} onClick={onSignup} className="sm:flex-1">
+        Sign up with us
+      </Button>
+      <Link href="/plans" className="sm:flex-1">
+        <Button variant="secondary" icon={Tag} className="w-full">
+          See plans
+        </Button>
+      </Link>
     </div>
   );
 }

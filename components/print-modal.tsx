@@ -29,6 +29,7 @@ export function PrintModal({
   title,
   subtitle,
   fileName,
+  nativeNotice,
 }: {
   open: boolean;
   onClose: () => void;
@@ -38,6 +39,17 @@ export function PrintModal({
   subtitle?: string;
   /** Base name for saved files, e.g. "service-charge-statement-2026-08". */
   fileName?: string;
+  /**
+   * Shown INSTEAD of the buttons inside the Android app.
+   *
+   * The native path below rasterises `.sheet` with html2canvas at scale 2. That is fine for a
+   * one-page statement and hopeless for a multi-page document: past roughly seven A4 pages the
+   * canvas exceeds Chrome's 16384px limit, `toBlob` resolves null, and the user gets "Could not
+   * turn the document into an image on this device" after a long wait. A document that exists to
+   * be printed and cut up is a desktop job anyway, so say so plainly rather than offering a
+   * button that fails.
+   */
+  nativeNotice?: string;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [busy, setBusy] = useState(false);
@@ -123,14 +135,20 @@ export function PrintModal({
         <div className="overflow-hidden rounded-xl border border-line/[0.08] bg-white">
           <iframe ref={iframeRef} srcDoc={html} title={title} className="h-[58vh] w-full" />
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Button icon={Printer} onClick={printDoc} loading={native && busy}>
-            {native ? t("Save & print") : t("Print")}
-          </Button>
-          <Button icon={Download} variant="secondary" onClick={downloadDoc} loading={native && busy}>
-            {t("Download")}
-          </Button>
-        </div>
+        {native && nativeNotice ? (
+          <p className="rounded-xl border border-line/[0.08] bg-overlay/[0.03] px-4 py-3 text-center text-xs leading-relaxed text-muted">
+            {t(nativeNotice)}
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <Button icon={Printer} onClick={printDoc} loading={native && busy}>
+              {native ? t("Save & print") : t("Print")}
+            </Button>
+            <Button icon={Download} variant="secondary" onClick={downloadDoc} loading={native && busy}>
+              {t("Download")}
+            </Button>
+          </div>
+        )}
         {!native && (
           <p className="text-center text-[11px] text-subtle">
             {t("Your browser's print dialog can also save this as a PDF.")}

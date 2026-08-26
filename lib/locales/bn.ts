@@ -946,4 +946,42 @@ export const bn: Record<string, string> = {
     "আপনার {0} প্ল্যানের মেয়াদ শেষ হয়েছে। ফ্রি প্ল্যানে যাওয়ার আগে নবায়নের জন্য আর {1} দিন সময় আছে।",
   "Your {0} plan has ended and you are now on the free plan — {1} properties and {2} tenants. Nothing has been deleted; anything beyond those limits is view-only until you choose a plan.":
     "আপনার {0} প্ল্যান শেষ হয়েছে এবং আপনি এখন ফ্রি প্ল্যানে আছেন — {1}টি সম্পত্তি ও {2} জন ভাড়াটিয়া। কোনো তথ্য মুছে ফেলা হয়নি; সীমার বাইরের সবকিছু নতুন প্ল্যান না নেওয়া পর্যন্ত শুধু দেখা যাবে।",
+
+  // ---- the PUBLIC pricing page (app/plans/page.tsx) + its contact modal ----
+  // Read by people who have not signed up, so it is the first Bangla most visitors ever see.
+  // ⚠️ check-i18n CANNOT see the two CTA captions: they sit inside a ternary
+  // ({price > 0 ? "Sign up" : "Start free"}) that the scanner does not evaluate. Listed here
+  // by hand — renaming either in the page silently reverts it to English.
+  "Plans & pricing": "প্ল্যান ও মূল্য",
+  "Start free. Pay only when your portfolio grows.": "ফ্রি দিয়ে শুরু করুন। আপনার সম্পত্তি বাড়লে তবেই খরচ।",
+  "Every plan includes the full dashboard — properties, tenants, rent invoices, receipts, maintenance and notices. Plans differ in how many properties and tenants you can manage, and which extra modules are bundled.":
+    "প্রতিটি প্ল্যানেই পুরো ড্যাশবোর্ড রয়েছে — সম্পত্তি, ভাড়াটিয়া, ভাড়ার বিল, রসিদ, রক্ষণাবেক্ষণ ও নোটিশ। প্ল্যানভেদে কেবল সম্পত্তি ও ভাড়াটিয়ার সংখ্যা এবং অতিরিক্ত মডিউলগুলো আলাদা।",
+  "Sign up": "সাইন আপ করুন",
+  "Start free": "ফ্রিতে শুরু করুন",
+  "Sign up with us": "আমাদের সঙ্গে সাইন আপ করুন",
+  "See plans": "প্ল্যান দেখুন",
+  "Free": "ফ্রি",
+  "Up to": "সর্বোচ্চ",
+  "Unlimited properties": "সীমাহীন সম্পত্তি",
+  "Unlimited tenants": "সীমাহীন ভাড়াটিয়া",
+  "Unlimited properties & tenants": "সীমাহীন সম্পত্তি ও ভাড়াটিয়া",
+  "Custom build for your entire building": "আপনার পুরো ভবনের জন্য বিশেষভাবে তৈরি",
+  "1 year free maintenance included": "১ বছরের ফ্রি রক্ষণাবেক্ষণ অন্তর্ভুক্ত",
+  "Monthly or yearly contract from year 2": "দ্বিতীয় বছর থেকে মাসিক বা বাৎসরিক চুক্তি",
+  "One-time plan — can't be renewed": "এককালীন প্ল্যান — নবায়ন করা যাবে না",
+  "Pricing is not available right now. Please get in touch and we will send it to you.":
+    "এই মুহূর্তে মূল্যতালিকা দেখানো যাচ্ছে না। যোগাযোগ করুন, আমরা আপনাকে পাঠিয়ে দেব।",
+  "Paid plans are activated after we confirm your payment. The free plan never expires. Prices are in Bangladeshi Taka and include any discount currently offered.":
+    "পেমেন্ট নিশ্চিত হওয়ার পর পেইড প্ল্যান চালু হয়। ফ্রি প্ল্যানের মেয়াদ কখনো শেষ হয় না। মূল্য বাংলাদেশি টাকায় এবং চলতি ছাড় ধরা আছে।",
+  "Enquiry about the": "যে প্ল্যান সম্পর্কে জানতে চান",
+  "I'm interested in the {plan} plan. Please get in touch.": "আমি {plan} প্ল্যানে আগ্রহী। অনুগ্রহ করে যোগাযোগ করুন।",
+  "Leave an email address or a phone number so we can reply.": "উত্তর দেওয়ার জন্য একটি ইমেইল বা ফোন নম্বর দিন।",
+  "Please leave an email address or a phone number so we can reply.": "অনুগ্রহ করে উত্তর দেওয়ার জন্য একটি ইমেইল বা ফোন নম্বর দিন।",
+
+  // ---- the service-charge cutting sheet (lib/service-charge-sheet.ts) ----
+  // Printed, cut up and handed to residents on paper, so it must not revert to English.
+  "Service Charge Receipt": "সার্ভিস চার্জ রসিদ",
+  "Service Charge Receipts": "সার্ভিস চার্জ রসিদসমূহ",
+  "Building Copy": "ভবনের কপি",
+  "Resident Copy": "বাসিন্দার কপি",
 };

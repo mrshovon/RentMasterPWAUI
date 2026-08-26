@@ -18,6 +18,7 @@ import { resolveReceiptMessage } from "../../lib/whatsapp";
 import { useSessionGuard } from "../../lib/use-session";
 import { usePresenceHeartbeat } from "../../lib/presence";
 import { PLAN_ADDONS, addonsOnTier } from "../../lib/addons";
+import { isContactTier, discountedPrice, tenureLabel } from "../../lib/plan-format";
 import { useTabState } from "../../lib/use-tab";
 import { usePendingAction } from "../../lib/use-pending";
 import { usePlan } from "../../lib/use-plan";
@@ -716,25 +717,11 @@ export default function OwnerDashboard() {
 }
 
 /* ============================================================ PLAN */
-// A tier with a "custom" billing interval is a contact-us / enterprise plan
-// (no self-service price, set up by the admin after the customer gets in touch).
-const isContactTier = (t: SubscriptionTier) => t.billing_interval === "custom";
-
-// Price after the admin-set discount. Owners used to be shown the undiscounted price even
-// when a plan carried a discount — only the admin console applied it.
-const discountedPrice = (t: SubscriptionTier) => {
-  const d = Number(t.discount_percent || 0);
-  return d > 0 ? Number(t.price) * (1 - d / 100) : Number(t.price);
-};
-
-// How long the plan runs, for the "৳500 / month" suffix. A 'days' plan states its own length.
-const tenureLabel = (t: SubscriptionTier) => {
-  if (t.billing_interval === "days") {
-    const n = Number(t.duration_days || 0);
-    return n === 1 ? "day" : `${n} days`;
-  }
-  return t.billing_interval;
-};
+// isContactTier / discountedPrice / tenureLabel now live in lib/plan-format.ts (imported above).
+// The public /plans page shows the same tiers to someone who has not signed up, and a marketing
+// page quoting a different figure from the one an owner is charged is the drift worth preventing —
+// discountedPrice() especially, which exists because owners were once shown the undiscounted
+// price on a discounted plan.
 
 function planStatusBadge(s: PlanState): { tone: "emerald" | "amber" | "rose"; label: string } {
   if (s.status === "locked") return { tone: "rose", label: s.lockReason === "revoked" ? "Revoked" : "Lapsed" };
