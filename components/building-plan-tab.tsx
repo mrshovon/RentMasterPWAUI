@@ -152,7 +152,7 @@ export function BuildingPlanTab({ building }: { building: Building | null }) {
   if (!data?.subscription || !state) {
     return (
       <div className="space-y-5">
-        <PageHeader title="Plan" subtitle="Your Whole Building subscription." />
+        <PageHeader title="Plan" subtitle="Your Whole Building software subscription and support contract." />
         <EmptyState
           icon={CreditCard}
           title="No billing contract on file"
@@ -166,7 +166,7 @@ export function BuildingPlanTab({ building }: { building: Building | null }) {
     <div className="space-y-5">
       <PageHeader
         title="Plan"
-        subtitle="Your Whole Building subscription, invoices and receipts."
+        subtitle="Your Whole Building software subscription and support contract — invoices and receipts."
         action={
           <Button variant="secondary" icon={RefreshCw} onClick={() => void load()}>Refresh</Button>
         }

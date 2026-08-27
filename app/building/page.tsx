@@ -263,7 +263,9 @@ function OverviewTab({
         <p className="mt-2 text-sm text-muted">
           This building runs on the <strong className="text-fg">Whole Building</strong> plan. Every
           owner you create here is covered by it — they never see a price or a payment screen, and
-          they are not capped at the free limits.
+          they are not capped at the free limits. The plan also covers software maintenance and
+          support, app updates, help with content changes, and custom features built for your
+          building. It does not cover building or property maintenance.
         </p>
       </Card>
     </div>

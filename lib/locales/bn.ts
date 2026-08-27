@@ -812,6 +812,8 @@ export const bn: Record<string, string> = {
   "Tap to enlarge and scan": "স্ক্যান করতে চাপ দিয়ে বড় করুন",
   "Tap anywhere to close": "বন্ধ করতে যেকোনো জায়গায় চাপ দিন",
   "Whole Building": "পুরো ভবন",
+  "Included with the Whole Building plan, or available as a paid add-on to your current plan.":
+    "পুরো ভবন প্ল্যানে অন্তর্ভুক্ত, অথবা আপনার বর্তমান প্ল্যানের সাথে পেইড অ্যাড-অন হিসেবে নেওয়া যাবে।",
   "Send enquiry": "অনুসন্ধান পাঠান",
   "Tell us about your building and what you need…": "আপনার ভবন ও প্রয়োজন সম্পর্কে লিখুন…",
   "Thanks — our team will reach out to you soon.": "ধন্যবাদ — আমাদের টিম শীঘ্রই যোগাযোগ করবে।",
@@ -964,10 +966,16 @@ export const bn: Record<string, string> = {
   "Up to": "সর্বোচ্চ",
   "Unlimited properties": "সীমাহীন সম্পত্তি",
   "Unlimited tenants": "সীমাহীন ভাড়াটিয়া",
-  "Unlimited properties & tenants": "সীমাহীন সম্পত্তি ও ভাড়াটিয়া",
+  "Unlimited flats, owners & tenants": "সীমাহীন ফ্ল্যাট, মালিক ও ভাড়াটিয়া",
   "Custom build for your entire building": "আপনার পুরো ভবনের জন্য বিশেষভাবে তৈরি",
-  "1 year free maintenance included": "১ বছরের ফ্রি রক্ষণাবেক্ষণ অন্তর্ভুক্ত",
+  "1 year free software maintenance & support": "১ বছরের ফ্রি সফটওয়্যার রক্ষণাবেক্ষণ ও সাপোর্ট",
+  "Custom features built for your building": "আপনার ভবনের প্রয়োজন অনুযায়ী বিশেষ ফিচার তৈরি",
+  "Free app updates & new features": "ফ্রি অ্যাপ আপডেট ও নতুন ফিচার",
+  "Content update support included": "কনটেন্ট হালনাগাদের সাপোর্ট অন্তর্ভুক্ত",
+  "Your own domain name on request": "চাইলে আপনার নিজস্ব ডোমেইন নাম",
   "Monthly or yearly contract from year 2": "দ্বিতীয় বছর থেকে মাসিক বা বাৎসরিক চুক্তি",
+  "On the Whole Building plan, maintenance means maintenance and support of the Bari360 software — updates, fixes and help from our team. It is not building or property maintenance.":
+    "পুরো ভবন প্ল্যানে রক্ষণাবেক্ষণ বলতে বোঝানো হয়েছে Bari360 সফটওয়্যারের রক্ষণাবেক্ষণ ও সাপোর্ট — আপডেট, ত্রুটি সংশোধন ও আমাদের টিমের সহায়তা। এটি ভবন বা সম্পত্তির রক্ষণাবেক্ষণ নয়।",
   "One-time plan — can't be renewed": "এককালীন প্ল্যান — নবায়ন করা যাবে না",
   "Pricing is not available right now. Please get in touch and we will send it to you.":
     "এই মুহূর্তে মূল্যতালিকা দেখানো যাচ্ছে না। যোগাযোগ করুন, আমরা আপনাকে পাঠিয়ে দেব।",

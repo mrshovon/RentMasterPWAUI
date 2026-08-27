@@ -134,8 +134,12 @@ export default function PlansPage() {
                     {contact ? (
                       <>
                         <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Custom build for your entire building")}</li>
-                        <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Unlimited properties & tenants")}</li>
-                        <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("1 year free maintenance included")}</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Unlimited flats, owners & tenants")}</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("1 year free software maintenance & support")}</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Custom features built for your building")}</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Free app updates & new features")}</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Content update support included")}</li>
+                        <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Your own domain name on request")}</li>
                         <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Monthly or yearly contract from year 2")}</li>
                       </>
                     ) : (
@@ -181,6 +185,14 @@ export default function PlansPage() {
         <p className="mt-6 text-xs leading-relaxed text-subtle">
           {t("Paid plans are activated after we confirm your payment. The free plan never expires. Prices are in Bangladeshi Taka and include any discount currently offered.")}
         </p>
+
+        {/* "Maintenance" reads as BUILDING maintenance to a building committee, which is the
+            opposite of what the contract covers. Say which one it is, next to the price. */}
+        {sorted.some(isContactTier) && (
+          <p className="mt-2 text-xs leading-relaxed text-subtle">
+            {t("On the Whole Building plan, maintenance means maintenance and support of the Bari360 software — updates, fixes and help from our team. It is not building or property maintenance.")}
+          </p>
+        )}
 
         <nav className="mt-14 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line/[0.06] pt-6 text-xs text-subtle">
           <Link href="/privacy" className="transition hover:text-primary">{t("Privacy Policy")}</Link>

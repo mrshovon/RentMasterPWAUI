@@ -3526,12 +3526,20 @@ function AnnouncementCard() {
 
 // Edit the Terms and the Privacy Policy without a developer, a build step and a deploy.
 //
-// WHAT IS SAVED IS AN OVERRIDE. The authored markdown in ../legal/ is compiled into the app
-// (content/legal/generated.ts) and remains the built-in fallback: an empty editor means "the
-// compiled text is what the public sees", and Reset puts it back. That is why the textarea shows
-// the compiled markdown as its PLACEHOLDER rather than pre-filling it — pre-filling would make
-// "never edited" and "edited to exactly the same words" indistinguishable, and the first save
-// would then silently freeze a snapshot that no longer tracks the .md files.
+// WHAT IS SAVED IS AN OVERRIDE. The authored markdown in ../legal/ is compiled into the app and
+// remains the built-in fallback: no saved row means "the compiled text is what the public sees",
+// and Revert puts it back.
+//
+// THE EDITOR IS PRE-FILLED with that built-in text (content/legal/source.ts — the raw markdown,
+// emitted alongside the parsed generated.ts, because the parser has no inverse and the source
+// cannot be recovered from blocks). An empty box was the original design and it was unusable:
+// these are 25,000-word documents, so "edit one sentence" meant retyping all of them.
+//
+// The cost of pre-filling is that "never edited" and "edited to exactly the same words" stop
+// being distinguishable by looking at the box, and a save of identical text would silently
+// freeze a snapshot that no longer tracks the .md files. Two things hold that line instead:
+// the Built-in / Edited badge reads the DATABASE rather than the textarea, and Publish is
+// disabled while the draft still matches the built-in text byte for byte.
 //
 // The preview renders through the real LegalDocument component and the real parser, so what the
 // admin approves is literally what /terms will show. Same reasoning as AnnouncementCard importing
@@ -3556,6 +3564,7 @@ function LegalDocsCard() {
   const [saving, setSaving] = useState(false);
   const [which, setWhich] = useState(0);
   const [draft, setDraft] = useState("");
+  const [builtIn, setBuiltIn] = useState<Record<string, string>>({});
   const [previewing, setPreviewing] = useState(false);
 
   const active = LEGAL_EDITOR_DOCS[which];
@@ -3577,13 +3586,26 @@ function LegalDocsCard() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  // Dynamic so 150 KB of legal prose stays out of this page's first chunk — the console is
+  // opened many times a day and this card is read a handful of times a year.
+  useEffect(() => {
+    let alive = true;
+    void import("../../content/legal/source").then((m) => { if (alive) setBuiltIn(m.LEGAL_SOURCE); });
+    return () => { alive = false; };
+  }, []);
   // Switching documents re-seeds the editor from what is stored for THAT one; an unsaved draft
   // for the previous document is discarded rather than carried across and saved onto the wrong
   // one, which for these four files would be an expensive mistake.
-  useEffect(() => { setDraft(saved[settingsKey]?.markdown || ""); }, [saved, settingsKey]);
+  useEffect(() => {
+    setDraft(saved[settingsKey]?.markdown || builtIn[active.key] || "");
+  }, [saved, settingsKey, builtIn, active.key]);
 
   const compiled = LEGAL_DOCS[active.key];
+  const builtInMd = builtIn[active.key] || "";
   const hasOverride = !!saved[settingsKey]?.markdown;
+  // Publishing this would store an override identical to the shipped text — a snapshot that then
+  // stops tracking the .md files while looking like a deliberate edit. Blocked rather than warned.
+  const unchanged = !!builtInMd && draft.trim() === builtInMd.trim();
   // What the public would see if this draft were published: the draft when there is one, the
   // compiled document when there is not.
   const previewDoc: LegalDoc = draft.trim() ? (extract(draft) as LegalDoc) : compiled;
@@ -3630,7 +3652,7 @@ function LegalDocsCard() {
       danger: true,
     });
     if (!ok) return;
-    setDraft("");
+    setDraft(builtInMd);
     await save(null);
   }
 
@@ -3641,8 +3663,8 @@ function LegalDocsCard() {
         <h3 className="text-sm font-bold text-heading">Terms &amp; Privacy Policy</h3>
       </div>
       <p className="mb-5 text-xs text-muted">
-        Published at /terms and /privacy, readable without an account. Leave a document empty to
-        publish the version built into the app.
+        Published at /terms and /privacy, readable without an account. Each document opens with the
+        text that is live right now — edit it and publish, or revert to the version built into the app.
       </p>
 
       {loading ? (
@@ -3704,7 +3726,7 @@ function LegalDocsCard() {
             rows={18}
             value={draft}
             spellCheck={false}
-            placeholder="Leave empty to publish the built-in text. Paste markdown here to replace it."
+            placeholder="Loading the current text…"
             onChange={(e) => setDraft(e.target.value)}
             className="font-mono text-xs leading-relaxed"
           />
@@ -3713,16 +3735,27 @@ function LegalDocsCard() {
             <code>- bullets</code>, <code>1. numbered</code>, <code>|tables|</code> and{" "}
             <code>---</code> rules. Anything else is a paragraph.
           </p>
+          {unchanged && (
+            <p className="text-[11px] text-subtle">
+              This is the text built into the app, word for word. Change something to enable Publish.
+            </p>
+          )}
 
           <div className="flex flex-wrap gap-2">
-            <Button loading={saving} disabled={!draft.trim()} onClick={() => save(draft)}>
+            <Button loading={saving} disabled={!draft.trim() || unchanged} onClick={() => save(draft)}>
               Publish
             </Button>
             <Button variant="secondary" onClick={() => setPreviewing(true)}>Preview</Button>
             {hasOverride && (
-              <Button variant="danger" loading={saving} onClick={reset}>
-                Revert to built-in
-              </Button>
+              <>
+                {/* Pull the shipped text back in to compare against, or to start over from. */}
+                <Button variant="secondary" disabled={!builtInMd} onClick={() => setDraft(builtInMd)}>
+                  Load built-in text
+                </Button>
+                <Button variant="danger" loading={saving} onClick={reset}>
+                  Revert to built-in
+                </Button>
+              </>
             )}
           </div>
         </div>

@@ -1052,10 +1052,14 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                 <ul className="mt-4 space-y-1.5 text-sm text-fg">
                   {contact ? (
                     <>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />Custom build for your entire building</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />Unlimited properties &amp; tenants</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />1 year free maintenance included</li>
-                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />Monthly or yearly contract from year 2</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Custom build for your entire building")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Unlimited flats, owners & tenants")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("1 year free software maintenance & support")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Custom features built for your building")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Free app updates & new features")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Content update support included")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Your own domain name on request")}</li>
+                      <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />{t("Monthly or yearly contract from year 2")}</li>
                     </>
                   ) : (
                     <>
@@ -1123,6 +1127,11 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
           })}
         </div>
         <p className="text-xs text-subtle">Paid plans are activated after our team confirms your bKash payment. The free plan never expires; paid plans renew on their billing interval and get a {`10`}-day grace period after expiry. A one-time plan can only be taken once — when it ends you move to the free plan and choose again.</p>
+        {/* Same clarification as the public pricing page: on this card "maintenance" is the
+            software contract, not the building's. */}
+        {plan.availableTiers.some(isContactTier) && (
+          <p className="text-xs text-subtle">{t("On the Whole Building plan, maintenance means maintenance and support of the Bari360 software — updates, fixes and help from our team. It is not building or property maintenance.")}</p>
+        )}
       </div>
 
       <ContactModal open={!!contactTier} tier={contactTier} ownerName={ownerName} onClose={() => setContactTier(null)} />

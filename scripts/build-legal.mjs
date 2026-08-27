@@ -33,6 +33,11 @@ import { extract, effectiveDateFrom } from '../lib/legal-markdown.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.resolve(ROOT, '..', 'legal');
 const OUT = path.join(ROOT, 'content', 'legal', 'generated.ts');
+// The RAW markdown, emitted as a second module. The admin console edits these documents as
+// markdown, so it needs the authored text to start from — generated.ts holds parsed BLOCKS and
+// the parser has no inverse, so the source cannot be recovered from it. Kept as its own file so
+// the admin page can code-split it rather than carry ~150 KB of prose in its first chunk.
+const OUT_SRC = path.join(ROOT, 'content', 'legal', 'source.ts');
 
 const DOCS = [
   { key: 'privacyEn', file: 'PRIVACY_POLICY.en.md' },
@@ -49,10 +54,12 @@ if (missing.length) {
 }
 
 const parsed = {};
+const raw = {};
 let version = '';
 for (const doc of DOCS) {
   const md = fs.readFileSync(path.join(SRC, doc.file), 'utf8');
   parsed[doc.key] = extract(md);
+  raw[doc.key] = md;
   // The effective date doubles as the document version. Taken from the English Terms so all four
   // agree on one value, and it must be a real date rather than the [EFFECTIVE DATE] placeholder.
   if (doc.key === 'termsEn') version = effectiveDateFrom(md);
@@ -94,6 +101,18 @@ export const LEGAL_DOCS = ${JSON.stringify(parsed, null, 2)} as unknown as {
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, body, 'utf8');
 
+const srcBody = `${banner}
+/**
+ * The authored markdown, verbatim. This is what the admin console loads into its editor so an
+ * edit starts from the text that is actually published rather than from an empty box. The
+ * console saves an OVERRIDE on top of this, so these strings stay the built-in fallback.
+ */
+export const LEGAL_SOURCE: Record<"privacyEn" | "privacyBn" | "termsEn" | "termsBn", string> =
+  ${JSON.stringify(raw, null, 2)};
+`;
+fs.writeFileSync(OUT_SRC, srcBody, 'utf8');
+
 const stats = DOCS.map((d) => `${d.key}: ${parsed[d.key].blocks.length} blocks`).join(', ');
 console.log(`Wrote ${path.relative(ROOT, OUT)} (${stats})`);
+console.log(`Wrote ${path.relative(ROOT, OUT_SRC)} (raw markdown for the admin editor)`);
 console.log(`LEGAL_VERSION = ${version || '(placeholder — set the Effective date in the .md files)'}`);

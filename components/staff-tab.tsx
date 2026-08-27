@@ -249,8 +249,7 @@ function StaffLocked({ onContact }: { onContact: () => void }) {
             ))}
           </ul>
           <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm text-muted">
-            Included with the <span className="font-semibold text-fg">{t("Whole Building")}</span> plan,
-            or available as a paid add-on to your current plan.
+            {t("Included with the Whole Building plan, or available as a paid add-on to your current plan.")}
           </div>
           <Button icon={ContactIcon} className="w-full" onClick={onContact}>
             Contact us to enable Staff
