@@ -205,14 +205,14 @@ export default function ResetPasswordPage() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                  New password <span className="text-danger">*</span>
+                  {t("New password")} <span className="text-danger">*</span>
                 </label>
                 <PasswordInput leftIcon={Lock} placeholder="••••••••" value={password}
                   onChange={(e) => setPassword(e.target.value)} autoFocus />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                  Confirm password <span className="text-danger">*</span>
+                  {t("Confirm password")} <span className="text-danger">*</span>
                 </label>
                 <PasswordInput leftIcon={Lock} placeholder="••••••••" value={confirm}
                   onChange={(e) => setConfirm(e.target.value)} />

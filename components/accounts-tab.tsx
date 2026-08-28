@@ -222,7 +222,7 @@ export function AccountsTab({
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-3 py-20 text-sm text-muted">
-        <Spinner /> Loading your accounts…
+        <Spinner /> {t("Loading your accounts…")}
       </div>
     );
   }
@@ -274,8 +274,7 @@ export function AccountsTab({
           <SectionLabel>Accounts</SectionLabel>
           {!hasDefault && (
             <div className="rounded-xl border border-warning/20 bg-warning/[0.06] px-4 py-3 text-xs text-warning">
-              No default account set. Marking an invoice paid or logging a staff salary won’t be booked
-              automatically until you star one account as the default.
+              {t("No default account set. Marking an invoice paid or logging a staff salary won’t be booked automatically until you star one account as the default.")}
             </div>
           )}
           <div className="grid gap-3 sm:grid-cols-2">
@@ -301,7 +300,7 @@ export function AccountsTab({
           <SectionLabel>Income &amp; expenses</SectionLabel>
           <div className="flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-subtle">
-              <Filter className="h-3.5 w-3.5" /> Filter
+              <Filter className="h-3.5 w-3.5" /> {t("Filter")}
             </span>
             <Select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} className="w-auto">
               <option value="">{t("All months")}</option>
@@ -381,8 +380,7 @@ function AccountsLocked({ onContact }: { onContact: () => void }) {
           </div>
           <h2 className="text-xl font-extrabold tracking-tight text-heading">{t("Accounts is an add-on")}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            Keep the books for your building — cash, bank and mobile-money accounts, every income and
-            expense, and money moved between them, all in one place.
+            {t("Keep the books for your building — cash, bank and mobile-money accounts, every income and expense, and money moved between them, all in one place.")}
           </p>
         </div>
         <div className="space-y-4 p-6">

@@ -697,8 +697,8 @@ export default function OwnerDashboard() {
       <Modal open={!!revealPasscode} onClose={() => setRevealPasscode(null)} title="Tenant login passcode">
         <div className="space-y-5">
           <p className="text-sm text-fg">
-            Share this passcode with <span className="font-semibold text-heading">{revealPasscode?.name}</span> so they
-            can sign in to the resident portal. For security it won&apos;t be shown again — you can reset it anytime.
+            {t("Share this passcode with {0} so they can sign in to the resident portal. For security it won't be shown again — you can reset it anytime.")
+              .replace("{0}", revealPasscode?.name || "")}
           </p>
           <div className="flex items-center justify-between rounded-xl border border-success/20 bg-success/[0.06] px-4 py-4">
             <span className="flex items-center gap-2 font-mono text-2xl font-black tracking-[0.3em] text-success">
@@ -734,6 +734,7 @@ function planStatusBadge(s: PlanState): { tone: "emerald" | "amber" | "rose"; la
 }
 
 function PlanBanner({ plan, onRenew }: { plan: SubscriptionResponse; onRenew: () => void }) {
+  const t = useT();
   const s = plan.subscription;
   let tone: "rose" | "amber" | null = null;
   let msg = "";
@@ -744,21 +745,31 @@ function PlanBanner({ plan, onRenew }: { plan: SubscriptionResponse; onRenew: ()
   // route to do it is 403'd for them (BUILDING_MANAGED_PLAN) is a dead end. Point them at their
   // building administrator instead.
   const managed = !!plan.building;
-  const building = plan.building?.name || "your building";
+  const building = plan.building?.name || t("your building");
 
   if (managed && (s.status === "locked" || s.status === "grace" || s.warnExpiringSoon || s.unpaidWindow)) {
     if (s.status === "locked") {
       tone = "rose";
-      msg = `${building}'s plan has lapsed, so your account is view-only. Ask your building administrator to renew it — nothing has been deleted.`;
+      msg = t("{0}'s plan has lapsed, so your account is view-only. Ask your building administrator to renew it — nothing has been deleted.")
+        .replace("{0}", building);
     } else if (s.status === "grace") {
       tone = "amber";
-      msg = `${building}'s plan has expired. ${s.daysLeftInGrace} day${s.daysLeftInGrace === 1 ? "" : "s"} left before your account becomes view-only.`;
+      msg = t(s.daysLeftInGrace === 1
+        ? "{0}'s plan has expired. {1} day left before your account becomes view-only."
+        : "{0}'s plan has expired. {1} days left before your account becomes view-only.")
+        .replace("{0}", building).replace("{1}", String(s.daysLeftInGrace));
     } else if (s.unpaidWindow) {
       tone = "amber";
-      msg = `${building}'s plan is awaiting payment. ${s.daysToPay} day${s.daysToPay === 1 ? "" : "s"} left before your account becomes view-only.`;
+      msg = t(s.daysToPay === 1
+        ? "{0}'s plan is awaiting payment. {1} day left before your account becomes view-only."
+        : "{0}'s plan is awaiting payment. {1} days left before your account becomes view-only.")
+        .replace("{0}", building).replace("{1}", String(s.daysToPay));
     } else {
       tone = "amber";
-      msg = `${building}'s plan expires in ${s.daysUntilExpiry} day${s.daysUntilExpiry === 1 ? "" : "s"}. Your building administrator renews it.`;
+      msg = t(s.daysUntilExpiry === 1
+        ? "{0}'s plan expires in {1} day. Your building administrator renews it."
+        : "{0}'s plan expires in {1} days. Your building administrator renews it.")
+        .replace("{0}", building).replace("{1}", String(s.daysUntilExpiry));
     }
     const cls = tone === "rose"
       ? "border-danger/30 bg-danger/10 text-danger"
@@ -773,18 +784,27 @@ function PlanBanner({ plan, onRenew }: { plan: SubscriptionResponse; onRenew: ()
 
   if (s.status === "locked") {
     tone = "rose";
-    msg = s.lockReason === "revoked"
+    msg = t(s.lockReason === "revoked"
       ? "Your management permissions have been revoked by an administrator. Contact support to restore access."
-      : "Your subscription has lapsed. Renew your plan to regain access — you can still view your data.";
+      : "Your subscription has lapsed. Renew your plan to regain access — you can still view your data.");
   } else if (s.downgradedFrom) {
     tone = "amber";
-    msg = `Your ${s.downgradedFrom.tierName} plan has ended, so you're on the free plan — ${s.limits.maxProperties} properties and ${s.limits.maxTenants} tenants. Nothing was deleted; anything beyond that is view-only.`;
+    msg = t("Your {0} plan has ended, so you're on the free plan — {1} properties and {2} tenants. Nothing was deleted; anything beyond that is view-only.")
+      .replace("{0}", t(s.downgradedFrom.tierName))
+      .replace("{1}", String(s.limits.maxProperties))
+      .replace("{2}", String(s.limits.maxTenants));
   } else if (s.status === "grace") {
     tone = "amber";
-    msg = `Your ${s.tierName} plan expired. ${s.daysLeftInGrace} day${s.daysLeftInGrace === 1 ? "" : "s"} of grace left to renew before management is locked.`;
+    msg = t(s.daysLeftInGrace === 1
+      ? "Your {0} plan expired. {1} day of grace left to renew before management is locked."
+      : "Your {0} plan expired. {1} days of grace left to renew before management is locked.")
+      .replace("{0}", t(s.tierName)).replace("{1}", String(s.daysLeftInGrace));
   } else if (s.warnExpiringSoon) {
     tone = "amber";
-    msg = `Your ${s.tierName} plan expires in ${s.daysUntilExpiry} day${s.daysUntilExpiry === 1 ? "" : "s"}. Renew to avoid interruption.`;
+    msg = t(s.daysUntilExpiry === 1
+      ? "Your {0} plan expires in {1} day. Renew to avoid interruption."
+      : "Your {0} plan expires in {1} days. Renew to avoid interruption.")
+      .replace("{0}", t(s.tierName)).replace("{1}", String(s.daysUntilExpiry));
   }
   if (!tone) return null;
   const cls = tone === "rose"
@@ -812,7 +832,7 @@ function UsageMeter({ label, current, limit, icon: Icon }: { label: string; curr
     <Card className="p-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted">
-          <Icon className="h-4 w-4" /> {label}
+          <Icon className="h-4 w-4" /> {t(label)}
         </div>
         <div className="text-sm font-black text-heading">
           {current} / {unlimited ? <InfinityIcon className="inline h-4 w-4 align-middle" /> : limit}
@@ -850,7 +870,7 @@ function BuildingManagedPlan({ plan }: { plan: SubscriptionResponse }) {
             <Building2 className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-heading">{s.tierName}</h3>
+            <h3 className="text-base font-semibold text-heading">{t(s.tierName)}</h3>
             <p className="mt-1 text-sm text-muted">
               {t("Your building administrator manages and pays for this plan.")}
             </p>
@@ -925,11 +945,10 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
       return;
     }
     const isCurrent = tier.id === s.tierId;
-    const verb = isCurrent ? "Renew" : "Switch to";
     if (!(await confirmDialog({
-      title: `${verb} ${tier.name}?`,
+      title: t(isCurrent ? "Renew {0}?" : "Switch to {0}?").replace("{0}", t(tier.name)),
       message: "Free plan — activation is instant.",
-      confirmLabel: verb.replace(" to", ""),
+      confirmLabel: t(isCurrent ? "Renew" : "Switch"),
     }))) return;
     try {
       setBusy(tier.id);
@@ -937,7 +956,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
         method: "POST", role: "owner", body: JSON.stringify({ tierId: tier.id }),
       });
       await onReload();
-      toast.success(res.message || "Plan updated.");
+      toast.success(res.message || t("Plan updated."));
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(null); }
   }
@@ -955,11 +974,13 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-black text-heading">{s.tierName}</span>
+                <span className="text-lg font-black text-heading">{t(s.tierName)}</span>
                 <Badge tone={badge.tone}>{badge.label}</Badge>
               </div>
               <div className="text-xs text-muted">
-                {s.isFree ? "Free · never expires" : `${formatCurrency(s.price)} / ${s.interval}`}
+                {s.isFree
+                  ? t("Free · never expires")
+                  : `${formatCurrency(s.price)} / ${t(s.interval)}`}
               </div>
             </div>
           </div>
@@ -967,10 +988,13 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
             <div className="flex items-center gap-2 text-sm text-fg">
               <CalendarClock className="h-4 w-4 text-subtle" />
               {s.status === "grace"
-                ? <span className="text-warning">Expired · {s.daysLeftInGrace}d grace left</span>
+                ? <span className="text-warning">{t("Expired · {0}d grace left").replace("{0}", String(s.daysLeftInGrace))}</span>
                 : s.status === "locked"
-                  ? <span className="text-danger">Lapsed on {formatDate(s.expiryDate)}</span>
-                  : <span>Renews / expires {formatDate(s.expiryDate)}{s.warnExpiringSoon ? ` · ${s.daysUntilExpiry}d left` : ""}</span>}
+                  ? <span className="text-danger">{t("Lapsed on {0}").replace("{0}", formatDate(s.expiryDate))}</span>
+                  : <span>
+                      {t("Renews / expires {0}").replace("{0}", formatDate(s.expiryDate))}
+                      {s.warnExpiringSoon ? ` · ${t("{0}d left").replace("{0}", String(s.daysUntilExpiry))}` : ""}
+                    </span>}
             </div>
           )}
         </div>
@@ -983,8 +1007,10 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
           <div>
             <div className="font-bold text-warning">{t("Payment awaiting approval")}</div>
             <p className="mt-0.5 text-warning/90">
-              We&apos;ve received your payment for the <strong>{pendingPayment.tier_name || pendingPayment.tier_id}</strong> plan
-              (৳{Number(pendingPayment.amount || 0)}, txn {pendingPayment.txn_id}). Our team will review and activate it shortly.
+              {t("We've received your payment for the {0} plan ({1}, txn {2}). Our team will review and activate it shortly.")
+                .replace("{0}", t(pendingPayment.tier_name || pendingPayment.tier_id))
+                .replace("{1}", `৳${Number(pendingPayment.amount || 0)}`)
+                .replace("{2}", String(pendingPayment.txn_id))}
             </p>
           </div>
         </div>
@@ -998,9 +1024,9 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
             <div className="font-bold text-danger">{t("Your last payment could not be approved")}</div>
             <p className="mt-0.5 text-danger/90">
               {rejectedPayment.admin_notes
-                ? <>Reason: {rejectedPayment.admin_notes}</>
-                : "Please review your payment details and try again."}
-              {" "}You can submit a new payment below.
+                ? t("Reason: {0}").replace("{0}", String(rejectedPayment.admin_notes))
+                : t("Please review your payment details and try again.")}
+              {" "}{t("You can submit a new payment below.")}
             </p>
           </div>
         </div>
@@ -1029,7 +1055,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
             return (
               <Card key={tier.id} className={`p-6 ${isCurrent ? "border-primary/40" : ""} ${contact ? "border-accent/30" : ""}`}>
                 <div className="flex items-center justify-between">
-                  <div className="text-base font-black text-heading">{tier.name}</div>
+                  <div className="text-base font-black text-heading">{t(tier.name)}</div>
                   {isCurrent ? <Badge tone="indigo">Current</Badge> : contact ? <Badge tone="cyan">Custom</Badge> : null}
                 </div>
                 {/* A hidden plan only ever reaches this list as the owner's OWN plan (the server
@@ -1038,17 +1064,18 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                   <p className="mt-1 text-xs text-subtle">{t("Arranged for your account — not publicly listed.")}</p>
                 )}
                 <div className="mt-1 text-2xl font-black text-heading">
-                  {contact ? "Contact us" : tier.price > 0 ? formatCurrency(discountedPrice(tier)) : "Free"}
-                  {!contact && tier.price > 0 && <span className="text-sm font-medium text-muted"> / {tenureLabel(tier)}</span>}
+                  {contact ? t("Contact us") : tier.price > 0 ? formatCurrency(discountedPrice(tier)) : t("Free")}
+                  {!contact && tier.price > 0 && <span className="text-sm font-medium text-muted"> / {t(tenureLabel(tier))}</span>}
                 </div>
                 {/* Show the saving when the admin has put a discount on this plan. */}
                 {!contact && tier.price > 0 && Number(tier.discount_percent || 0) > 0 && (
                   <div className="mt-1 flex items-center gap-2 text-xs">
                     <span className="text-subtle line-through">{formatCurrency(tier.price)}</span>
-                    <Badge tone="emerald">Save {Number(tier.discount_percent)}%</Badge>
+                    <Badge tone="emerald">{t("Save {0}%").replace("{0}", String(Number(tier.discount_percent)))}</Badge>
                   </div>
                 )}
-                {tier.description && <p className="mt-2 text-xs text-muted">{tier.description}</p>}
+                {/* Database text: the English string is its own key -- see app/plans/page.tsx. */}
+                {tier.description && <p className="mt-2 text-xs text-muted">{t(tier.description)}</p>}
                 <ul className="mt-4 space-y-1.5 text-sm text-fg">
                   {contact ? (
                     <>
@@ -1064,9 +1091,15 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                   ) : (
                     <>
                       <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />
-                        {unlimitedP ? "Unlimited properties" : `Up to ${tier.max_properties_allowed} properties`}</li>
+                        {unlimitedP
+                          ? t("Unlimited properties")
+                          : t(tier.max_properties_allowed === 1 ? "Up to {0} property" : "Up to {0} properties")
+                              .replace("{0}", String(tier.max_properties_allowed))}</li>
                       <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />
-                        {unlimitedT ? "Unlimited tenants" : `Up to ${tier.max_tenants_allowed} tenants`}</li>
+                        {unlimitedT
+                          ? t("Unlimited tenants")
+                          : t(tier.max_tenants_allowed === 1 ? "Up to {0} tenant" : "Up to {0} tenants")
+                              .replace("{0}", String(tier.max_tenants_allowed))}</li>
                       {/* Optional modules this plan bundles — no separate purchase needed. */}
                       {PLAN_ADDONS.filter((a) => addonsOnTier(tier).includes(a.key)).map((a) => (
                         <li key={a.key} className="flex items-center gap-2">
@@ -1076,7 +1109,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                       {/* A trial: say so up front, not only once the button is greyed out. */}
                       {tier.is_recurring === false && (
                         <li className="flex items-center gap-2 text-muted">
-                          <Info className="h-4 w-4 text-subtle" />One-time plan — can&apos;t be renewed
+                          <Info className="h-4 w-4 text-subtle" />{t("One-time plan — can't be renewed")}
                         </li>
                       )}
                     </>
@@ -1088,7 +1121,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                       {t("Contact us")}
                     </Button>
                   ) : isCurrent && s.isFree ? (
-                    <Button variant="secondary" className="w-full" disabled>Current plan</Button>
+                    <Button variant="secondary" className="w-full" disabled>{t("Current plan")}</Button>
                   ) : tier.oneTimeUsed ? (
                     /* A one-time plan they've already had. While they're still on it that means
                        "Current plan" with no Renew; once it has lapsed, it stays listed but
@@ -1098,16 +1131,20 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                         {isCurrent ? "Current plan" : "Already used"}
                       </Button>
                       <p className="mt-2 text-xs text-subtle">
-                        {isCurrent
+                        {t(isCurrent
                           ? "This is a one-time plan. When it ends you'll move to the free plan — pick another plan to carry on."
-                          : "You've already used this one-time plan."}
+                          : "You've already used this one-time plan.")}
                       </p>
                     </>
                   ) : blockedDowngrade ? (
                     <>
-                      <Button variant="secondary" className="w-full" disabled>Downgrade blocked</Button>
+                      <Button variant="secondary" className="w-full" disabled>{t("Downgrade blocked")}</Button>
                       <p className="mt-2 text-xs text-danger">
-                        You use {plan.usage.properties.current} propert{plan.usage.properties.current === 1 ? "y" : "ies"} / {plan.usage.tenants.current} tenant{plan.usage.tenants.current === 1 ? "" : "s"}. Reduce to {unlimitedP ? "∞" : tier.max_properties_allowed} / {unlimitedT ? "∞" : tier.max_tenants_allowed} first.
+                        {t("You use {0} properties / {1} tenants. Reduce to {2} / {3} first.")
+                          .replace("{0}", String(plan.usage.properties.current))
+                          .replace("{1}", String(plan.usage.tenants.current))
+                          .replace("{2}", unlimitedP ? "∞" : String(tier.max_properties_allowed))
+                          .replace("{3}", unlimitedT ? "∞" : String(tier.max_tenants_allowed))}
                       </p>
                     </>
                   ) : (
@@ -1118,7 +1155,7 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
                       loading={busy === tier.id}
                       onClick={() => choose(tier)}
                     >
-                      {isCurrent ? "Renew plan" : tier.price > s.price ? "Upgrade" : "Switch to this plan"}
+                      {t(isCurrent ? "Renew plan" : tier.price > s.price ? "Upgrade" : "Switch to this plan")}
                     </Button>
                   )}
                 </div>
@@ -1126,7 +1163,10 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
             );
           })}
         </div>
-        <p className="text-xs text-subtle">Paid plans are activated after our team confirms your bKash payment. The free plan never expires; paid plans renew on their billing interval and get a {`10`}-day grace period after expiry. A one-time plan can only be taken once — when it ends you move to the free plan and choose again.</p>
+        <p className="text-xs text-subtle">
+          {t("Paid plans are activated after our team confirms your bKash payment. The free plan never expires; paid plans renew on their billing interval and get a {0}-day grace period after expiry. A one-time plan can only be taken once — when it ends you move to the free plan and choose again.")
+            .replace("{0}", "10")}
+        </p>
         {/* Same clarification as the public pricing page: on this card "maintenance" is the
             software contract, not the building's. */}
         {plan.availableTiers.some(isContactTier) && (
@@ -1201,12 +1241,12 @@ function PaymentModal({
       <div className="space-y-5">
         {/* Pay-to details */}
         <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
-          <div className="text-xs font-bold uppercase tracking-wider text-muted">Pay with {providerName}</div>
+          <div className="text-xs font-bold uppercase tracking-wider text-muted">{t("Pay with {0}").replace("{0}", providerName)}</div>
           {config?.qrUrl ? (
             <div className="mt-3 flex flex-col items-center gap-1">
               <button type="button" onClick={() => setZoomed(true)}
                 className="rounded-lg ring-1 ring-line/10 transition hover:ring-primary/50"
-                title="Tap to enlarge and scan">
+                title={t("Tap to enlarge and scan")}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={config.qrUrl} alt={`${providerName} QR code`} className="h-44 w-44 rounded-lg bg-white object-contain p-2" />
               </button>
@@ -1280,6 +1320,7 @@ function ContactModal({
   ownerName: string | null;
   onClose: () => void;
 }) {
+  const t = useT();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -1291,14 +1332,14 @@ function ContactModal({
     if (!open) return;
     setName(ownerName || "");
     setMessage(
-      prefill ?? (tier ? `I'm interested in the ${tier.name} plan. Please get in touch.` : "")
+      prefill ?? (tier ? t("I'm interested in the {plan} plan. Please get in touch.").replace("{plan}", t(tier.name)) : "")
     );
     setEmail(""); setPhone("");
   }, [open, tier, prefill, ownerName]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!message.trim()) { toast.error("Please add a message."); return; }
+    if (!message.trim()) { toast.error(t("Please add a message.")); return; }
     // Both optional — but this is how the team replies, so anything supplied must be reachable.
     const parsedEmail = validateEmail(email);
     if (!parsedEmail.ok) { toast.error(parsedEmail.error); return; }
@@ -1313,7 +1354,7 @@ function ContactModal({
           tierId: tier?.id, message: message.trim(),
         }),
       });
-      toast.success("Thanks — our team will reach out to you soon.");
+      toast.success(t("Thanks — our team will reach out to you soon."));
       onClose();
     } catch (e: any) { toast.error(e.message); }
     finally { setSending(false); }
@@ -1321,7 +1362,7 @@ function ContactModal({
 
   return (
     <Modal open={open} onClose={onClose} title="Contact us"
-      subtitle={subject ?? (tier ? `Enquiry about the ${tier.name} plan` : undefined)}>
+      subtitle={subject ?? (tier ? `${t("Enquiry about the")} ${t(tier.name)}` : undefined)}>
       <form onSubmit={submit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Your name">
@@ -1444,6 +1485,7 @@ function PropertiesTab({ properties, disabledIds, onUpgrade, onAdd, onEdit, onVa
   onEdit: (p: Property) => void; onVacate: (p: Property) => void;
   onCharges: (p: Property) => void; onHistory: (p: Property) => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const filtered = q
@@ -1491,7 +1533,7 @@ function PropertiesTab({ properties, disabledIds, onUpgrade, onAdd, onEdit, onVa
                 </p>
               </div>
               <div className="flex items-center justify-between border-t border-line/[0.06] pt-3 text-xs text-subtle">
-                <span>Flat <span className="font-semibold text-fg">{p.flat_no}</span></span>
+                <span>{t("Flat")} <span className="font-semibold text-fg">{p.flat_no}</span></span>
                 <span className="font-mono">{p.id.slice(0, 8)}…</span>
               </div>
               {disabled ? (
@@ -1555,11 +1597,12 @@ function LoginAccessToggle({ tenant, onToggle }: { tenant: Tenant; onToggle: (t:
 function ResetPasscodeButton({
   tenant, onReset, pending, label = "Reset",
 }: { tenant: Tenant; onReset: (t: Tenant) => void; pending: boolean; label?: string }) {
+  const t = useT();
   return (
     <button
       onClick={() => onReset(tenant)}
       disabled={pending}
-      title="Generate a new login passcode"
+      title={t("Generate a new login passcode")}
       className="inline-flex items-center gap-1.5 rounded-lg bg-overlay/[0.04] px-2 py-1 text-xs text-fg transition hover:bg-overlay/[0.08] hover:text-heading disabled:pointer-events-none disabled:opacity-50"
     >
       {pending ? <Spinner className="h-3 w-3" /> : <RotateCcw className="h-3 w-3" />} {label}
@@ -1672,35 +1715,35 @@ function TenantsTab({
 
           {/* Mobile cards */}
           <div className="space-y-3 md:hidden">
-            {filtered.map((t) => {
-              const disabled = isDisabled(t.id);
+            {filtered.map((tn) => {
+              const disabled = isDisabled(tn.id);
               return (
-              <Card key={t.id} className={`p-4 ${disabled ? "opacity-60" : ""}`}>
+              <Card key={tn.id} className={`p-4 ${disabled ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 font-semibold text-heading">
-                    {t.name}{disabled && <Badge tone="rose">Disabled</Badge>}
+                    {tn.name}{disabled && <Badge tone="rose">Disabled</Badge>}
                   </div>
                   <ResetPasscodeButton
-                    tenant={t}
+                    tenant={tn}
                     onReset={onResetPasscode}
-                    pending={isPending(`passcode:${t.id}`)}
+                    pending={isPending(`passcode:${tn.id}`)}
                     label="Reset passcode"
                   />
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted">
                   <span>
-                    {t.properties?.name ?? propName(t.property_id) ?? (
+                    {tn.properties?.name ?? propName(tn.property_id) ?? (
                       <Badge tone="amber">Unassigned</Badge>
                     )}
                   </span>
-                  <span className="text-right font-semibold text-success">{formatCurrency(t.monthly_rent)}</span>
-                  <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{t.phone}</span>
-                  <span className="text-right">Due {ordinalDay(t.due_date)}</span>
+                  <span className="text-right font-semibold text-success">{formatCurrency(tn.monthly_rent)}</span>
+                  <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{tn.phone}</span>
+                  <span className="text-right">{t("Due {0}").replace("{0}", ordinalDay(tn.due_date))}</span>
                 </div>
                 {/* Its own row, not squeezed into the grid cell beside the rent — it needs a real tap target. */}
-                {!t.property_id && (
+                {!tn.property_id && (
                   <div className="mt-3">
-                    <LoginAccessToggle tenant={t} onToggle={onToggleLogin} />
+                    <LoginAccessToggle tenant={tn} onToggle={onToggleLogin} />
                   </div>
                 )}
                 <div className="mt-3 flex justify-end gap-2">
@@ -1708,8 +1751,8 @@ function TenantsTab({
                     <Button size="sm" variant="secondary" icon={ArrowUpCircle} onClick={onUpgrade}>Upgrade to re-enable</Button>
                   ) : (
                     <>
-                      <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(t)}>Edit</Button>
-                      <Button size="sm" variant="secondary" icon={FileText} onClick={() => onDocs(t)}>Docs</Button>
+                      <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(tn)}>Edit</Button>
+                      <Button size="sm" variant="secondary" icon={FileText} onClick={() => onDocs(tn)}>Docs</Button>
                     </>
                   )}
                 </div>
@@ -1838,7 +1881,7 @@ function BillingTab({
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-end gap-1">
-                        <button title="Receipt & share" onClick={() => onReceipt(l)}
+                        <button title={t("Receipt & share")} onClick={() => onReceipt(l)}
                           className="rounded-lg p-1.5 text-primary transition hover:bg-primary/10">
                           <Receipt className="h-4 w-4" />
                         </button>
@@ -1955,6 +1998,7 @@ function MaintenanceTab({ logs, onUpdate }: { logs: MaintenanceLog[]; onUpdate: 
 
 /* ============================================================ SUPPORT TICKETS */
 function SupportTab({ tickets, onCreate }: { tickets: SupportTicket[]; onCreate: () => void }) {
+  const t = useT();
   return (
     <div className="space-y-6">
       <PageHeader
@@ -1971,34 +2015,34 @@ function SupportTab({ tickets, onCreate }: { tickets: SupportTicket[]; onCreate:
         />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {tickets.map((t) => (
-            <Card key={t.id} className="flex flex-col gap-3 p-5">
+          {tickets.map((tk) => (
+            <Card key={tk.id} className="flex flex-col gap-3 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <div className="rounded-lg bg-primary/10 p-2 text-primary"><LifeBuoy className="h-4 w-4" /></div>
                   <div>
-                    <h3 className="font-bold text-heading">{t.subject}</h3>
-                    <span className="text-[11px] font-semibold text-subtle">#{t.ticket_no}</span>
+                    <h3 className="font-bold text-heading">{tk.subject}</h3>
+                    <span className="text-[11px] font-semibold text-subtle">#{tk.ticket_no}</span>
                   </div>
                 </div>
-                <Badge tone={priorityTone[t.priority]}>{t.priority}</Badge>
+                <Badge tone={priorityTone[tk.priority]}>{tk.priority}</Badge>
               </div>
-              <p className="text-sm leading-relaxed text-muted">{t.description}</p>
-              <AttachmentStrip raw={t.attachment_file_url} />
-              {t.admin_remarks && (
+              <p className="text-sm leading-relaxed text-muted">{tk.description}</p>
+              <AttachmentStrip raw={tk.attachment_file_url} />
+              {tk.admin_remarks && (
                 <div className="rounded-lg border border-primary/20 bg-primary/[0.06] px-3 py-2 text-xs text-fg">
                   <span className="flex items-center gap-1.5 font-semibold text-primary">
-                    <MessageSquare className="h-3.5 w-3.5" /> Admin response
+                    <MessageSquare className="h-3.5 w-3.5" /> {t("Admin response")}
                   </span>
-                  <p className="mt-1 leading-relaxed">{t.admin_remarks}</p>
+                  <p className="mt-1 leading-relaxed">{tk.admin_remarks}</p>
                 </div>
               )}
               <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line/[0.06] pt-3 text-xs text-subtle">
-                <span>{ticketCategoryLabel[t.category]}</span>
-                <span>· Raised {formatDate(t.created_at)}</span>
-                {t.finished_at && <span>· Closed {formatDate(t.finished_at)}</span>}
-                <Badge tone={ticketStatusTone[t.status]} className="ml-auto">
-                  {ticketStatusLabel[t.status]}
+                <span>{ticketCategoryLabel[tk.category]}</span>
+                <span>{t("· Raised {0}").replace("{0}", formatDate(tk.created_at))}</span>
+                {tk.finished_at && <span>{t("· Closed {0}").replace("{0}", formatDate(tk.finished_at))}</span>}
+                <Badge tone={ticketStatusTone[tk.status]} className="ml-auto">
+                  {ticketStatusLabel[tk.status]}
                 </Badge>
               </div>
             </Card>
@@ -2095,7 +2139,7 @@ function RaiseTicketModal({
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {items.map((it) => (
               <div key={it.key} className="relative aspect-square overflow-hidden rounded-xl border border-line/[0.08]">
-                <img src={it.preview} alt="Attachment preview" className="h-full w-full object-cover" />
+                <img src={it.preview} alt={t("Attachment preview")} className="h-full w-full object-cover" />
                 <button type="button" onClick={() => removeItem(it.key)}
                   className="absolute right-1 top-1 rounded-lg bg-black/60 p-1 text-heading transition hover:bg-black/80">
                   <X className="h-3.5 w-3.5" />
@@ -2265,7 +2309,7 @@ function TenantModal({
           <Select required value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
             <option value="">{t("Select a property…")}</option>
             {(vacant.length ? vacant : properties).map((p) => (
-              <option key={p.id} value={p.id}>{p.name} · Flat {p.flat_no}{p.is_vacant ? "" : " (occupied)"}</option>
+              <option key={p.id} value={p.id}>{`${p.name} · ${t("Flat")} ${p.flat_no}${p.is_vacant ? "" : ` (${t("occupied")})`}`}</option>
             ))}
           </Select>
         </Field>
@@ -2400,7 +2444,7 @@ function PaymentReceivedModal({
               buttons nested in a label would re-trigger the input on every click. */}
           <div className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">
-              Amount received <span className="text-danger">*</span>
+              {t("Amount received")} <span className="text-danger">*</span>
             </span>
             <div className="flex gap-2">
               <TextInput
@@ -2420,7 +2464,7 @@ function PaymentReceivedModal({
 
           <div className="space-y-1.5">
             <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">
-              Payment date <span className="text-danger">*</span>
+              {t("Payment date")} <span className="text-danger">*</span>
             </span>
             <div className="flex gap-2">
               <TextInput
@@ -2524,7 +2568,7 @@ function PaymentHistoryModal({
                   <div className="mt-0.5 text-xs text-muted">{formatDate(p.paid_on)}</div>
                 </div>
                 {!locked && (
-                  <button title="Delete" disabled={busy === p.id} onClick={() => remove(p)}
+                  <button title={t("Delete")} disabled={busy === p.id} onClick={() => remove(p)}
                     className="rounded-lg p-1.5 text-danger transition hover:bg-danger/10 disabled:opacity-50">
                     {busy === p.id ? <Spinner className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
                   </button>
@@ -2730,6 +2774,7 @@ function RemindersTab({
 }: {
   reminders: Reminder[]; tenants: Tenant[]; onCreate: () => void; onChanged: () => Promise<void>;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState<string | null>(null);
   const nameById = useMemo(() => {
     const m: Record<string, string> = {};
@@ -2801,7 +2846,7 @@ function RemindersTab({
                       <IconBtnOwner title="Cancel" tone="amber" icon={X} loading={busy === r.id} onClick={() => act(r.id, "cancel")} />
                     </>
                   )}
-                  <IconBtnOwner title="Delete" tone="rose" icon={Trash2} loading={busy === r.id} onClick={() => act(r.id, "delete")} />
+                  <IconBtnOwner title={t("Delete")} tone="rose" icon={Trash2} loading={busy === r.id} onClick={() => act(r.id, "delete")} />
                 </div>
               </div>
             </Card>
@@ -3159,7 +3204,7 @@ function EditTenantModal({
             <option value="">{t("— Unassigned —")}</option>
             {assignable.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} · Flat {p.flat_no}{p.id === tenant?.property_id ? " (current)" : ""}
+                {`${p.name} · ${t("Flat")} ${p.flat_no}${p.id === tenant?.property_id ? ` (${t("current")})` : ""}`}
               </option>
             ))}
           </Select>
@@ -3216,7 +3261,7 @@ function EditTenantModal({
         </Field>
         {rentChanged && (
           <div className="rounded-xl border border-warning/20 bg-warning/10 px-4 py-2.5 text-xs text-warning">
-            Rent will change to {formatCurrency(Number(form.monthlyRent) || 0)} — the previous rent is archived for history.
+            {t("Rent will change to {0} — the previous rent is archived for history.").replace("{0}", formatCurrency(Number(form.monthlyRent) || 0))}
           </div>
         )}
         <Button type="submit" loading={saving} className="w-full">Save changes</Button>
@@ -3265,7 +3310,7 @@ function PropertyHistoryModal({ property, onClose }: { property: Property | null
         <p className="text-sm text-subtle">{t("Loading…")}</p>
       ) : rows.length === 0 ? (
         <p className="text-sm text-muted">
-          No past tenants archived yet. When you vacate this unit, the outgoing resident is recorded here.
+          {t("No past tenants archived yet. When you vacate this unit, the outgoing resident is recorded here.")}
         </p>
       ) : (
         <div className="space-y-3">
@@ -3276,9 +3321,9 @@ function PropertyHistoryModal({ property, onClose }: { property: Property | null
                 <span className="text-xs text-subtle">{o.tenant_phone}</span>
               </div>
               <div className="mt-2 grid grid-cols-1 gap-1.5 text-xs text-muted sm:grid-cols-3">
-                <span>From: {o.lease_start ? formatDate(o.lease_start) : "—"}</span>
-                <span>To: {o.lease_end ? formatDate(o.lease_end) : "—"}</span>
-                <span className="font-semibold text-success">Rent paid: {formatCurrency(o.total_rent_paid ?? 0)}</span>
+                <span>{t("From: {0}").replace("{0}", o.lease_start ? formatDate(o.lease_start) : "—")}</span>
+                <span>{t("To: {0}").replace("{0}", o.lease_end ? formatDate(o.lease_end) : "—")}</span>
+                <span className="font-semibold text-success">{t("Rent paid: {0}").replace("{0}", formatCurrency(o.total_rent_paid ?? 0))}</span>
               </div>
             </div>
           ))}
@@ -3349,7 +3394,7 @@ function SignatureModal({
       <div className="space-y-4">
         {(preview || current) && (
           <div className="rounded-xl border border-line/[0.08] bg-white p-4 text-center">
-            <img src={preview || current || ""} alt="Signature" className="mx-auto max-h-24 object-contain" />
+            <img src={preview || current || ""} alt={t("Signature")} className="mx-auto max-h-24 object-contain" />
           </div>
         )}
 
@@ -3682,7 +3727,7 @@ function OwnerDocumentsModal({ tenant, onClose }: { tenant: Tenant | null; onClo
             </div>
           ) : (
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] px-4 py-4 text-sm text-muted transition hover:border-primary/40 hover:text-fg">
-              <Upload className="h-4 w-4" /> Choose a file
+              <Upload className="h-4 w-4" /> {t("Choose a file")}
               <input type="file" accept="image/*,application/pdf" className="hidden"
                 onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
             </label>
@@ -3707,9 +3752,9 @@ function OwnerDocumentsModal({ tenant, onClose }: { tenant: Tenant | null; onClo
                 <div className="truncate text-sm font-semibold text-fg">{d.title}</div>
                 <div className="text-[10px] uppercase tracking-wider text-subtle">{d.doc_type ?? "document"} · {formatDate(d.created_at)}</div>
               </div>
-              <a href={d.file_url} target="_blank" rel="noreferrer" title="Open"
+              <a href={d.file_url} target="_blank" rel="noreferrer" title={t("Open")}
                 className="rounded-lg p-1.5 text-muted transition hover:bg-overlay/[0.06] hover:text-primary"><Download className="h-4 w-4" /></a>
-              <button type="button" onClick={() => remove(d.id)} title="Delete"
+              <button type="button" onClick={() => remove(d.id)} title={t("Delete")}
                 className="rounded-lg p-1.5 text-muted transition hover:bg-danger/10 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))

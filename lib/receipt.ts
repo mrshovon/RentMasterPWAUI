@@ -207,7 +207,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#eef2f6;color:#1
 @page{size:A4 portrait;margin:12mm}
 @media print{body{background:#fff;padding:0}.receipt{zoom:.45;margin:0;max-width:none;width:780px;padding:24px 28px}}
 </style></head><body><div class="receipt">
-<div class="head"><div>${statusHtml}</div><div class="title">${esc(tr("MONEY RECEIPT"))}</div><div class="copy">${esc(o.copyLabel)}</div></div>
+<div class="head"><div>${statusHtml}</div><div class="title">${esc(tr("MONEY RECEIPT"))}</div><div class="copy">${esc(tr(o.copyLabel))}</div></div>
 <div class="oname">${esc(o.ownerName || tr("Owner"))}</div>
 <div class="addr">${esc(o.propertyAddress || "")}</div>
 <div class="divider"></div>

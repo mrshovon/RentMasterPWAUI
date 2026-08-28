@@ -136,7 +136,7 @@ export function MaintenanceGate() {
         {window_ && (
           <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-4 py-3">
             <div className="text-[11px] font-bold uppercase tracking-wider text-subtle">
-              Maintenance window
+              {t("Maintenance window")}
             </div>
             <div className="mt-1 text-sm font-semibold text-heading">{window_}</div>
           </div>

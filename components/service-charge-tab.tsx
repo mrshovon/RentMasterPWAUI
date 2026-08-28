@@ -101,7 +101,7 @@ export function ServiceChargeTab() {
       billingMonth: inv.billing_month,
       unitLabel: b.unitLabel,
       partyLabel: "Flat Owner",
-      tenantName: res?.owner?.name || b.unitLabel || "Flat Owner",
+      tenantName: res?.owner?.name || b.unitLabel || t("Flat Owner"),
       houseRent: 0,
       serviceCharge: Number(inv.service_charge || 0),
       extraCharge: Number(inv.extra_charge || 0),
@@ -218,11 +218,11 @@ export function ServiceChargeTab() {
                   <td className="p-4 text-fg">{formatCurrency(Number(inv.total_payable || 0))}</td>
                   <td className="p-4 text-fg">{formatCurrency(Number(inv.amount_paid || 0))}</td>
                   <td className="p-4">
-                    <Badge tone={statusTone(inv.payment_status)}>{statusLabel(inv.payment_status)}</Badge>
+                    <Badge tone={statusTone(inv.payment_status)}>{t(statusLabel(inv.payment_status))}</Badge>
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => setOpen(inv)}>View</Button>
+                      <Button size="sm" variant="secondary" onClick={() => setOpen(inv)}>{t("View")}</Button>
                       {/* Offered at every status, exactly as the building admin's copy is: an
                           unpaid invoice still prints a receipt showing what is owed, and that is
                           the document an owner takes to their building office. */}

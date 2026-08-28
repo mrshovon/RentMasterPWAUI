@@ -6,6 +6,7 @@ import { ensurePushSubscription, getPushPermission, type PushPermission } from "
 import { ensureNativePush } from "../lib/native-push";
 import { isNativeApp } from "../lib/platform";
 import { getSessionToken, rentMasterFetch } from "../lib/api-service";
+import { useT } from "../lib/i18n";
 import { toast } from "./toast";
 import { Button } from "./ui";
 
@@ -65,6 +66,7 @@ export function PushTestButton({ className }: { className?: string }) {
  * a row of diagnostic buttons above every page was noise for the 99% of visits that don't need it.
  */
 export function PushToggle() {
+  const t = useT();
   const [permission, setPermission] = useState<PushPermission>("unsupported");
   const [busy, setBusy] = useState(false);
 
@@ -93,8 +95,7 @@ export function PushToggle() {
     return (
       <div className="mb-5 flex items-center gap-2.5 rounded-xl border border-line/[0.06] bg-overlay/[0.02] px-4 py-2.5 text-xs text-muted">
         <BellOff className="h-4 w-4 shrink-0 text-subtle" />
-        Notifications are blocked for this app. Re-enable them in your browser or system settings to
-        get rent, invoice and maintenance alerts.
+        {t("Notifications are blocked for this app. Re-enable them in your browser or system settings to get rent, invoice and maintenance alerts.")}
       </div>
     );
   }
@@ -102,7 +103,7 @@ export function PushToggle() {
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3">
       <p className="text-xs text-fg">
-        Turn on notifications for invoices, payments and maintenance updates.
+        {t("Turn on notifications for invoices, payments and maintenance updates.")}
       </p>
       <Button
         size="sm"

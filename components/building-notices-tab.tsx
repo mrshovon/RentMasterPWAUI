@@ -12,6 +12,7 @@ import { PrintModal } from "./print-modal";
 import {
   Card, Badge, Button, Modal, Field, TextInput, TextArea, Select, PageHeader, EmptyState,
 } from "./ui";
+import { useT } from "../lib/i18n";
 
 // =====================================================================================
 // 🏢 BUILDING ADMIN — NOTICES
@@ -25,7 +26,9 @@ import {
 // the copies already delivered stay in people's feeds, because silently retracting them would
 // make the app lie about what was published.
 //
-// English-only, like the rest of the building console. See scripts/check-i18n.mjs.
+// The three AUDIENCE_LABEL strings are BOTH screen text (the badge) and PRINTED text (the
+// letter's To: line), so they are translated at the point of use rather than at definition —
+// lib/building-print.ts calls tr() on audienceLabel, and the badge calls t().
 // =====================================================================================
 
 const AUDIENCE_LABEL: Record<string, string> = {
@@ -44,6 +47,7 @@ export function BuildingNoticesTab({
   /** Uploaded in Settings. Absent means "Print signed" is not offered at all. */
   signatureUrl?: string | null;
 }) {
+  const t = useT();
   const [notices, setNotices] = useState<BuildingNotice[]>([]);
   const [loading, setLoading] = useState(true);
   const [composing, setComposing] = useState(false);
@@ -67,7 +71,7 @@ export function BuildingNoticesTab({
   // `signed` only decides whether the signature image travels on the header. There is no flag in
   // the document builder — the unsigned copy is simply one with no signatureUrl on it.
   function printNotice(n: BuildingNotice, signed: boolean) {
-    if (!building) { toast.error("Your building details are still loading."); return; }
+    if (!building) { toast.error(t("Your building details are still loading.")); return; }
     const target = n.target_owner_id ? owners.find((o) => o.owner_id === n.target_owner_id) : null;
     const html = buildNoticeLetterHtml({
       building: {
@@ -85,7 +89,7 @@ export function BuildingNoticesTab({
       referenceNo: n.reference_no,
       noticeNo: n.notice_no ?? null,
       audienceLabel: target
-        ? `${target.name || target.email || "Owner"}${target.unit_label ? ` (${target.unit_label})` : ""}`
+        ? `${target.name || target.email || t("Owner")}${target.unit_label ? ` (${target.unit_label})` : ""}`
         : AUDIENCE_LABEL[n.audience] || null,
     });
     setPrinting({
@@ -98,7 +102,7 @@ export function BuildingNoticesTab({
 
   async function remove(n: BuildingNotice) {
     const ok = await confirmDialog({
-      title: "Delete this notice?",
+      title: t("Delete this notice?"),
       message:
         "It leaves your record here. Copies already delivered stay in people's feeds — this does not unpublish it.",
       confirmLabel: "Delete",
@@ -108,7 +112,7 @@ export function BuildingNoticesTab({
     try {
       await rentMasterFetch(`/api/admin/building/notices/${n.id}`, { method: "DELETE" });
       setNotices((list) => list.filter((x) => x.id !== n.id));
-      toast.success("Removed from your notice record.");
+      toast.success(t("Removed from your notice record."));
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -140,11 +144,14 @@ export function BuildingNoticesTab({
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-base font-semibold text-heading">{n.title}</h3>
                     <Badge tone={n.audience === "all_tenants" ? "cyan" : "indigo"}>
-                      {AUDIENCE_LABEL[n.audience] || n.audience}
+                      {t(AUDIENCE_LABEL[n.audience] || n.audience)}
                     </Badge>
                   </div>
                   <div className="mt-1 text-xs text-muted">
-                    {`Ref ${n.reference_no || `#${n.notice_no ?? ""}`} · ${formatDate(n.issued_on)} · delivered to ${n.delivered_count}`}
+                    {t("Ref {0} · {1} · delivered to {2}")
+                      .replace("{0}", n.reference_no || `#${n.notice_no ?? ""}`)
+                      .replace("{1}", formatDate(n.issued_on))
+                      .replace("{2}", String(n.delivered_count))}
                   </div>
                   <p className="mt-3 whitespace-pre-wrap text-sm text-fg">{n.content}</p>
                 </div>
@@ -194,6 +201,7 @@ function ComposeNoticeModal({
   onClose: () => void;
   onIssued: () => Promise<void>;
 }) {
+  const t = useT();
   const empty = {
     title: "", content: "", audience: "all_owners", targetOwnerId: "",
     issuedOn: new Date().toISOString().slice(0, 10), referenceNo: "",
@@ -206,11 +214,11 @@ function ComposeNoticeModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.title.trim() || !form.content.trim()) {
-      toast.error("A notice needs a title and some text.");
+      toast.error(t("A notice needs a title and some text."));
       return;
     }
     if (form.audience === "individual_owner" && !form.targetOwnerId) {
-      toast.error("Choose which owner this is for.");
+      toast.error(t("Choose which owner this is for."));
       return;
     }
     try {
@@ -224,7 +232,7 @@ function ComposeNoticeModal({
       // The printable record is the deliverable; a failed fan-out is reported rather than hidden,
       // so nobody assumes a notice reached people when it did not.
       if (res.warnings?.length) res.warnings.forEach((w) => toast.warning(w));
-      else toast.success("Notice published.");
+      else toast.success(t("Notice published."));
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -247,16 +255,16 @@ function ComposeNoticeModal({
         <Field label="Who is it for?" required>
           <Select value={form.audience}
             onChange={(e) => setForm({ ...form, audience: e.target.value, targetOwnerId: "" })}>
-            <option value="all_owners">All flat owners</option>
-            <option value="individual_owner">One owner</option>
-            <option value="all_tenants">Tenants of the building&apos;s own spaces</option>
+            <option value="all_owners">{t("All flat owners")}</option>
+            <option value="individual_owner">{t("One owner")}</option>
+            <option value="all_tenants">{t("Tenants of the building's own spaces")}</option>
           </Select>
         </Field>
         {form.audience === "individual_owner" && (
           <Field label="Which owner?" required>
             <Select required value={form.targetOwnerId}
               onChange={(e) => setForm({ ...form, targetOwnerId: e.target.value })}>
-              <option value="">Choose an owner…</option>
+              <option value="">{t("Choose an owner…")}</option>
               {owners.map((o) => (
                 <option key={o.owner_id} value={o.owner_id}>
                   {`${o.name || o.email}${o.unit_label ? ` — ${o.unit_label}` : ""}`}

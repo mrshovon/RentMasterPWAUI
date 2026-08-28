@@ -108,7 +108,7 @@ export function UpdateGate() {
       <div className="space-y-5">
         <div className="flex items-center gap-2 text-sm font-semibold text-fg">
           <Sparkles className="h-4 w-4 text-primary" />
-          What&apos;s new in v{release.version}
+          {t("What's new in v{0}").replace("{0}", String(release.version))}
         </div>
 
         <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm leading-relaxed text-fg">

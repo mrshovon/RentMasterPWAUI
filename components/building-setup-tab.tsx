@@ -5,6 +5,7 @@ import { Plus, Pencil, Trash2, Wrench, TrendingUp, Power } from "lucide-react";
 import { rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
 import { confirmDialog } from "./confirm";
+import { useT } from "../lib/i18n";
 import { formatCurrency } from "../lib/format";
 import { BuildingAmenity, BuildingIncomeSource } from "../types/api";
 import {
@@ -19,10 +20,13 @@ import {
 // The actual transactions live in the Accounts tab, and these lists exist so the categories
 // there stay consistent instead of being retyped every month.
 //
-// English-only, like the rest of the building console. See scripts/check-i18n.mjs.
+// Translated, like the rest of the app. This console was English-only by a standing decision
+// that was overturned once it became clear DashboardShell shows a language toggle here — so a
+// building admin was offered a Bangla switch that changed nothing. See scripts/check-i18n.mjs.
 // =====================================================================================
 
 export function BuildingSetupTab() {
+  const t = useT();
   const [amenities, setAmenities] = useState<BuildingAmenity[]>([]);
   const [sources, setSources] = useState<BuildingIncomeSource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +61,7 @@ export function BuildingSetupTab() {
 
   async function removeAmenity(a: BuildingAmenity) {
     const ok = await confirmDialog({
-      title: `Delete "${a.name}"?`,
+      title: t("Delete {0}?").replace("{0}", `"${a.name}"`),
       message: "Past expense entries keep their category text — this only removes the shortcut.",
       confirmLabel: "Delete",
       danger: true,
@@ -66,7 +70,7 @@ export function BuildingSetupTab() {
     try {
       await rentMasterFetch(`/api/admin/building/amenities/${a.id}`, { method: "DELETE" });
       setAmenities((list) => list.filter((x) => x.id !== a.id));
-      toast.success("Amenity deleted.");
+      toast.success(t("Amenity deleted."));
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -74,7 +78,7 @@ export function BuildingSetupTab() {
 
   async function removeSource(s: BuildingIncomeSource) {
     const ok = await confirmDialog({
-      title: `Delete "${s.name}"?`,
+      title: t("Delete {0}?").replace("{0}", `"${s.name}"`),
       message: "Past income entries keep their category text — this only removes the shortcut.",
       confirmLabel: "Delete",
       danger: true,
@@ -83,7 +87,7 @@ export function BuildingSetupTab() {
     try {
       await rentMasterFetch(`/api/admin/building/income-sources/${s.id}`, { method: "DELETE" });
       setSources((list) => list.filter((x) => x.id !== s.id));
-      toast.success("Income source deleted.");
+      toast.success(t("Income source deleted."));
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -137,7 +141,7 @@ export function BuildingSetupTab() {
       <Card className="p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="flex items-center gap-2 text-sm font-semibold text-heading">
-            <Wrench className="h-4 w-4 text-primary" /> Amenities
+            <Wrench className="h-4 w-4 text-primary" /> {t("Amenities")}
           </h3>
           <Button size="sm" icon={Plus} onClick={() => setAmenityOpen(true)}>Add</Button>
         </div>
@@ -158,13 +162,13 @@ export function BuildingSetupTab() {
                     {!a.is_active && <Badge tone="slate">Inactive</Badge>}
                   </div>
                   <div className="text-xs text-muted">
-                    {formatCurrency(Number(a.monthly_cost || 0))} / month
+                    {t("{0} / month").replace("{0}", formatCurrency(Number(a.monthly_cost || 0)))}
                     {a.description ? ` · ${a.description}` : ""}
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <Button size="sm" variant="ghost" icon={Power} onClick={() => toggleAmenity(a)}>
-                    {a.is_active ? "Disable" : "Enable"}
+                    {t(a.is_active ? "Disable" : "Enable")}
                   </Button>
                   <Button size="sm" variant="secondary" icon={Pencil} onClick={() => setEditingAmenity(a)}>Edit</Button>
                   <Button size="sm" variant="danger" icon={Trash2} onClick={() => removeAmenity(a)}>Delete</Button>
@@ -179,7 +183,7 @@ export function BuildingSetupTab() {
       <Card className="p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h3 className="flex items-center gap-2 text-sm font-semibold text-heading">
-            <TrendingUp className="h-4 w-4 text-primary" /> Income sources
+            <TrendingUp className="h-4 w-4 text-primary" /> {t("Income sources")}
           </h3>
           <Button size="sm" icon={Plus} onClick={() => setSourceOpen(true)}>Add</Button>
         </div>
@@ -207,7 +211,7 @@ export function BuildingSetupTab() {
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <Button size="sm" variant="ghost" icon={Power} onClick={() => toggleSource(s)}>
-                    {s.is_active ? "Disable" : "Enable"}
+                    {t(s.is_active ? "Disable" : "Enable")}
                   </Button>
                   <Button size="sm" variant="secondary" icon={Pencil} onClick={() => setEditingSource(s)}>Edit</Button>
                   <Button size="sm" variant="danger" icon={Trash2} onClick={() => removeSource(s)}>Delete</Button>
@@ -242,6 +246,7 @@ function AmenityModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const t = useT();
   const [form, setForm] = useState({ name: "", description: "", monthlyCost: "" });
   const [saving, setSaving] = useState(false);
 
@@ -255,7 +260,7 @@ function AmenityModal({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { toast.error("Give the amenity a name."); return; }
+    if (!form.name.trim()) { toast.error(t("Give the amenity a name.")); return; }
     try {
       setSaving(true);
       const payload = {
@@ -274,7 +279,7 @@ function AmenityModal({
       }
       await onSaved();
       onClose();
-      toast.success(amenity ? "Amenity updated." : "Amenity added.");
+      toast.success(t(amenity ? "Amenity updated." : "Amenity added."));
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -313,6 +318,7 @@ function IncomeSourceModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const t = useT();
   const [form, setForm] = useState({ name: "", category: "", defaultAmount: "", note: "" });
   const [saving, setSaving] = useState(false);
 
@@ -327,7 +333,7 @@ function IncomeSourceModal({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { toast.error("Give the income source a name."); return; }
+    if (!form.name.trim()) { toast.error(t("Give the income source a name.")); return; }
     try {
       setSaving(true);
       const payload = {
@@ -347,7 +353,7 @@ function IncomeSourceModal({
       }
       await onSaved();
       onClose();
-      toast.success(source ? "Income source updated." : "Income source added.");
+      toast.success(t(source ? "Income source updated." : "Income source added."));
     } catch (e: any) {
       toast.error(e.message);
     } finally {

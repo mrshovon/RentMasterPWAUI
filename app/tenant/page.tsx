@@ -256,17 +256,22 @@ export default function TenantDashboard() {
           {metrics.dueLedger && (
             <Card className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-sm font-bold text-fg">Rent for {formatMonth(metrics.dueLedger.billing_month, lang)}</div>
+                <div className="text-sm font-bold text-fg">{t("Rent for {0}").replace("{0}", formatMonth(metrics.dueLedger.billing_month, lang))}</div>
                 <div className="mt-1 text-xs text-muted">
-                  Rent {formatCurrency(metrics.dueLedger.rent_amount)} · Service {formatCurrency(metrics.dueLedger.service_charge)}
-                  {Number(metrics.dueLedger.extra_charge) > 0 && ` · Extra ${formatCurrency(metrics.dueLedger.extra_charge)}`}
+                  {t("Rent {0} · Service {1}")
+                    .replace("{0}", formatCurrency(metrics.dueLedger.rent_amount))
+                    .replace("{1}", formatCurrency(metrics.dueLedger.service_charge))}
+                  {Number(metrics.dueLedger.extra_charge) > 0 &&
+                    ` · ${t("Extra {0}").replace("{0}", formatCurrency(metrics.dueLedger.extra_charge))}`}
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1 text-right">
                 <div className="text-2xl font-black text-success">{formatCurrency(metrics.amountDue)}</div>
                 {Number(metrics.dueLedger.amount_paid) > 0 && (
                   <div className="text-[11px] text-muted">
-                    {formatCurrency(metrics.dueLedger.amount_paid)} of {formatCurrency(metrics.dueLedger.total_payable)} paid
+                    {t("{0} of {1} paid")
+                      .replace("{0}", formatCurrency(metrics.dueLedger.amount_paid))
+                      .replace("{1}", formatCurrency(metrics.dueLedger.total_payable))}
                   </div>
                 )}
                 <Badge tone={statusTone[metrics.dueLedger.payment_status]}>{metrics.dueLedger.payment_status}</Badge>
@@ -325,7 +330,7 @@ export default function TenantDashboard() {
                           <td className="p-4 text-fg">{formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}</td>
                           <td className="p-4 font-bold text-success">
                             <button type="button" onClick={() => setBreakdown(l)}
-                              className="inline-flex items-center gap-1.5 transition hover:text-success" title="View charge breakdown">
+                              className="inline-flex items-center gap-1.5 transition hover:text-success" title={t("View charge breakdown")}>
                               {formatCurrency(l.total_payable)}
                               <Info className="h-3.5 w-3.5 text-subtle" />
                             </button>
@@ -343,7 +348,7 @@ export default function TenantDashboard() {
                               {/* Any recorded payment is worth a receipt — it's the tenant's proof
                                   of what they've handed over so far, settled or not. */}
                               {Number(l.amount_paid) > 0 && (
-                                <button title="Download receipt" onClick={() => openTenantReceipt(l)}
+                                <button title={t("Download receipt")} onClick={() => openTenantReceipt(l)}
                                   className="inline-flex items-center gap-1 rounded-lg bg-surface-2/80 px-2.5 py-1.5 text-xs font-semibold text-heading transition hover:bg-surface-2/80">
                                   <Receipt className="h-3.5 w-3.5" /> Receipt
                                 </button>
@@ -366,17 +371,19 @@ export default function TenantDashboard() {
                     </div>
                     <div className="mt-2 flex items-end justify-between">
                       <span className="text-xs text-muted">
-                        Rent {formatCurrency(l.rent_amount)} + {formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}
+                        {t("Rent {0} + {1}")
+                          .replace("{0}", formatCurrency(l.rent_amount))
+                          .replace("{1}", formatCurrency(Number(l.service_charge) + Number(l.extra_charge)))}
                       </span>
                       <button type="button" onClick={() => setBreakdown(l)}
-                        className="inline-flex items-center gap-1 text-lg font-black text-success" title="View charge breakdown">
+                        className="inline-flex items-center gap-1 text-lg font-black text-success" title={t("View charge breakdown")}>
                         {formatCurrency(l.total_payable)}
                         <Info className="h-3.5 w-3.5 text-subtle" />
                       </button>
                     </div>
                     <div className="mt-3 flex items-center justify-end gap-2">
                       {Number(l.amount_paid) > 0 && (
-                        <button title="Download receipt" onClick={() => openTenantReceipt(l)}
+                        <button title={t("Download receipt")} onClick={() => openTenantReceipt(l)}
                           className="inline-flex items-center gap-1 rounded-lg bg-surface-2/80 px-2.5 py-1.5 text-xs font-semibold text-heading">
                           <Receipt className="h-3.5 w-3.5" /> Receipt
                         </button>
@@ -704,6 +711,7 @@ function ServiceChargeBreakdownModal({
   breakdown: ServiceChargeBreakdown | null;
   serviceCharge?: number;
 }) {
+  const t = useT();
   const items = breakdown
     ? SERVICE_CHARGE_ITEMS
         .map((it) => ({ ...it, amount: Number(breakdown[it.key] || 0) }))
@@ -716,7 +724,7 @@ function ServiceChargeBreakdownModal({
       subtitle="What your monthly service charge covers.">
       {items.length === 0 ? (
         <p className="text-sm text-muted">
-          Your owner hasn&apos;t published a service charge breakdown for your unit yet.
+          {t("Your owner hasn't published a service charge breakdown for your unit yet.")}
         </p>
       ) : (
         <div className="space-y-1">
@@ -727,7 +735,7 @@ function ServiceChargeBreakdownModal({
           <BreakRow label="Total service charge" value={formatCurrency(total)} strong />
           {typeof serviceCharge === "number" && Math.abs(serviceCharge - total) > 0.01 && (
             <p className="pt-2 text-[11px] text-subtle">
-              Your billed service charge is {formatCurrency(serviceCharge)}.
+              {t("Your billed service charge is {0}.").replace("{0}", formatCurrency(serviceCharge))}
             </p>
           )}
         </div>
@@ -789,7 +797,7 @@ function BillPaymentAction({
   if (ledger.payment_status === "paid") {
     return (
       <span className="inline-flex items-center gap-1 text-xs font-semibold text-success">
-        <CheckCircle2 className="h-3.5 w-3.5" /> Confirmed
+        <CheckCircle2 className="h-3.5 w-3.5" /> {t("Confirmed")}
       </span>
     );
   }
@@ -801,7 +809,7 @@ function BillPaymentAction({
   if (ledger.payment_status === "partial") {
     return (
       <span className="text-xs font-semibold text-danger">
-        {formatCurrency(Math.max(0, Number(ledger.total_payable || 0) - Number(ledger.amount_paid || 0)))} still due
+        {t("{0} still due").replace("{0}", formatCurrency(Math.max(0, Number(ledger.total_payable || 0) - Number(ledger.amount_paid || 0))))}
       </span>
     );
   }
@@ -894,7 +902,7 @@ function TicketModal({
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {items.map((it) => (
               <div key={it.key} className="relative aspect-square overflow-hidden rounded-xl border border-line/[0.08]">
-                <img src={it.preview} alt="Attachment preview" className="h-full w-full object-cover" />
+                <img src={it.preview} alt={t("Attachment preview")} className="h-full w-full object-cover" />
                 <button type="button" onClick={() => removeItem(it.key)}
                   className="absolute right-1 top-1 rounded-lg bg-black/60 p-1 text-heading transition hover:bg-black/80">
                   <X className="h-3.5 w-3.5" />

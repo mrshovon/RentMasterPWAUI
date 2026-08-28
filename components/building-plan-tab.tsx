@@ -17,6 +17,7 @@ import {
 import {
   Card, Badge, Button, Modal, Field, TextInput, TextArea, Select, PageHeader, EmptyState, StatCard,
 } from "./ui";
+import { useT } from "../lib/i18n";
 
 // =====================================================================================
 // 🏢💳 BUILDING ADMIN — PLAN
@@ -35,7 +36,9 @@ import {
 // live, so gating it behind the lock it exists to lift would be a closed loop — the same
 // standing exception the backend route makes.
 //
-// English-only, like the rest of the building console. See scripts/check-i18n.mjs.
+// Translated, like the rest of the app. This console was English-only by a standing decision
+// that was overturned once it became clear DashboardShell shows a language toggle here — so a
+// building admin was offered a Bangla switch that changed nothing. See scripts/check-i18n.mjs.
 // =====================================================================================
 
 const METHODS = [
@@ -67,6 +70,7 @@ const REQUEST_STATUS_LABEL: Record<string, string> = {
 const OPEN_STATUSES = ["new", "in_progress", "quoted"];
 
 export function BuildingPlanTab({ building }: { building: Building | null }) {
+  const t = useT();
   const [data, setData] = useState<BuildingPlanResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [renewOpen, setRenewOpen] = useState(false);
@@ -185,10 +189,12 @@ export function BuildingPlanTab({ building }: { building: Building | null }) {
       ) : (
         <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
           <div>
-            <div className="text-sm font-bold text-heading">Nothing outstanding</div>
+            <div className="text-sm font-bold text-heading">{t("Nothing outstanding")}</div>
             <div className="text-xs text-muted">
-              You have no unpaid invoice right now.
-              {state.expiryDate ? ` Your plan runs to ${formatDate(state.expiryDate)}.` : ""}
+              {t("You have no unpaid invoice right now.")}
+              {state.expiryDate
+                ? ` ${t("Your plan runs to {0}.").replace("{0}", formatDate(state.expiryDate))}`
+                : ""}
             </div>
           </div>
           <Button
@@ -236,37 +242,46 @@ export function BuildingPlanTab({ building }: { building: Building | null }) {
 // -------------------------------------------------------------------------------------
 
 export function BuildingPlanBanner({ state, onOpen }: { state: BuildingPlanState | null; onOpen: () => void }) {
+  const t = useT();
   if (!state) return null;
 
   let tone: "rose" | "amber" | null = null;
   let icon = AlertTriangle;
   let msg = "";
 
+  // Counted sentences carry BOTH English forms as their own dictionary keys and fill {0} after
+  // the lookup. The old `day${n === 1 ? "" : "s"}` concatenation is untranslatable by
+  // construction: Bangla has no -s plural and puts the number elsewhere in the clause, so a
+  // sentence assembled from fragments can never come out as one grammatical Bangla sentence.
   if (state.status === "locked") {
     tone = "rose";
     icon = ShieldAlert;
-    msg =
+    msg = t(
       state.lockReason === "revoked"
         ? "Your plan has been suspended. Contact support to restore access."
-        : "Your plan has lapsed. You and your flat owners are read-only until it is renewed.";
+        : "Your plan has lapsed. You and your flat owners are read-only until it is renewed.");
   } else if (state.unpaidWindow) {
     tone = "amber";
     icon = Clock;
-    msg = `Payment is due. ${state.daysToPay} day${state.daysToPay === 1 ? "" : "s"} left${
-      state.payBy ? ` (by ${formatDate(state.payBy)})` : ""
-    } before you and your flat owners are locked.`;
+    const by = state.payBy ? t(" (by {0})").replace("{0}", formatDate(state.payBy)) : "";
+    msg = t(state.daysToPay === 1
+      ? "Payment is due. {0} day left{1} before you and your flat owners are locked."
+      : "Payment is due. {0} days left{1} before you and your flat owners are locked.")
+      .replace("{0}", String(state.daysToPay)).replace("{1}", by);
   } else if (state.status === "grace") {
     tone = "amber";
     icon = Clock;
-    msg = `Your plan has expired. ${state.daysLeftInGrace} day${
-      state.daysLeftInGrace === 1 ? "" : "s"
-    } of grace left to renew before management is locked.`;
+    msg = t(state.daysLeftInGrace === 1
+      ? "Your plan has expired. {0} day of grace left to renew before management is locked."
+      : "Your plan has expired. {0} days of grace left to renew before management is locked.")
+      .replace("{0}", String(state.daysLeftInGrace));
   } else if (state.warnExpiringSoon) {
     tone = "amber";
     icon = Clock;
-    msg = `Your plan expires in ${state.daysUntilExpiry} day${
-      state.daysUntilExpiry === 1 ? "" : "s"
-    }. Request a renewal to avoid interruption.`;
+    msg = t(state.daysUntilExpiry === 1
+      ? "Your plan expires in {0} day. Request a renewal to avoid interruption."
+      : "Your plan expires in {0} days. Request a renewal to avoid interruption.")
+      .replace("{0}", String(state.daysUntilExpiry));
   }
 
   if (!tone) return null;
@@ -282,7 +297,7 @@ export function BuildingPlanBanner({ state, onOpen }: { state: BuildingPlanState
       <Icon className="h-5 w-5 shrink-0" />
       <span className="min-w-0 flex-1 text-sm font-semibold">{msg}</span>
       <Button size="sm" variant="secondary" onClick={onOpen}>
-        {state.status === "locked" ? "Renew now" : "View plan"}
+        {t(state.status === "locked" ? "Renew now" : "View plan")}
       </Button>
     </div>
   );
@@ -332,6 +347,7 @@ function InvoiceCard({
   onClaim: () => void;
   claimPending: boolean;
 }) {
+  const t = useT();
   const balance = Number(invoice.balance ?? Math.max(0, Number(invoice.total_payable) - Number(invoice.amount_paid)));
 
   return (
@@ -339,9 +355,9 @@ function InvoiceCard({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/[0.06] p-5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-heading">Invoice #{invoice.invoice_no}</span>
+            <span className="text-sm font-bold text-heading">{t("Invoice #{0}").replace("{0}", String(invoice.invoice_no))}</span>
             <Badge tone={invoice.payment_status === "partial" ? "amber" : "rose"}>
-              {invoice.payment_status === "partial" ? "Partly paid" : "Unpaid"}
+              {t(invoice.payment_status === "partial" ? "Partly paid" : "Unpaid")}
             </Badge>
             <Badge tone="indigo">{invoice.kind === "initial" ? "First term" : "Renewal"}</Badge>
           </div>
@@ -380,7 +396,7 @@ function InvoiceCard({
 
       {invoice.terms && (
         <div className="border-t border-line/[0.06] px-5 py-4">
-          <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-muted">Terms</div>
+          <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-muted">{t("Terms")}</div>
           <p className="whitespace-pre-wrap text-xs leading-relaxed text-fg">{invoice.terms}</p>
         </div>
       )}
@@ -400,9 +416,10 @@ function InvoiceCard({
 }
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  const t = useT();
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className={strong ? "font-semibold text-heading" : "text-muted"}>{label}</span>
+      <span className={strong ? "font-semibold text-heading" : "text-muted"}>{t(label)}</span>
       <span className={strong ? "font-extrabold text-heading" : "text-fg"}>{value}</span>
     </div>
   );
@@ -415,13 +432,14 @@ function RequestsCard({
   openRenewal: BuildingPlanRequest | null;
   onRequest: () => void;
 }) {
+  const t = useT();
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/[0.06] p-5">
         <div>
-          <div className="text-sm font-bold text-heading">Requests</div>
+          <div className="text-sm font-bold text-heading">{t("Requests")}</div>
           <div className="text-xs text-muted">
-            Ask us for another year, or to add maintenance &amp; support or extra modules.
+            {t("Ask us for another year, or to add maintenance & support or extra modules.")}
           </div>
         </div>
         <Button icon={RefreshCw} onClick={onRequest} disabled={!!openRenewal}>
@@ -430,7 +448,7 @@ function RequestsCard({
       </div>
 
       {requests.length === 0 ? (
-        <div className="p-5 text-sm text-muted">Nothing requested yet.</div>
+        <div className="p-5 text-sm text-muted">{t("Nothing requested yet.")}</div>
       ) : (
         <div className="divide-y divide-line/[0.04]">
           {requests.map((r) => (
@@ -454,7 +472,7 @@ function RequestsCard({
                   dead end, and this is the only channel they have. */}
               {r.admin_notes && (
                 <p className="mt-2 rounded-lg bg-overlay/[0.03] p-2 text-xs text-fg">
-                  <span className="font-semibold">Our reply: </span>{r.admin_notes}
+                  <span className="font-semibold">{t("Our reply")}: </span>{r.admin_notes}
                 </p>
               )}
             </div>
@@ -471,12 +489,13 @@ function PastInvoicesCard({
   invoices: BuildingPlanInvoice[];
   onPrint: (i: BuildingPlanInvoice) => void;
 }) {
+  const t = useT();
   const settled = invoices.filter((i) => i.payment_status === "paid" || i.status === "void");
   if (!settled.length) return null;
 
   return (
     <Card className="overflow-hidden">
-      <div className="border-b border-line/[0.06] p-5 text-sm font-bold text-heading">Past invoices</div>
+      <div className="border-b border-line/[0.06] p-5 text-sm font-bold text-heading">{t("Past invoices")}</div>
       <div className="divide-y divide-line/[0.04]">
         {settled.map((inv) => (
           <div key={inv.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
@@ -511,15 +530,16 @@ function ReceiptsCard({
   invoices: Map<string, BuildingPlanInvoice>;
   onPrint: (p: BuildingPlanPayment) => void;
 }) {
+  const t = useT();
   return (
     <Card className="overflow-hidden">
       <div className="border-b border-line/[0.06] p-5">
-        <div className="text-sm font-bold text-heading">Receipts</div>
-        <div className="text-xs text-muted">Every payment we have recorded against your plan.</div>
+        <div className="text-sm font-bold text-heading">{t("Receipts")}</div>
+        <div className="text-xs text-muted">{t("Every payment we have recorded against your plan.")}</div>
       </div>
 
       {payments.length === 0 ? (
-        <div className="p-5 text-sm text-muted">No payments recorded yet.</div>
+        <div className="p-5 text-sm text-muted">{t("No payments recorded yet.")}</div>
       ) : (
         <div className="divide-y divide-line/[0.04]">
           {payments.map((p) => {
@@ -527,12 +547,12 @@ function ReceiptsCard({
             return (
               <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-heading">Receipt #{p.payment_no}</div>
+                  <div className="text-sm font-semibold text-heading">{t("Receipt #{0}").replace("{0}", String(p.payment_no))}</div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-muted">
                     <span>{formatDate(p.paid_on)}</span>
-                    <span>{METHODS.find((m) => m.value === p.method)?.label || p.method}</span>
+                    <span>{t(METHODS.find((m) => m.value === p.method)?.label || p.method)}</span>
                     {p.reference && <span className="min-w-0 break-words">{p.reference}</span>}
-                    {inv && <span>Invoice #{inv.invoice_no}</span>}
+                    {inv && <span>{t("Invoice #{0}").replace("{0}", String(inv.invoice_no))}</span>}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">

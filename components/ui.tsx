@@ -409,7 +409,7 @@ export function Modal({
               <button
                 onClick={onClose}
                 className="rounded-lg p-1.5 text-muted transition hover:bg-overlay/[0.06] hover:text-heading"
-                aria-label="Close"
+                aria-label={t("Close")}
               >
                 <X className="h-5 w-5" />
               </button>

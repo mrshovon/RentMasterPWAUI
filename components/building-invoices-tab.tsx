@@ -16,6 +16,7 @@ import { PrintModal } from "./print-modal";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, Select, PageHeader, EmptyState,
 } from "./ui";
+import { useT } from "../lib/i18n";
 
 // =====================================================================================
 // 🏢 BUILDING ADMIN — SERVICE CHARGE
@@ -47,6 +48,7 @@ export function BuildingInvoicesTab({
   building: Building | null;
   signatureUrl?: string | null;
 }) {
+  const t = useT();
   const [month, setMonth] = useState(currentBillingMonth());
   const [invoices, setInvoices] = useState<BuildingServiceInvoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -329,11 +331,11 @@ export function BuildingInvoicesTab({
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
               <tr>
-                <th className="p-4">Owner</th>
-                <th className="p-4">Payable</th>
-                <th className="p-4">Paid</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="p-4">{t("Owner")}</th>
+                <th className="p-4">{t("Payable")}</th>
+                <th className="p-4">{t("Paid")}</th>
+                <th className="p-4">{t("Status")}</th>
+                <th className="p-4 text-right">{t("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -350,12 +352,12 @@ export function BuildingInvoicesTab({
                       {formatCurrency(Number(inv.total_payable || 0))}
                       {Number(inv.extra_charge || 0) > 0 && (
                         <div className="text-xs text-muted">
-                          incl. extra {formatCurrency(Number(inv.extra_charge))}
+                          {t("incl. extra {0}").replace("{0}", formatCurrency(Number(inv.extra_charge)))}
                         </div>
                       )}
                       {Number(inv.discount || 0) > 0 && (
                         <div className="text-xs text-muted">
-                          less discount {formatCurrency(Number(inv.discount))}
+                          {t("less discount {0}").replace("{0}", formatCurrency(Number(inv.discount)))}
                         </div>
                       )}
                     </td>
@@ -447,6 +449,7 @@ function IssueInvoiceModal({
   onClose: () => void;
   onIssued: () => Promise<void>;
 }) {
+  const t = useT();
   const empty = {
     ownerId: "", serviceCharge: "", extraCharge: "", extraChargeRemarks: "", discount: "", note: "",
   };
@@ -491,11 +494,12 @@ function IssueInvoiceModal({
   const total = Number(form.serviceCharge || 0) + Number(form.extraCharge || 0) - Number(form.discount || 0);
 
   return (
-    <Modal open={open} onClose={onClose} title="Issue an invoice" subtitle={`Billing month ${month}`}>
+    <Modal open={open} onClose={onClose} title="Issue an invoice"
+      subtitle={t("Billing month {0}").replace("{0}", month)}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Owner" required>
           <Select required value={form.ownerId} onChange={(e) => pickOwner(e.target.value)}>
-            <option value="">Choose an owner…</option>
+            <option value="">{t("Choose an owner…")}</option>
             {owners.map((o) => (
               <option key={o.owner_id} value={o.owner_id}>
                 {`${o.name || o.email}${o.unit_label ? ` — ${o.unit_label}` : ""}`}
@@ -633,9 +637,10 @@ function ChargeFields({
 /** The server recomputes this from the charge lines and clamps it at zero — shown here only so
  *  the number is not a surprise after saving. */
 function TotalRow({ total }: { total: number }) {
+  const t = useT();
   return (
     <div className="rounded-xl bg-surface-2 px-4 py-3 text-sm">
-      <span className="text-muted">Total payable: </span>
+      <span className="text-muted">{t("Total payable")}: </span>
       <strong className="text-heading">{formatCurrency(Math.max(0, total))}</strong>
     </div>
   );
@@ -654,6 +659,7 @@ function RecordPaymentModal({
    *  refreshed row rather than this modal's pre-payment copy of it. */
   onReceipt: (invoiceId: string) => void;
 }) {
+  const t = useT();
   const outstanding = invoice
     ? Math.max(0, Number(invoice.total_payable || 0) - Number(invoice.amount_paid || 0))
     : 0;
@@ -719,11 +725,11 @@ function RecordPaymentModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Method">
             <Select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
-              <option value="cash">Cash</option>
+              <option value="cash">{t("Cash")}</option>
               <option value="bkash">bKash</option>
               <option value="nagad">Nagad</option>
-              <option value="bank">Bank</option>
-              <option value="other">Other</option>
+              <option value="bank">{t("Bank")}</option>
+              <option value="other">{t("Other")}</option>
             </Select>
           </Field>
           <Field label="Note">
@@ -731,7 +737,7 @@ function RecordPaymentModal({
           </Field>
         </div>
         <p className="text-xs text-muted">
-          This also books an income entry into your default account, if Accounts is set up.
+          {t("This also books an income entry into your default account, if Accounts is set up.")}
         </p>
         <Button type="submit" loading={saving} className="w-full">Record payment</Button>
       </form>
@@ -747,6 +753,7 @@ function PaymentHistoryModal({
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
+  const t = useT();
   const [payments, setPayments] = useState<BuildingServicePayment[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -800,9 +807,9 @@ function PaymentHistoryModal({
       subtitle={ownerName && invoice ? `${ownerName} · ${formatMonth(invoice.billing_month)}` : undefined}
     >
       {loading ? (
-        <p className="py-6 text-center text-sm text-muted">Loading…</p>
+        <p className="py-6 text-center text-sm text-muted">{t("Loading…")}</p>
       ) : payments.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted">Nothing recorded against this invoice yet.</p>
+        <p className="py-6 text-center text-sm text-muted">{t("Nothing recorded against this invoice yet.")}</p>
       ) : (
         <div className="space-y-2">
           {payments.map((p) => (

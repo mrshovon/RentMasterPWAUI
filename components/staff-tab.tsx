@@ -52,6 +52,7 @@ export function StaffTab({
   /** Opens the "contact us" enquiry modal owned by the page. */
   onContact: () => void;
 }) {
+  const t = useT();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [payments, setPayments] = useState<StaffPayment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +139,7 @@ export function StaffTab({
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-3 py-20 text-sm text-muted">
-        <Spinner /> Loading your staff…
+        <Spinner /> {t("Loading your staff…")}
       </div>
     );
   }
@@ -230,8 +231,7 @@ function StaffLocked({ onContact }: { onContact: () => void }) {
           </div>
           <h2 className="text-xl font-extrabold tracking-tight text-heading">{t("Staff is an add-on")}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            Keep a record of every caretaker, guard and cleaner you employ — their salary, the
-            property they cover, and every payment you make them.
+            {t("Keep a record of every caretaker, guard and cleaner you employ — their salary, the property they cover, and every payment you make them.")}
           </p>
         </div>
         <div className="space-y-4 p-6">
@@ -274,6 +274,7 @@ function StaffCard({
   onToggleActive: () => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   return (
     <Card className="p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -296,16 +297,16 @@ function StaffCard({
               </span>
               {s.joining_date && (
                 <span className="flex items-center gap-1">
-                  <CalendarClock className="h-3.5 w-3.5" />Joined {formatDate(s.joining_date)}
+                  <CalendarClock className="h-3.5 w-3.5" />{t("Joined {0}").replace("{0}", formatDate(s.joining_date))}
                 </span>
               )}
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
               <span className="text-muted">
-                Salary <span className="font-semibold text-fg">{formatCurrency(s.monthly_salary)}</span>/mo
+                {t("Salary {0}/mo").replace("{0}", formatCurrency(s.monthly_salary))}
               </span>
               <span className="text-muted">
-                Paid to date <span className="font-semibold text-success">{formatCurrency(paidTotal)}</span>
+                {t("Paid to date {0}").replace("{0}", formatCurrency(paidTotal))}
               </span>
             </div>
           </div>

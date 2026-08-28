@@ -90,7 +90,7 @@ export function DashboardShell({
                 BARI360
               </div>
               <div className="text-[10px] uppercase tracking-widest text-subtle">
-                {roleLabel}
+                {t(roleLabel)}
               </div>
             </div>
           </div>
@@ -116,7 +116,7 @@ export function DashboardShell({
                 )}
               >
                 <Icon className="h-[18px] w-[18px] shrink-0" />
-                <span className="flex-1 text-left">{item.label}</span>
+                <span className="flex-1 text-left">{t(item.label)}</span>
                 {item.locked && (
                   <Crown
                     className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-btn-ink" : "text-warning")}
@@ -169,12 +169,12 @@ export function DashboardShell({
           <div className="flex items-center gap-2 md:hidden">
             <img src="/logo.png" alt="Bari360" className="h-8 w-8 rounded-lg object-cover" />
             <span className="text-sm font-bold text-fg">
-              {activeTab?.label ?? "Bari360"}
+              {activeTab ? t(activeTab.label) : "Bari360"}
             </span>
           </div>
           {/* Desktop: name the current section, so the bar isn't a lone cluster of buttons. */}
           <span className="hidden text-sm font-bold text-fg md:block">
-            {activeTab?.label ?? roleLabel}
+            {t(activeTab?.label ?? roleLabel)}
           </span>
           <div className="flex items-center gap-1">
             <LanguageToggle variant="icon" />
@@ -250,7 +250,7 @@ export function DashboardShell({
                         </span>
                       )}
                     </span>
-                    <span className="max-w-full truncate">{item.label}</span>
+                    <span className="max-w-full truncate">{t(item.label)}</span>
                   </button>
                 );
               })}
@@ -292,7 +292,7 @@ export function DashboardShell({
                   </span>
                 )}
               </span>
-              <span className="max-w-full truncate px-1">{item.label}</span>
+              <span className="max-w-full truncate px-1">{t(item.label)}</span>
               {isActive && (
                 <span className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-primary" />
               )}

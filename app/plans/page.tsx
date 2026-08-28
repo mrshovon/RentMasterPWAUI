@@ -110,7 +110,7 @@ export default function PlansPage() {
               return (
                 <Card key={tier.id} className={`p-6 ${contact ? "border-accent/30" : ""}`}>
                   <div className="flex items-center justify-between">
-                    <div className="text-base font-black text-heading">{tier.name}</div>
+                    <div className="text-base font-black text-heading">{t(tier.name)}</div>
                     {contact ? <Badge tone="cyan">Custom</Badge> : price === 0 ? <Badge tone="emerald">Free</Badge> : null}
                   </div>
 
@@ -124,11 +124,15 @@ export default function PlansPage() {
                   {!contact && price > 0 && Number(tier.discount_percent || 0) > 0 && (
                     <div className="mt-1 flex items-center gap-2 text-xs">
                       <span className="text-subtle line-through">{formatCurrency(price)}</span>
-                      <Badge tone="emerald">Save {Number(tier.discount_percent)}%</Badge>
+                      <Badge tone="emerald">{t("Save {0}%").replace("{0}", String(Number(tier.discount_percent)))}</Badge>
                     </div>
                   )}
 
-                  {tier.description && <p className="mt-2 text-xs text-muted">{tier.description}</p>}
+                  {/* Tier text comes from the database, so the English string is its own
+                      dictionary key. Editing a plan's wording in the admin console creates a
+                      key nobody has translated yet and the card falls back to English --
+                      by design, not a bug. Add the new string to lib/locales/bn.ts. */}
+                  {tier.description && <p className="mt-2 text-xs text-muted">{t(tier.description)}</p>}
 
                   <ul className="mt-4 space-y-1.5 text-sm text-fg">
                     {contact ? (

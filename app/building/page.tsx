@@ -17,6 +17,7 @@ import { useRevalidateOnFocus } from "../../lib/use-revalidate";
 import { Building, BuildingOwner, BuildingPlanState, Property } from "../../types/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
+import { useT } from "../../lib/i18n";
 import { AppSettingsCard } from "../../components/app-settings-card";
 import { SignatureCard } from "../../components/signature-card";
 import { BuildingInvoicesTab } from "../../components/building-invoices-tab";
@@ -50,6 +51,7 @@ import { validateEmail, validatePhone, memberOwnerLoginId } from "../../lib/vali
 // =====================================================================================
 
 export default function BuildingAdminDashboard() {
+  const t = useT();
   const { session, checkingSession, logout } = useSessionGuard("building");
   usePresenceHeartbeat(!!session);
 
@@ -150,7 +152,7 @@ export default function BuildingAdminDashboard() {
   // The building admin is already on the top plan, so there is no upsell to show them. If a
   // module is somehow off, the honest answer is "ask support", not "buy an upgrade".
   const contactSupport = () =>
-    toast.info("This module is part of the Whole Building plan. Contact support if it is switched off.");
+    toast.info(t("This module is part of the Whole Building plan. Contact support if it is switched off."));
 
   if (checkingSession || !session) return <FullScreenLoader label="Checking your session" />;
   if (loading) return <FullScreenLoader label="Loading your building" />;
@@ -238,6 +240,7 @@ function OverviewTab({
   metrics: { owners: number; active: number; monthlyServiceCharge: number };
   onAdd: () => void;
 }) {
+  const t = useT();
   return (
     <div className="space-y-6">
       <PageHeader
@@ -259,13 +262,13 @@ function OverviewTab({
       </div>
 
       <Card className="p-5">
-        <h3 className="text-sm font-semibold text-heading">Your plan</h3>
+        <h3 className="text-sm font-semibold text-heading">{t("Your plan")}</h3>
+        {/* One key, with the plan name slotted in: Bangla puts the name elsewhere in the
+            clause, so splitting the sentence around <strong> would fix English word order
+            onto Bangla words. The name loses its bold; the sentence stays grammatical. */}
         <p className="mt-2 text-sm text-muted">
-          This building runs on the <strong className="text-fg">Whole Building</strong> plan. Every
-          owner you create here is covered by it — they never see a price or a payment screen, and
-          they are not capped at the free limits. The plan also covers software maintenance and
-          support, app updates, help with content changes, and custom features built for your
-          building. It does not cover building or property maintenance.
+          {t("This building runs on the {0} plan. Every owner you create here is covered by it — they never see a price or a payment screen, and they are not capped at the free limits. The plan also covers software maintenance and support, app updates, help with content changes, and custom features built for your building. It does not cover building or property maintenance.")
+            .replace("{0}", t("Whole Building"))}
         </p>
       </Card>
     </div>
@@ -285,6 +288,7 @@ function OwnersTab({
   onEdit: (o: BuildingOwner) => void;
   onReload: () => Promise<void>;
 }) {
+  const t = useT();
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -313,7 +317,9 @@ function OwnersTab({
     const ok = await confirmDialog({
       title: `Detach ${o.name || "this owner"}?`,
       message:
-        "Their login keeps working and nothing is deleted — but they leave your building, and their plan drops back to the free limits (2 properties, 2 tenants). Their login ID stays reserved to them, so the next owner of that flat gets a numbered variant of it.",
+        // Deliberately no figures. This said "(2 properties, 2 tenants)" while the live
+        // free_tier row allows 1/1 — a hardcoded limit in prose drifts the moment the plan does.
+        "Their login keeps working and nothing is deleted — but they leave your building, and their plan drops back to the free limits. Their login ID stays reserved to them, so the next owner of that flat gets a numbered variant of it.",
       confirmLabel: "Detach",
       danger: true,
     });
@@ -362,12 +368,12 @@ function OwnersTab({
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
               <tr>
-                <th className="p-4">Owner</th>
-                <th className="p-4">Flat</th>
-                <th className="p-4">Service charge</th>
-                <th className="p-4">Joined</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="p-4">{t("Owner")}</th>
+                <th className="p-4">{t("Flat")}</th>
+                <th className="p-4">{t("Service charge")}</th>
+                <th className="p-4">{t("Joined")}</th>
+                <th className="p-4">{t("Status")}</th>
+                <th className="p-4 text-right">{t("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -456,6 +462,7 @@ function ResetPasswordModal({
   onClose: () => void;
   onDone: (ownerId: string, password: string) => Promise<void>;
 }) {
+  const t = useT();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
@@ -485,7 +492,7 @@ function ResetPasswordModal({
         {/* Shown because the admin has to relay both halves, and for a generated login this is
             the only place the ID is visible next to the password it belongs to. */}
         <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-3">
-          <p className="text-[11px] uppercase tracking-wide text-muted">Login ID</p>
+          <p className="text-[11px] uppercase tracking-wide text-muted">{t("Login ID")}</p>
           <p className="mt-1 font-mono text-sm break-all text-heading">{owner?.email || "—"}</p>
         </div>
         <Field label="New password" required hint="At least 8 characters.">
@@ -495,7 +502,7 @@ function ResetPasswordModal({
           <PasswordInput required minLength={8} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </Field>
         <p className="text-xs text-muted">
-          Nothing is emailed — a building login has no inbox. Send the new password to them yourself.
+          {t("Nothing is emailed — a building login has no inbox. Send the new password to them yourself.")}
         </p>
         <div className="grid grid-cols-2 gap-3">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
@@ -519,6 +526,7 @@ function CreateOwnerModal({
   onClose: () => void;
   onCreated: () => Promise<void>;
 }) {
+  const t = useT();
   const empty = {
     name: "", email: "", phone: "", password: "",
     unitLabel: "", defaultServiceCharge: "",
@@ -586,12 +594,11 @@ function CreateOwnerModal({
       <Modal open={open} onClose={close} title="Owner created" subtitle="Pass these on — nothing was emailed.">
         <div className="space-y-4">
           <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
-            <p className="text-[11px] uppercase tracking-wide text-muted">Login ID for {issued.name}</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted">{t("Login ID for {0}").replace("{0}", issued.name)}</p>
             <p className="mt-1 font-mono text-sm break-all text-heading">{issued.loginId}</p>
           </div>
           <p className="text-sm text-muted">
-            This is what they sign in with, together with the password you set. It has no inbox —
-            if they forget the password, reset it from their row on the roster.
+            {t("This is what they sign in with, together with the password you set. It has no inbox — if they forget the password, reset it from their row on the roster.")}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <Button variant="secondary" onClick={() => {
@@ -626,9 +633,9 @@ function CreateOwnerModal({
         </div>
         {preview?.ok && (
           <div className="rounded-lg border border-line/[0.08] bg-overlay/[0.02] px-3 py-2 text-sm">
-            <span className="text-muted">Login: </span>
+            <span className="text-muted">{t("Login")}: </span>
             <span className="font-mono break-all text-heading">{preview.value}</span>
-            <span className="block text-xs text-muted">Confirmed when the account is created.</span>
+            <span className="block text-xs text-muted">{t("Confirmed when the account is created.")}</span>
           </div>
         )}
         <Field label="Temporary password" required hint="At least 8 characters. Send it to them separately.">
@@ -735,6 +742,7 @@ function SettingsTab({
   signatureUrl: string | null;
   onSignatureSaved: (url: string) => void;
 }) {
+  const t = useT();
   const [form, setForm] = useState({
     name: "", houseNo: "", address: "", city: "", signatoryName: "", signatoryTitle: "", notes: "",
   });
@@ -773,7 +781,7 @@ function SettingsTab({
 
       <Card className="p-5">
         <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-heading">
-          <Building2 className="h-4 w-4 text-primary" /> Building details
+          <Building2 className="h-4 w-4 text-primary" /> {t("Building details")}
         </h3>
         <form onSubmit={submit} className="space-y-4">
           <Field label="Building name" required>

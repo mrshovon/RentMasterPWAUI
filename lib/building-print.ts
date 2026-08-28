@@ -387,7 +387,7 @@ export function buildNoticeLetterHtml(o: NoticeLetterOptions): string {
   const ref = o.referenceNo || (o.noticeNo != null ? `#${o.noticeNo}` : "");
 
   const body = `
-${o.audienceLabel ? `<div class="sub"><b>${esc(tr("To"))}:</b> ${esc(o.audienceLabel)}</div>` : ""}
+${o.audienceLabel ? `<div class="sub"><b>${esc(tr("To"))}:</b> ${esc(tr(o.audienceLabel))}</div>` : ""}
 <p class="body-text">${esc(o.content)}</p>`;
 
   return shell({

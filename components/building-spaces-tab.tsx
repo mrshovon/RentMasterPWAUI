@@ -16,6 +16,7 @@ import { validatePhone } from "../lib/validate";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, Select, PageHeader, EmptyState,
 } from "./ui";
+import { useT } from "../lib/i18n";
 
 // =====================================================================================
 // 🏢 BUILDING ADMIN — SPACES, TENANTS AND RENT
@@ -31,10 +32,17 @@ import {
 // screen that is live and working. A building's own space is also a much smaller problem than a
 // landlord's whole portfolio, so a simpler surface is the right one.
 //
-// English-only, like the rest of the building console. See scripts/check-i18n.mjs.
+// Translated, like the rest of the app. This console was English-only by a standing decision
+// that was overturned once it became clear DashboardShell shows a language toggle here — so a
+// building admin was offered a Bangla switch that changed nothing. See scripts/check-i18n.mjs.
 // =====================================================================================
 
+// The slug is what the API stores; the label is what a human reads. The dropdown used to
+// render the slug itself, so it offered "cash" and "bkash" in lower case in both languages.
 const RENT_METHODS = ["cash", "bkash", "nagad", "bank", "other"] as const;
+const RENT_METHOD_LABEL: Record<string, string> = {
+  cash: "Cash", bkash: "bKash", nagad: "Nagad", bank: "Bank", other: "Other",
+};
 
 function currentMonth(): string {
   const d = new Date();
@@ -48,6 +56,7 @@ export function BuildingSpacesTab({
   building: Building | null;
   signatureUrl?: string | null;
 }) {
+  const t = useT();
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [ledgers, setLedgers] = useState<BillingLedger[]>([]);
@@ -239,7 +248,10 @@ export function BuildingSpacesTab({
                   <div className="mt-4 rounded-xl bg-surface-2 px-4 py-3">
                     <div className="text-sm font-medium text-heading">{tenant.name}</div>
                     <div className="text-xs text-muted">
-                      {tenant.phone} · {formatCurrency(Number(tenant.monthly_rent || 0))} / month · due day {tenant.due_date}
+                      {t("{0} · {1} / month · due day {2}")
+                        .replace("{0}", String(tenant.phone))
+                        .replace("{1}", formatCurrency(Number(tenant.monthly_rent || 0)))
+                        .replace("{2}", String(tenant.due_date))}
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button size="sm" icon={ReceiptText} onClick={() => setInvoiceFor(tenant)}>Bill rent</Button>
@@ -265,17 +277,17 @@ export function BuildingSpacesTab({
       {ledgers.length > 0 && (
         <Card className="overflow-x-auto">
           <div className="border-b border-line/[0.06] px-5 py-4">
-            <h3 className="text-sm font-semibold text-heading">Rent invoices</h3>
+            <h3 className="text-sm font-semibold text-heading">{t("Rent invoices")}</h3>
           </div>
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
               <tr>
-                <th className="p-4">Tenant</th>
-                <th className="p-4">Month</th>
-                <th className="p-4">Payable</th>
-                <th className="p-4">Paid</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="p-4">{t("Tenant")}</th>
+                <th className="p-4">{t("Month")}</th>
+                <th className="p-4">{t("Payable")}</th>
+                <th className="p-4">{t("Paid")}</th>
+                <th className="p-4">{t("Status")}</th>
+                <th className="p-4 text-right">{t("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -474,12 +486,13 @@ function AddTenantModal({
 function PasscodeModal({
   info, onClose,
 }: { info: { name: string; code: string } | null; onClose: () => void }) {
+  const t = useT();
   return (
     <Modal open={!!info} onClose={onClose} title="Their sign-in passcode"
       subtitle="Shown once. Write it down before closing.">
       <div className="space-y-4">
         <p className="text-sm text-muted">
-          {info?.name} signs in with their phone number and this passcode.
+          {t("{0} signs in with their phone number and this passcode.").replace("{0}", info?.name || "")}
         </p>
         <div className="rounded-xl bg-surface-2 px-4 py-6 text-center">
           <span className="font-mono text-3xl font-semibold tracking-[0.3em] text-heading">{info?.code}</span>
@@ -495,6 +508,7 @@ function PasscodeModal({
 function BillRentModal({
   tenant, onClose, onSaved,
 }: { tenant: Tenant | null; onClose: () => void; onSaved: () => Promise<void> }) {
+  const t = useT();
   const [form, setForm] = useState({
     billingMonth: currentMonth(), rentAmount: "", serviceCharge: "", extraCharge: "",
     extraChargeRemarks: "", discount: "",
@@ -577,7 +591,7 @@ function BillRentModal({
           </Field>
         )}
         <div className="rounded-xl bg-surface-2 px-4 py-3 text-sm">
-          <span className="text-muted">Total payable: </span>
+          <span className="text-muted">{t("Total payable")}: </span>
           <strong className="text-heading">{formatCurrency(Math.max(0, total))}</strong>
         </div>
         <Button type="submit" loading={saving} className="w-full">Create invoice</Button>
@@ -596,6 +610,7 @@ function RecordRentModal({
    *  the refreshed row. Deliberately not the ledger object — this one is pre-payment. */
   onReceipt: (ledgerId: string) => void;
 }) {
+  const t = useT();
   const outstanding = ledger
     ? Math.max(0, Number(ledger.total_payable || 0) - Number(ledger.amount_paid || 0))
     : 0;
@@ -656,7 +671,7 @@ function RecordRentModal({
           <Field label="Method">
             <Select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })}>
               {RENT_METHODS.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>{t(RENT_METHOD_LABEL[m])}</option>
               ))}
             </Select>
           </Field>

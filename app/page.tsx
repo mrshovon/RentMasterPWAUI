@@ -186,7 +186,7 @@ export default function EntryGatewayPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="font-mono text-xs text-faint">Bari360 · v{APP_VERSION}</span>
+            <span className="font-mono text-xs text-faint">{`Bari360 · v${APP_VERSION}`}</span>
             <DownloadAndroid variant="icon" />
             <LegalLinks />
           </div>

@@ -1,4 +1,7 @@
-- The Whole Building plan now spells out everything it includes: a year of free software maintenance and support, custom features built for your building, free app updates, help with content changes, and your own domain name on request.
-- Maintenance on that plan means maintenance and support of the Bari360 software, not building or property maintenance. Both the pricing page and your Plan tab now say so.
-- The Whole Building plan details on your Plan tab now appear in Bangla when the app is set to Bangla. They were showing in English before.
-- Administrators editing the Terms and Conditions or the Privacy Policy now open the editor with the current published text already loaded, instead of a blank box.
+- The app now actually appears in Bangla where it did not before. Plan names and descriptions, the whole Plan tab, rent and service charge lines, staff and accounts screens, and the tenant's rent view were all still showing English even with Bangla selected.
+- The building administrator console is now fully in Bangla too. It always had a language switch, but nothing on those screens changed when you used it.
+- Your printed money receipt now says Owner Copy or Tenant Copy in Bangla instead of English.
+- The Free and Premium plans have proper descriptions now, in both languages.
+- On the plan cards, "Up to 1 properties" now reads correctly, and counted sentences like days remaining read naturally in Bangla.
+- When recording rent received on a building space, the payment method list now shows Cash, bKash and Nagad properly instead of lowercase code words.
+- Notification, update and maintenance messages are translated too.
