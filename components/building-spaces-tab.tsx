@@ -241,7 +241,11 @@ export function BuildingSpacesTab({
                     <h3 className="text-base font-semibold text-heading">{p.name}</h3>
                     <p className="text-xs text-muted">{p.flat_no ? `${p.flat_no} · ` : ""}{p.address}</p>
                   </div>
-                  <Badge tone={p.is_vacant ? "slate" : "emerald"}>{p.is_vacant ? "Vacant" : "Occupied"}</Badge>
+                  {/* A space its holder lives in is not a vacancy. Mirrors the owner dashboard
+                      rather than assuming two states. */}
+                  <Badge tone={!p.is_vacant ? "emerald" : p.is_self_occupied ? "indigo" : "slate"}>
+                    {t(!p.is_vacant ? "Occupied" : p.is_self_occupied ? "Self-occupied" : "Vacant")}
+                  </Badge>
                 </div>
 
                 {tenant ? (

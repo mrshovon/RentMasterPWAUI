@@ -235,7 +235,11 @@ export default function OwnerDashboard() {
 
   // ---- Derived metrics ----
   const metrics = useMemo(() => {
+    // occupied still means "has a tenant". Self-occupied units are NOT vacancies — counting them as
+    // such told an owner they had empty flats losing them money when in fact they live there.
     const occupied = properties.filter((p) => !p.is_vacant).length;
+    const selfOccupied = properties.filter((p) => p.is_vacant && p.is_self_occupied).length;
+    const vacant = properties.length - occupied - selfOccupied;
     const monthlyRevenue = tenants.reduce((s, t) => s + Number(t.monthly_rent || 0), 0);
     // What is still OWED — a partly-paid invoice contributes only its remaining balance.
     const outstanding = ledgers
@@ -245,7 +249,10 @@ export default function OwnerDashboard() {
     const openTickets = maintenance.filter((m) => m.resolution_status !== "resolved").length;
     const openSupport = tickets.filter((t) => t.status !== "done").length;
     const pendingReminders = reminders.filter((r) => r.status === "pending").length;
-    return { occupied, monthlyRevenue, outstanding, unpaidCount, openTickets, openSupport, pendingReminders };
+    // lettable = everything the owner could put a tenant in. A self-occupied flat is not a
+    // vacancy and must not drag the occupancy percentage down.
+    const lettable = Math.max(0, properties.length - selfOccupied);
+    return { occupied, selfOccupied, vacant, lettable, monthlyRevenue, outstanding, unpaidCount, openTickets, openSupport, pendingReminders };
   }, [properties, tenants, ledgers, maintenance, tickets, reminders]);
 
   // Badge shows what's NEW — admin bulletins, and the row a tenant generates by flagging rent
@@ -424,6 +431,23 @@ export default function OwnerDashboard() {
     setReceipt({ html, phone: l.tenants?.phone || tenant?.phone || null, message, fileName: `rent-receipt-${l.billing_month}` });
   }
 
+  // ---- "I live here" / "Mark available" ----
+  // Optimistic with a rollback, exactly like vacateProperty below: the badge is the whole point of
+  // the action, so it should change under the finger rather than after a round trip.
+  async function setSelfOccupied(p: Property, next: boolean) {
+    const prev = properties;
+    setProperties((xs) => xs.map((x) => (x.id === p.id ? { ...x, is_self_occupied: next } : x)));
+    try {
+      await rentMasterFetch(`/api/admin/properties/${p.id}`, {
+        method: "PATCH", body: JSON.stringify({ isSelfOccupied: next }), role: "owner",
+      });
+      toast.success(next ? t("Marked as self-occupied.") : t("Marked as available to let."));
+    } catch (e: any) {
+      setProperties(prev);
+      toast.error(e.message);
+    }
+  }
+
   // ---- Vacate a property (archives occupancy on the backend) ----
   async function vacateProperty(p: Property) {
     if (!(await confirmDialog({
@@ -495,6 +519,7 @@ export default function OwnerDashboard() {
           onAdd={() => guardedOpen("property", () => setPropOpen(true))}
           onEdit={setEditProp}
           onVacate={vacateProperty}
+          onSelfOccupy={setSelfOccupied}
           onCharges={setChargeProp}
           onHistory={setHistoryProp}
         />
@@ -1387,7 +1412,10 @@ function OverviewTab({
   sessionName, accountEmail,
 }: {
   properties: Property[]; tenants: Tenant[];
-  metrics: { occupied: number; monthlyRevenue: number; outstanding: number; unpaidCount: number; openTickets: number };
+  metrics: {
+    occupied: number; selfOccupied: number; vacant: number; lettable: number;
+    monthlyRevenue: number; outstanding: number; unpaidCount: number; openTickets: number;
+  };
   maintenance: MaintenanceLog[];
   onQuickInvoice: () => void; onQuickProperty: () => void;
   sessionName?: string; accountEmail?: string | null;
@@ -1414,7 +1442,13 @@ function OverviewTab({
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Properties" accent="indigo" icon={Building2}
           value={properties.length}
-          sub={`${metrics.occupied} occupied · ${properties.length - metrics.occupied} vacant`} />
+          // Whole phrases, not a number glued to a bare word: "vacant" and "self-occupied" on
+          // their own read as slugs to check-i18n and would ship untranslated without it noticing.
+          sub={[
+            t("{0} occupied").replace("{0}", String(metrics.occupied)),
+            metrics.selfOccupied ? t("{0} self-occupied").replace("{0}", String(metrics.selfOccupied)) : "",
+            t("{0} vacant").replace("{0}", String(metrics.vacant)),
+          ].filter(Boolean).join(" · ")} />
         <StatCard label="Tenants" accent="cyan" icon={Users}
           value={tenants.length} sub="Active residents" />
         <StatCard label="Monthly rent roll" accent="emerald" icon={CircleDollarSign}
@@ -1432,16 +1466,20 @@ function OverviewTab({
             <>
               <div className="mb-3 flex items-end justify-between">
                 <span className="text-3xl font-black text-heading">
-                  {Math.round((metrics.occupied / properties.length) * 100)}%
+                  {Math.round((metrics.occupied / metrics.lettable) * 100) || 0}%
                 </span>
+                {/* Out of the LETTABLE units. A flat the owner lives in is not a unit they failed
+                    to fill, so counting it against them makes the number mean nothing. */}
                 <span className="text-xs text-subtle">
-                  {metrics.occupied}/{properties.length} units filled
+                  {t("{0} of {1} units filled")
+                    .replace("{0}", String(metrics.occupied))
+                    .replace("{1}", String(metrics.lettable))}
                 </span>
               </div>
               <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
-                  style={{ width: `${(metrics.occupied / properties.length) * 100}%` }}
+                  style={{ width: `${(metrics.occupied / metrics.lettable) * 100 || 0}%` }}
                 />
               </div>
             </>
@@ -1480,9 +1518,10 @@ function OverviewTab({
 }
 
 /* ============================================================ PROPERTIES */
-function PropertiesTab({ properties, disabledIds, onUpgrade, onAdd, onEdit, onVacate, onCharges, onHistory }: {
+function PropertiesTab({ properties, disabledIds, onUpgrade, onAdd, onEdit, onVacate, onSelfOccupy, onCharges, onHistory }: {
   properties: Property[]; disabledIds: string[]; onUpgrade: () => void; onAdd: () => void;
   onEdit: (p: Property) => void; onVacate: (p: Property) => void;
+  onSelfOccupy: (p: Property, next: boolean) => void;
   onCharges: (p: Property) => void; onHistory: (p: Property) => void;
 }) {
   const t = useT();
@@ -1518,12 +1557,16 @@ function PropertiesTab({ properties, disabledIds, onUpgrade, onAdd, onEdit, onVa
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Home className="h-5 w-5" />
                 </div>
+                {/* disabled > occupied > self-occupied > vacant. "Occupied" in Bangla is literally
+                    "has been rented", so a self-occupied flat needs its own word, not that one. */}
                 {disabled ? (
                   <Badge tone="rose">Disabled</Badge>
+                ) : !p.is_vacant ? (
+                  <Badge tone="emerald">Occupied</Badge>
+                ) : p.is_self_occupied ? (
+                  <Badge tone="indigo">Self-occupied</Badge>
                 ) : (
-                  <Badge tone={p.is_vacant ? "amber" : "emerald"}>
-                    {p.is_vacant ? "Vacant" : "Occupied"}
-                  </Badge>
+                  <Badge tone="amber">Vacant</Badge>
                 )}
               </div>
               <div>
@@ -1550,6 +1593,14 @@ function PropertiesTab({ properties, disabledIds, onUpgrade, onAdd, onEdit, onVa
                     <Button size="sm" variant="ghost" icon={History} onClick={() => onHistory(p)} className="flex-1">History</Button>
                     {!p.is_vacant && (
                       <Button size="sm" variant="ghost" icon={DoorOpen} onClick={() => onVacate(p)} className="flex-1">Vacate</Button>
+                    )}
+                    {/* Only a flat inside a building. A self-occupied unit has no tenant to vacate,
+                        so it gets the opposite action instead. */}
+                    {p.is_vacant && p.is_building_flat && (
+                      <Button size="sm" variant="ghost" icon={Home}
+                        onClick={() => onSelfOccupy(p, !p.is_self_occupied)} className="flex-1">
+                        {t(p.is_self_occupied ? "Mark available" : "I live here")}
+                      </Button>
                     )}
                   </div>
                 </>
@@ -2275,7 +2326,11 @@ function TenantModal({
   };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
-  const vacant = properties.filter((p) => p.is_vacant);
+  // Available to let: no tenant AND not one the owner lives in themselves.
+  const vacant = properties.filter((p) => p.is_vacant && !p.is_self_occupied);
+  // The fallback below offers everything when nothing is vacant, so self-occupied has to be kept
+  // out of THAT list too — otherwise the one case it matters in is the one that leaks it.
+  const offerable = properties.filter((p) => !p.is_self_occupied);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -2308,7 +2363,7 @@ function TenantModal({
         <Field label="Property" required>
           <Select required value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })}>
             <option value="">{t("Select a property…")}</option>
-            {(vacant.length ? vacant : properties).map((p) => (
+            {(vacant.length ? vacant : offerable).map((p) => (
               <option key={p.id} value={p.id}>{`${p.name} · ${t("Flat")} ${p.flat_no}${p.is_vacant ? "" : ` (${t("occupied")})`}`}</option>
             ))}
           </Select>
@@ -3157,7 +3212,11 @@ function EditTenantModal({
 
   // A tenant can move into any unit that is free, or stay where they are. Occupied units
   // belonging to someone else are not offered — the backend rejects those anyway.
-  const assignable = properties.filter((p) => p.is_vacant || p.id === tenant?.property_id);
+  // Their current unit stays listed even if it is somehow flagged, so a move never silently
+  // drops the option they are already on.
+  const assignable = properties.filter(
+    (p) => (p.is_vacant && !p.is_self_occupied) || p.id === tenant?.property_id,
+  );
   const moved = !!tenant && form.propertyId !== (tenant.property_id ?? "");
 
   const [revisions, setRevisions] = useState<RentRevision[]>([]);

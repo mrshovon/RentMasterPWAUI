@@ -1,8 +1,6 @@
-- A flat owner can now hold several flats in a building under one login. When you add an owner you list their flats, and they manage all of them from a single account instead of signing in separately for each one.
-- Each flat has its own monthly service charge, so a shop and a three-bedroom are not billed the same amount.
-- Each flat gets its own invoice every month. You can mark one flat paid while another is still owed.
-- Adding a flat also creates it as a property in that owner's own dashboard, so they can put a tenant in it, bill rent and print receipts straight away.
-- Receipts, the cutting sheet and the accounts entries now name the flat the invoice is actually for. Before, an owner with more than one flat would have seen the same flat printed on all of them.
-- The owner's service charge statement now shows each flat separately with its own running balance, then a total across all of them.
-- You can add or remove an owner's flats at any time from Edit owner. Removing a flat stops it being billed but keeps its property, tenant and rent history in the owner's dashboard. A flat that already has invoices is deactivated rather than deleted.
-- Adding or removing flats never changes how the owner signs in.
+- Fixed: if you own more than one flat in a building, the flats you held before the recent update were missing from your dashboard. They are back, and every flat you hold now appears as a property you can put a tenant in, bill rent for and print receipts from.
+- You can now mark a flat as self-occupied when you live in it yourself. It stops being counted as an empty flat you are failing to let, and it is not offered when you add a tenant.
+- A self-occupied flat shows its own badge, and the properties summary now counts occupied, self-occupied and vacant separately instead of treating anything without a tenant as vacant.
+- The occupancy percentage no longer counts the flat you live in against you.
+- Putting a tenant into a flat automatically clears the self-occupied mark.
+- Your building administrator still bills service charge on a self-occupied flat, and it still counts toward your plan's property limit.

@@ -1522,4 +1522,19 @@ export const bn: Record<string, string> = {
     "ফ্ল্যাটটির বিল করা বন্ধ হবে। এর সম্পত্তি, ভাড়াটিয়া ও ভাড়ার ইতিহাস মালিকের নিজের ড্যাশবোর্ডে থেকে যাবে।",
   "Flat total": "ফ্ল্যাটের মোট",
   "Total across all flats": "সব ফ্ল্যাট মিলিয়ে মোট",
+
+  // ---- self-occupied: the owner lives in it themselves (ADD_PROPERTY_SELF_OCCUPIED.sql) ----
+  "Self-occupied": "নিজে থাকেন",
+  "I live here": "আমি এখানে থাকি",
+  "Mark available": "ভাড়ার জন্য খুলুন",
+  "Marked as self-occupied.": "নিজে থাকেন হিসেবে চিহ্নিত হয়েছে।",
+  "Marked as available to let.": "ভাড়া দেওয়ার জন্য উন্মুক্ত করা হয়েছে।",
+  "{0} occupied": "{0}টি ভাড়া হয়েছে",
+  "{0} self-occupied": "{0}টিতে নিজে থাকেন",
+  "{0} vacant": "{0}টি খালি",
+  "{0} of {1} units filled": "{1}টির মধ্যে {0}টি ভাড়া হয়েছে",
+  "This flat has a tenant. Vacate it first, then mark it as self-occupied.":
+    "এই ফ্ল্যাটে ভাড়াটিয়া আছেন। আগে খালি করুন, তারপর নিজে থাকেন হিসেবে চিহ্নিত করুন।",
+  "Only a flat inside a building can be marked as self-occupied.":
+    "শুধু ভবনের ভেতরের ফ্ল্যাটকেই নিজে থাকেন হিসেবে চিহ্নিত করা যায়।",
 };

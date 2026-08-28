@@ -21,7 +21,16 @@ export interface Property {
   // Name printed on this property's receipts. Null = use the owner's account name.
   receipt_name: string | null;
   owner_phone: string | null;
+  /** No tenant. Says nothing about whether the owner lives here — see is_self_occupied. */
   is_vacant: boolean;
+  /**
+   * The owner lives here themselves: not let, not available, earning no rent. Orthogonal to
+   * is_vacant, which keeps meaning "no tenant". Display precedence is
+   * disabled > occupied > self-occupied > vacant.
+   */
+  is_self_occupied: boolean;
+  /** Computed server-side: this property is a flat in a Whole Building plan. Not a column. */
+  is_building_flat?: boolean;
   created_at: string;
 }
 
@@ -179,6 +188,7 @@ export interface TenantProfile {
     address: string;
     flat_no: string;
     is_vacant: boolean;
+    is_self_occupied: boolean;
     owner_phone: string | null;
     receipt_name: string | null;
   } | null;
