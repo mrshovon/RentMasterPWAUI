@@ -111,7 +111,10 @@ export function BuildingInvoicesTab({
         propertyAddress: [building.address, building.city].filter(Boolean).join(", ") || null,
         refNo: inv.invoice_no ? `#${inv.invoice_no}` : null,
         billingMonth: inv.billing_month,
-        unitLabel: owner?.unit_label || null,
+        // The INVOICE's own flat, never the owner's. An owner may hold several, and the roster row
+        // carries only their primary — so reading the label off the owner printed the same flat on
+        // all three of their receipts.
+        unitLabel: inv.flat_label || owner?.unit_label || null,
         partyLabel: "Flat Owner",
         tenantName: partyName,
         houseRent: 0,
@@ -168,7 +171,8 @@ export function BuildingInvoicesTab({
             return {
               invoiceNo: inv.invoice_no ?? null,
               ownerName: owner?.name || owner?.email || "Flat Owner",
-              unitLabel: owner?.unit_label || null,
+              // Same as the receipt: the slip must name the flat the invoice is for.
+              unitLabel: inv.flat_label || owner?.unit_label || null,
               serviceCharge: Number(inv.service_charge || 0),
               extraCharge: Number(inv.extra_charge || 0),
               extraChargeRemarks: inv.extra_charge_remarks,
@@ -220,12 +224,24 @@ export function BuildingInvoicesTab({
     return { billed, collected, outstanding: Math.max(0, billed - collected) };
   }, [invoices]);
 
-  // Active owners with no invoice yet this month — exactly what Generate would create, so the
-  // button can say how many and disable itself when there is nothing to do.
+  // Every active FLAT on the roster, flattened. One invoice is issued per flat, so this is the
+  // unit the Generate button counts in.
+  const activeFlats = useMemo(
+    () => owners.filter((o) => o.is_active).flatMap((o) => (o.flats || []).filter((f) => f.is_active)),
+    [owners],
+  );
+
+  // Flats with no invoice yet this month — exactly what Generate would create, so the button can
+  // say how many and disable itself when there is nothing to do. Falls back to counting OWNERS on a
+  // roster that predates flats, so the button is never silently zero.
   const missing = useMemo(() => {
-    const billed = new Set(invoices.map((i) => i.owner_id));
-    return owners.filter((o) => o.is_active && !billed.has(o.owner_id));
-  }, [owners, invoices]);
+    if (!activeFlats.length) {
+      const billedOwners = new Set(invoices.map((i) => i.owner_id));
+      return owners.filter((o) => o.is_active && !billedOwners.has(o.owner_id)).map((o) => o.owner_id);
+    }
+    const billed = new Set(invoices.map((i) => i.flat_id).filter(Boolean));
+    return activeFlats.filter((f) => !billed.has(f.id)).map((f) => f.id);
+  }, [owners, invoices, activeFlats]);
 
   async function generate() {
     try {
@@ -345,8 +361,12 @@ export function BuildingInvoicesTab({
                 return (
                   <tr key={inv.id} className="border-b border-line/[0.04] last:border-0">
                     <td className="p-4">
-                      <div className="font-medium text-heading">{owner?.name || "—"}</div>
-                      <div className="text-xs text-muted">{owner?.unit_label || owner?.email || "—"}</div>
+                      {/* Flat first: with several invoices for one person in a month, the flat is
+                          what tells the rows apart. */}
+                      <div className="font-medium text-heading">
+                        {inv.flat_label || owner?.unit_label || "—"}
+                      </div>
+                      <div className="text-xs text-muted">{owner?.name || owner?.email || "—"}</div>
                     </td>
                     <td className="p-4 text-fg">
                       {formatCurrency(Number(inv.total_payable || 0))}
@@ -451,28 +471,49 @@ function IssueInvoiceModal({
 }) {
   const t = useT();
   const empty = {
-    ownerId: "", serviceCharge: "", extraCharge: "", extraChargeRemarks: "", discount: "", note: "",
+    flatId: "", serviceCharge: "", extraCharge: "", extraChargeRemarks: "", discount: "", note: "",
   };
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
 
-  // Pre-fill from the roster the moment an owner is picked. Storing a default service charge is
-  // pointless if the person still has to retype it, and retyping is how the two figures diverge.
-  function pickOwner(ownerId: string) {
-    const o = owners.find((x) => x.owner_id === ownerId);
-    setForm((f) => ({ ...f, ownerId, serviceCharge: o ? String(o.default_service_charge ?? "") : "" }));
+  // The list is FLATS, not owners: an invoice bills one flat, and an owner may hold several. Each
+  // option carries the owner it belongs to so a person with three flats reads as three lines.
+  const options = useMemo(
+    () =>
+      owners
+        .filter((o) => o.is_active)
+        .flatMap((o) =>
+          (o.flats || [])
+            .filter((f) => f.is_active)
+            .map((f) => ({
+              flatId: f.id,
+              ownerId: o.owner_id,
+              charge: f.default_service_charge,
+              label: `${o.name || o.email || "—"}${f.unit_label ? ` — ${f.unit_label}` : ""}`,
+            })),
+        ),
+    [owners],
+  );
+
+  // Pre-fill from the flat the moment one is picked. Storing a default service charge is pointless
+  // if the person still has to retype it, and retyping is how the two figures diverge.
+  function pickFlat(flatId: string) {
+    const o = options.find((x) => x.flatId === flatId);
+    setForm((f) => ({ ...f, flatId, serviceCharge: o ? String(o.charge ?? "") : "" }));
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.ownerId) { toast.error("Choose an owner."); return; }
+    const picked = options.find((x) => x.flatId === form.flatId);
+    if (!picked) { toast.error("Choose a flat."); return; }
     try {
       setSaving(true);
       await rentMasterFetch("/api/admin/building/invoices", {
         method: "POST",
         body: JSON.stringify({
           billingMonth: month,
-          ownerId: form.ownerId,
+          ownerId: picked.ownerId,
+          flatId: picked.flatId,
           serviceCharge: Number(form.serviceCharge || 0),
           extraCharge: Number(form.extraCharge || 0),
           extraChargeRemarks: form.extraChargeRemarks,
@@ -497,13 +538,11 @@ function IssueInvoiceModal({
     <Modal open={open} onClose={onClose} title="Issue an invoice"
       subtitle={t("Billing month {0}").replace("{0}", month)}>
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Owner" required>
-          <Select required value={form.ownerId} onChange={(e) => pickOwner(e.target.value)}>
-            <option value="">{t("Choose an owner…")}</option>
-            {owners.map((o) => (
-              <option key={o.owner_id} value={o.owner_id}>
-                {`${o.name || o.email}${o.unit_label ? ` — ${o.unit_label}` : ""}`}
-              </option>
+        <Field label="Flat" required>
+          <Select required value={form.flatId} onChange={(e) => pickFlat(e.target.value)}>
+            <option value="">{t("Choose a flat…")}</option>
+            {options.map((o) => (
+              <option key={o.flatId} value={o.flatId}>{o.label}</option>
             ))}
           </Select>
         </Field>
@@ -582,17 +621,20 @@ function EditInvoiceModal({
   );
 }
 
+// Only the money lines. Which THING is being billed — a flat when issuing, the invoice itself
+// when editing — is the caller's business, so it is not in this type and the component is generic
+// over whatever else the caller carries in its form state.
 type ChargeForm = {
-  ownerId: string; serviceCharge: string; extraCharge: string;
+  serviceCharge: string; extraCharge: string;
   extraChargeRemarks: string; discount: string; note: string;
 };
 
 /** The charge lines, shared by issue and edit so the two forms can never drift apart. */
-function ChargeFields({
+function ChargeFields<T extends ChargeForm>({
   form, setForm, requireService,
 }: {
-  form: ChargeForm;
-  setForm: (f: ChargeForm) => void;
+  form: T;
+  setForm: (f: T) => void;
   requireService?: boolean;
 }) {
   return (

@@ -482,6 +482,14 @@ export interface BuildingServiceInvoice {
   building_id: string;
   admin_id: string;
   owner_id: string;
+  /** Which flat this bills. Null only on invoices written before flats existed. */
+  flat_id: string | null;
+  /**
+   * The flat's label AS IT WAS when the invoice was issued. A snapshot, not a join — it is what
+   * every receipt, cutting slip and accounts note prints, and it still reads correctly once the
+   * flat row is gone. See ADD_BUILDING_OWNER_FLATS.sql.
+   */
+  flat_label: string | null;
   billing_month: string; // "YYYY-MM"
   service_charge: number;
   extra_charge: number;
@@ -521,17 +529,44 @@ export interface BuildingStatementResponse {
   } | null;
   /** The caller's own name, for the party row on their receipt. */
   owner?: { name: string | null };
+  /** Every flat they hold. building.unitLabel stays their primary, for back-compat. */
+  flats?: BuildingOwnerFlat[];
   count: number;
   data: BuildingServiceInvoice[];
+}
+
+/**
+ * One flat an owner holds. An owner may hold several under a single login; the roster row
+ * (BuildingOwner) stays one per person.
+ */
+export interface BuildingOwnerFlat {
+  id: string;
+  building_id: string;
+  owner_id: string;
+  unit_label: string | null;
+  flat_no: string | null;
+  default_service_charge: number;
+  /** The flat their login was built from, and the fallback for owner-keyed reads. */
+  is_primary: boolean;
+  /** properties.id — the rentable unit behind this flat, if one was created. */
+  property_id: string | null;
+  is_active: boolean;
+  joined_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface BuildingOwner {
   building_id: string;
   owner_id: string;
+  /** Their PRIMARY flat's label — login provenance and the owner-keyed fallback. See `flats`. */
   unit_label: string | null;
   /** The normalised flat token that went into their login ("4b"). Display uses unit_label. */
   flat_no: string | null;
+  /** Frozen. The real charge is per flat — a shop and a three-bed are not billed the same. */
   default_service_charge: number;
+  /** Every flat they hold, active and inactive. Present on the roster GET. */
+  flats?: BuildingOwnerFlat[];
   joined_at: string;
   is_active: boolean;
   created_at: string;

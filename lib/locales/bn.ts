@@ -1505,4 +1505,21 @@ export const bn: Record<string, string> = {
   "Your plan expires in {0} days. Request a renewal to avoid interruption.":
     "আপনার প্ল্যানের মেয়াদ {0} দিনে শেষ হবে। বিঘ্ন এড়াতে নবায়নের অনুরোধ করুন।",
   "Cannot be a future date.": "ভবিষ্যতের তারিখ দেওয়া যাবে না।",
+
+  // ---- one owner, several flats (ADD_BUILDING_OWNER_FLATS.sql) ----
+  Flats: "ফ্ল্যাটসমূহ",
+  "Your flats": "আপনার ফ্ল্যাটসমূহ",
+  "Add flat": "ফ্ল্যাট যোগ করুন",
+  "Choose a flat…": "একটি ফ্ল্যাট বেছে নিন…",
+  "Choose a flat.": "একটি ফ্ল্যাট বেছে নিন।",
+  "The flat needs a number.": "ফ্ল্যাটের একটি নম্বর প্রয়োজন।",
+  "No flats yet. Add one so this owner can be billed.":
+    "এখনো কোনো ফ্ল্যাট নেই। এই মালিককে বিল করতে একটি যোগ করুন।",
+  "One login covers all of them. Each flat is billed its own service charge.":
+    "একটি লগইনেই সবগুলো চলবে। প্রতিটি ফ্ল্যাটের নিজস্ব সার্ভিস চার্জ বিল করা হয়।",
+  Deactivate: "নিষ্ক্রিয় করুন",
+  "The flat stops being billed. Its property, tenant and rent history stay in the owner's own dashboard.":
+    "ফ্ল্যাটটির বিল করা বন্ধ হবে। এর সম্পত্তি, ভাড়াটিয়া ও ভাড়ার ইতিহাস মালিকের নিজের ড্যাশবোর্ডে থেকে যাবে।",
+  "Flat total": "ফ্ল্যাটের মোট",
+  "Total across all flats": "সব ফ্ল্যাট মিলিয়ে মোট",
 };

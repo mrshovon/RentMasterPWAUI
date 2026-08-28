@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, Users, Settings, Plus, Pencil, KeyRound, Ban, ShieldCheck,
   Unlink, Building2, CircleDollarSign, ReceiptText, Home, HardHat, Wallet, Wrench,
-  Megaphone, FileText, CreditCard,
+  Megaphone, FileText, CreditCard, Trash2,
 } from "lucide-react";
 import { rentMasterFetch } from "../../lib/api-service";
 import { toast } from "../../components/toast";
@@ -14,7 +14,7 @@ import { usePresenceHeartbeat } from "../../lib/presence";
 import { useTabState } from "../../lib/use-tab";
 import { usePlan } from "../../lib/use-plan";
 import { useRevalidateOnFocus } from "../../lib/use-revalidate";
-import { Building, BuildingOwner, BuildingPlanState, Property } from "../../types/api";
+import { Building, BuildingOwner, BuildingOwnerFlat, BuildingPlanState, Property } from "../../types/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { useT } from "../../lib/i18n";
@@ -293,7 +293,8 @@ function OwnersTab({
   const [busy, setBusy] = useState<string | null>(null);
 
   const filtered = owners.filter((o) => {
-    const hay = `${o.name || ""} ${o.email || ""} ${o.phone || ""} ${o.unit_label || ""}`.toLowerCase();
+    const flatLabels = (o.flats || []).map((f) => f.unit_label || "").join(" ");
+    const hay = `${o.name || ""} ${o.email || ""} ${o.phone || ""} ${o.unit_label || ""} ${flatLabels}`.toLowerCase();
     return hay.includes(q.toLowerCase());
   });
 
@@ -384,8 +385,19 @@ function OwnersTab({
                     <div className="text-xs text-muted">{o.email || "—"}</div>
                     {o.phone && <div className="text-xs text-subtle">{o.phone}</div>}
                   </td>
-                  <td className="p-4 text-fg">{o.unit_label || "—"}</td>
-                  <td className="p-4 text-fg">{formatCurrency(Number(o.default_service_charge || 0))}</td>
+                  <td className="p-4 text-fg">
+                    {(o.flats?.filter((f) => f.is_active).map((f) => f.unit_label).filter(Boolean).join(", "))
+                      || o.unit_label || "—"}
+                  </td>
+                  <td className="p-4 text-fg">
+                    {/* The sum across their flats — one number per person is what the column meant
+                        before an owner could hold several. */}
+                    {formatCurrency(
+                      o.flats?.length
+                        ? o.flats.filter((f) => f.is_active).reduce((sum, f) => sum + Number(f.default_service_charge || 0), 0)
+                        : Number(o.default_service_charge || 0),
+                    )}
+                  </td>
                   <td className="p-4 text-muted">{formatDate(o.joined_at)}</td>
                   <td className="p-4">
                     {o.suspended ? (
@@ -513,6 +525,98 @@ function ResetPasswordModal({
   );
 }
 
+/* ============================================================ FLATS */
+// An owner may hold several flats in the building under ONE login — the point of the whole
+// feature. These helpers are shared by the create form and the edit form so the two can never
+// disagree about what a valid flat list looks like.
+//
+// THE FIRST FLAT IS SPECIAL ON CREATE ONLY: the login identifier is built from it and then frozen.
+// Adding a fourth flat, or removing the one the identifier came from, never changes how the person
+// signs in — see app/api/admin/building/owners/[id]/route.ts.
+
+interface FlatDraft {
+  unitLabel: string;
+  defaultServiceCharge: string;
+}
+
+const blankFlat = (): FlatDraft => ({ unitLabel: "", defaultServiceCharge: "" });
+
+/** Returns an error message, or null when the list is fine. */
+function validateFlats(flats: FlatDraft[], opts: { requireFirst: boolean }): string | null {
+  if (!flats.length) return "Add at least one flat.";
+  if (opts.requireFirst && !flats[0].unitLabel.trim()) {
+    return "The first flat needs a number — the login is built from it.";
+  }
+  if (flats.some((f, i) => i > 0 && !f.unitLabel.trim())) return "Every flat needs a number.";
+  const seen = new Set<string>();
+  for (const f of flats) {
+    const key = f.unitLabel.trim().toLowerCase();
+    if (key && seen.has(key)) return `${f.unitLabel} is listed twice.`;
+    seen.add(key);
+  }
+  return null;
+}
+
+function FlatRows({
+  flats, setFlats, requireFirst, firstIsLogin,
+}: {
+  flats: FlatDraft[];
+  setFlats: (f: FlatDraft[]) => void;
+  requireFirst: boolean;
+  /** True on create for a building that issues identifiers — the first row feeds the login. */
+  firstIsLogin: boolean;
+}) {
+  const t = useT();
+  const set = (i: number, patch: Partial<FlatDraft>) =>
+    setFlats(flats.map((f, x) => (x === i ? { ...f, ...patch } : f)));
+
+  return (
+    <div className="space-y-3 rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-heading">{t("Flats")}</p>
+          <p className="text-xs text-muted">
+            {t("One login covers all of them. Each flat is billed its own service charge.")}
+          </p>
+        </div>
+        <Button type="button" size="sm" variant="secondary" icon={Plus}
+          onClick={() => setFlats([...flats, blankFlat()])}>
+          {t("Add flat")}
+        </Button>
+      </div>
+
+      {flats.map((f, i) => (
+        <div key={i} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <Field
+            label={i === 0 && firstIsLogin ? "Flat number" : "Flat / unit"}
+            required={i === 0 ? requireFirst : true}
+            hint={i === 0 && firstIsLogin ? "Part of their login. It never changes, even if this flat does." : undefined}
+          >
+            <TextInput
+              required={i === 0 ? requireFirst : true}
+              value={f.unitLabel}
+              placeholder="3B"
+              onChange={(e) => set(i, { unitLabel: e.target.value })}
+            />
+          </Field>
+          <Field label="Monthly service charge" hint={i === 0 ? "Pre-fills each invoice; editable per month." : undefined}>
+            <TextInput type="number" min="0" step="0.01" value={f.defaultServiceCharge}
+              onChange={(e) => set(i, { defaultServiceCharge: e.target.value })} />
+          </Field>
+          {flats.length > 1 ? (
+            <Button type="button" size="sm" variant="ghost" icon={Trash2}
+              onClick={() => setFlats(flats.filter((_, x) => x !== i))}>
+              {t("Remove")}
+            </Button>
+          ) : (
+            <span />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ============================================================ CREATE / EDIT OWNER */
 
 function CreateOwnerModal({
@@ -527,11 +631,12 @@ function CreateOwnerModal({
   onCreated: () => Promise<void>;
 }) {
   const t = useT();
-  const empty = {
-    name: "", email: "", phone: "", password: "",
-    unitLabel: "", defaultServiceCharge: "",
-  };
+  const empty = { name: "", email: "", phone: "", password: "" };
   const [form, setForm] = useState(empty);
+  // An owner may hold several flats under ONE login. The FIRST one is special: it is what the
+  // login identifier is built from, and that identifier is frozen at creation — adding or removing
+  // flats later never changes how they sign in.
+  const [flats, setFlats] = useState<FlatDraft[]>([blankFlat()]);
   const [saving, setSaving] = useState(false);
   const [issued, setIssued] = useState<{ name: string; loginId: string } | null>(null);
 
@@ -539,10 +644,11 @@ function CreateOwnerModal({
   // "their login is generated". A building that predates the feature simply never turns it on.
   const houseNo = building?.house_no || "";
   const generatesLogins = !!houseNo;
-  const preview = generatesLogins ? memberOwnerLoginId(houseNo, form.unitLabel, form.phone) : null;
+  const preview = generatesLogins ? memberOwnerLoginId(houseNo, flats[0].unitLabel, form.phone) : null;
 
   function close() {
     setIssued(null);
+    setFlats([blankFlat()]);
     onClose();
   }
 
@@ -558,21 +664,31 @@ function CreateOwnerModal({
     if (!parsedPhone.ok) { toast.error(parsedPhone.error); return; }
     if (preview && !preview.ok) { toast.error(preview.error); return; }
     if (form.password.length < 8) { toast.error("Password must be at least 8 characters."); return; }
+    const flatError = validateFlats(flats, { requireFirst: generatesLogins });
+    if (flatError) { toast.error(flatError); return; }
 
     try {
       setSaving(true);
-      const res = await rentMasterFetch("/api/admin/building/owners", {
+      const res = await rentMasterFetch<{ data?: any; warnings?: string[] }>("/api/admin/building/owners", {
         method: "POST",
         body: JSON.stringify({
           ...form,
           email,
           phone: parsedPhone.value,
-          defaultServiceCharge: Number(form.defaultServiceCharge || 0),
+          flats: flats.map((f) => ({
+            unitLabel: f.unitLabel,
+            defaultServiceCharge: Number(f.defaultServiceCharge || 0),
+          })),
         }),
       });
       const name = form.name;
       setForm(empty);
+      setFlats([blankFlat()]);
       await onCreated();
+
+      // A property that could not be created is worth saying out loud — the owner can still make
+      // it themselves, but nobody would know to.
+      (res?.warnings || []).forEach((w: string) => toast.warning(w));
 
       // A generated login has to be copied off the screen and passed on by hand, so the modal
       // holds it instead of closing behind a toast that fades.
@@ -620,17 +736,19 @@ function CreateOwnerModal({
           <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          {generatesLogins ? (
-            <Field label="Flat number" required hint="Printed on their statements, and part of their login.">
-              <TextInput required value={form.unitLabel} placeholder="3B"
-                onChange={(e) => setForm({ ...form, unitLabel: e.target.value })} />
-            </Field>
-          ) : (
+          {!generatesLogins && (
             <EmailField label="Email" required value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
           )}
           <PhoneField label="Phone" required={generatesLogins} value={form.phone}
             onChange={(v) => setForm({ ...form, phone: v })} />
         </div>
+
+        <FlatRows
+          flats={flats}
+          setFlats={setFlats}
+          requireFirst={generatesLogins}
+          firstIsLogin={generatesLogins}
+        />
         {preview?.ok && (
           <div className="rounded-lg border border-line/[0.08] bg-overlay/[0.02] px-3 py-2 text-sm">
             <span className="text-muted">{t("Login")}: </span>
@@ -642,21 +760,163 @@ function CreateOwnerModal({
           <PasswordInput required minLength={8} value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })} />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {!generatesLogins && (
-            <Field label="Flat / unit" hint="Printed on their statements.">
-              <TextInput value={form.unitLabel} placeholder="Flat 4B"
-                onChange={(e) => setForm({ ...form, unitLabel: e.target.value })} />
-            </Field>
-          )}
-          <Field label="Monthly service charge" hint="Pre-fills each invoice; editable per month.">
-            <TextInput type="number" min="0" step="0.01" value={form.defaultServiceCharge}
-              onChange={(e) => setForm({ ...form, defaultServiceCharge: e.target.value })} />
-          </Field>
-        </div>
         <Button type="submit" loading={saving} className="w-full">Create owner</Button>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * Managing an existing owner's flats.
+ *
+ * Each action is its OWN request against /owners/[id]/flats — add, save, remove. Deliberately not
+ * an array diffed on save: a diff is how a flat with a year of invoices behind it gets deleted
+ * because it was missing from a payload. Adding and removing are different decisions with
+ * different consequences, so they are different buttons.
+ *
+ * Removing a flat never touches the property behind it. The tenant, their rent invoices and the
+ * receipts all stay in the owner's own dashboard — the server says so in its response and this
+ * surfaces that message rather than inventing its own.
+ */
+function OwnerFlatsEditor({
+  ownerId, flats, onChanged,
+}: {
+  ownerId: string;
+  flats: BuildingOwnerFlat[];
+  onChanged: () => Promise<void>;
+}) {
+  const t = useT();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [adding, setAdding] = useState<FlatDraft | null>(null);
+  const [edits, setEdits] = useState<Record<string, FlatDraft>>({});
+
+  const draftFor = (fl: BuildingOwnerFlat): FlatDraft =>
+    edits[fl.id] ?? { unitLabel: fl.unit_label || "", defaultServiceCharge: String(fl.default_service_charge ?? "") };
+
+  async function call(id: string, run: () => Promise<any>) {
+    try {
+      setBusy(id);
+      const res = await run();
+      (res?.warnings || []).forEach((w: string) => toast.warning(w));
+      if (res?.message) toast.success(res.message);
+      await onChanged();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-heading">{t("Flats")}</p>
+          <p className="text-xs text-muted">
+            {t("One login covers all of them. Each flat is billed its own service charge.")}
+          </p>
+        </div>
+        {!adding && (
+          <Button type="button" size="sm" variant="secondary" icon={Plus} onClick={() => setAdding(blankFlat())}>
+            {t("Add flat")}
+          </Button>
+        )}
+      </div>
+
+      {flats.length === 0 && !adding && (
+        <p className="text-xs text-subtle">{t("No flats yet. Add one so this owner can be billed.")}</p>
+      )}
+
+      {flats.map((fl) => {
+        const d = draftFor(fl);
+        const dirty = d.unitLabel !== (fl.unit_label || "") ||
+          Number(d.defaultServiceCharge || 0) !== Number(fl.default_service_charge || 0);
+        return (
+          <div key={fl.id} className={`grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end ${fl.is_active ? "" : "opacity-60"}`}>
+            <Field label="Flat / unit">
+              <TextInput value={d.unitLabel}
+                onChange={(e) => setEdits({ ...edits, [fl.id]: { ...d, unitLabel: e.target.value } })} />
+            </Field>
+            <Field label="Monthly service charge">
+              <TextInput type="number" min="0" step="0.01" value={d.defaultServiceCharge}
+                onChange={(e) => setEdits({ ...edits, [fl.id]: { ...d, defaultServiceCharge: e.target.value } })} />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              {dirty && (
+                <Button type="button" size="sm" loading={busy === fl.id}
+                  onClick={() => call(fl.id, async () => {
+                    const r = await rentMasterFetch(`/api/admin/building/owners/${ownerId}/flats/${fl.id}`, {
+                      method: "PATCH",
+                      body: JSON.stringify({
+                        unitLabel: d.unitLabel,
+                        defaultServiceCharge: Number(d.defaultServiceCharge || 0),
+                      }),
+                    });
+                    setEdits((x) => { const n = { ...x }; delete n[fl.id]; return n; });
+                    return r;
+                  })}>
+                  {t("Save")}
+                </Button>
+              )}
+              {/* Deactivate stops the flat being billed and keeps every invoice behind it. It is
+                  what an admin almost always means by "remove", so it is the plain button. */}
+              <Button type="button" size="sm" variant="secondary" loading={busy === fl.id}
+                onClick={() => call(fl.id, () => rentMasterFetch(`/api/admin/building/owners/${ownerId}/flats/${fl.id}`, {
+                  method: "PATCH",
+                  body: JSON.stringify({ isActive: !fl.is_active }),
+                }))}>
+                {t(fl.is_active ? "Deactivate" : "Reactivate")}
+              </Button>
+              <Button type="button" size="sm" variant="danger" icon={Trash2} loading={busy === fl.id}
+                onClick={async () => {
+                  const ok = await confirmDialog({
+                    title: `Remove ${fl.unit_label || "this flat"}?`,
+                    message: "The flat stops being billed. Its property, tenant and rent history stay in the owner's own dashboard.",
+                    confirmLabel: "Remove",
+                    danger: true,
+                  });
+                  if (!ok) return;
+                  void call(fl.id, () => rentMasterFetch(`/api/admin/building/owners/${ownerId}/flats/${fl.id}`, { method: "DELETE" }));
+                }}>
+                {t("Remove")}
+              </Button>
+            </div>
+          </div>
+        );
+      })}
+
+      {adding && (
+        <div className="grid gap-3 border-t border-line/[0.06] pt-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+          <Field label="Flat / unit" required>
+            <TextInput autoFocus value={adding.unitLabel} placeholder="4A"
+              onChange={(e) => setAdding({ ...adding, unitLabel: e.target.value })} />
+          </Field>
+          <Field label="Monthly service charge">
+            <TextInput type="number" min="0" step="0.01" value={adding.defaultServiceCharge}
+              onChange={(e) => setAdding({ ...adding, defaultServiceCharge: e.target.value })} />
+          </Field>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" loading={busy === "new"}
+              onClick={() => {
+                if (!adding.unitLabel.trim()) { toast.error("The flat needs a number."); return; }
+                void call("new", async () => {
+                  const r = await rentMasterFetch(`/api/admin/building/owners/${ownerId}/flats`, {
+                    method: "POST",
+                    body: JSON.stringify({
+                      flats: [{ unitLabel: adding.unitLabel, defaultServiceCharge: Number(adding.defaultServiceCharge || 0) }],
+                    }),
+                  });
+                  setAdding(null);
+                  return r;
+                });
+              }}>
+              {t("Add")}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(null)}>{t("Cancel")}</Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -669,17 +929,13 @@ function EditOwnerModal({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const [form, setForm] = useState({ name: "", phone: "", unitLabel: "", defaultServiceCharge: "" });
+  const t = useT();
+  const [form, setForm] = useState({ name: "", phone: "" });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!owner) return;
-    setForm({
-      name: owner.name || "",
-      phone: owner.phone || "",
-      unitLabel: owner.unit_label || "",
-      defaultServiceCharge: String(owner.default_service_charge ?? ""),
-    });
+    setForm({ name: owner.name || "", phone: owner.phone || "" });
   }, [owner]);
 
   async function submit(e: React.FormEvent) {
@@ -691,12 +947,8 @@ function EditOwnerModal({
       setSaving(true);
       await rentMasterFetch(`/api/admin/building/owners/${owner.owner_id}`, {
         method: "PATCH",
-        body: JSON.stringify({
-          name: form.name,
-          phone: parsedPhone.value,
-          unitLabel: form.unitLabel,
-          defaultServiceCharge: Number(form.defaultServiceCharge || 0),
-        }),
+        // Flats are managed by their own requests below, not folded into this payload.
+        body: JSON.stringify({ name: form.name, phone: parsedPhone.value }),
       });
       await onSaved();
       onClose();
@@ -717,17 +969,16 @@ function EditOwnerModal({
           </Field>
           <PhoneField label="Phone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Flat / unit" hint="Changing this does not change how they sign in.">
-            <TextInput value={form.unitLabel} onChange={(e) => setForm({ ...form, unitLabel: e.target.value })} />
-          </Field>
-          <Field label="Monthly service charge">
-            <TextInput type="number" min="0" step="0.01" value={form.defaultServiceCharge}
-              onChange={(e) => setForm({ ...form, defaultServiceCharge: e.target.value })} />
-          </Field>
-        </div>
         <Button type="submit" loading={saving} className="w-full">Save changes</Button>
       </form>
+
+      {/* Outside the form on purpose: each flat action is its own request and must not be swept
+          up by the name/phone submit. */}
+      {owner && (
+        <div className="mt-4">
+          <OwnerFlatsEditor ownerId={owner.owner_id} flats={owner.flats || []} onChanged={onSaved} />
+        </div>
+      )}
     </Modal>
   );
 }

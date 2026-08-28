@@ -310,6 +310,8 @@ export interface OwnerStatementInvoice {
   total_payable: number;
   amount_paid: number;
   payment_status: string;
+  /** Which flat this bills. Null on invoices issued before an owner could hold several. */
+  flat_label?: string | null;
 }
 
 export interface OwnerStatementOptions {
@@ -320,28 +322,42 @@ export interface OwnerStatementOptions {
 }
 
 export function buildOwnerStatementHtml(o: OwnerStatementOptions): string {
-  // A running balance is the whole reason a statement beats a list of invoices: it answers
-  // "what do I owe right now" without the reader adding anything up.
-  let running = 0;
-  const rows = o.invoices
-    .map((i) => {
-      const payable = Number(i.total_payable || 0);
-      const paid = Number(i.amount_paid || 0);
-      running += payable - paid;
-      return `<tr>
+  // ONE SECTION PER FLAT. An owner may hold several, and a running balance that steps through two
+  // flats interleaved by month answers no question anybody has — the point of the statement is
+  // "what do I owe on 3B", not "what do I owe in aggregate on some days". Each flat gets its own
+  // chain; the grand total closes the document.
+  //
+  // An owner with a single flat sees exactly what they saw before: no section heading, one table.
+  const groups = new Map<string, OwnerStatementInvoice[]>();
+  for (const i of o.invoices) {
+    const key = i.flat_label || o.owner.unitLabel || "";
+    const list = groups.get(key);
+    if (list) list.push(i);
+    else groups.set(key, [i]);
+  }
+  const multi = groups.size > 1;
+
+  const section = (label: string, list: OwnerStatementInvoice[]) => {
+    let running = 0;
+    let billed = 0;
+    let received = 0;
+    const rows = list
+      .map((i) => {
+        const payable = Number(i.total_payable || 0);
+        const paid = Number(i.amount_paid || 0);
+        running += payable - paid;
+        billed += payable;
+        received += paid;
+        return `<tr>
 <td>${esc(formatMonth(i.billing_month))}</td>
 <td class="n">${esc(money(payable))}</td>
 <td class="n">${esc(money(paid))}</td>
 <td class="n">${esc(money(running))}</td>
 </tr>`;
-    })
-    .join("");
+      })
+      .join("");
 
-  const body = `
-<div class="sub">
-  <b>${esc(tr("Owner"))}:</b> ${esc(o.owner.name || "—")}
-  ${o.owner.unitLabel ? ` &nbsp;·&nbsp; <b>${esc(tr("Flat"))}:</b> ${esc(o.owner.unitLabel)}` : ""}
-</div>
+    return `${multi && label ? `<div class="sub"><b>${esc(tr("Flat"))}:</b> ${esc(label)}</div>` : ""}
 <table>
   <thead><tr>
     <th>${esc(tr("Month"))}</th>
@@ -352,13 +368,44 @@ export function buildOwnerStatementHtml(o: OwnerStatementOptions): string {
   <tbody>
     ${rows || `<tr><td colspan="4" class="empty">${esc(tr("No invoices have been issued yet."))}</td></tr>`}
     <tr class="sum">
-      <td>${esc(tr("Total"))}</td>
+      <td>${esc(tr(multi ? "Flat total" : "Total"))}</td>
+      <td class="n">${esc(money(billed))}</td>
+      <td class="n">${esc(money(received))}</td>
+      <td class="n">${esc(money(billed - received))}</td>
+    </tr>
+  </tbody>
+</table>`;
+  };
+
+  const sections = groups.size
+    ? Array.from(groups.entries()).map(([label, list]) => section(label, list)).join("")
+    : section("", []);
+
+  // Only when there is more than one chain to add up — otherwise it repeats the table's own row.
+  const grand = multi
+    ? `<table>
+  <tbody>
+    <tr class="sum">
+      <td>${esc(tr("Total across all flats"))}</td>
       <td class="n">${esc(money(o.totals.billed))}</td>
       <td class="n">${esc(money(o.totals.received))}</td>
       <td class="n">${esc(money(o.totals.due))}</td>
     </tr>
   </tbody>
-</table>
+</table>`
+    : "";
+
+  const flatLine = multi
+    ? Array.from(groups.keys()).filter(Boolean).join(", ")
+    : o.owner.unitLabel || "";
+
+  const body = `
+<div class="sub">
+  <b>${esc(tr("Owner"))}:</b> ${esc(o.owner.name || "—")}
+  ${flatLine ? ` &nbsp;·&nbsp; <b>${esc(tr(multi ? "Flats" : "Flat"))}:</b> ${esc(flatLine)}` : ""}
+</div>
+${sections}
+${grand}
 <div class="sub">${esc(tr("Balance shown is the amount outstanding after each month's invoice."))}</div>`;
 
   return shell({

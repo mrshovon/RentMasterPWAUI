@@ -63,6 +63,8 @@ export function ServiceChargeTab() {
   useEffect(() => { load(); }, [load]);
 
   const invoices = res?.data || [];
+  // More than one flat is what makes the flat worth naming on each row.
+  const multiFlat = (res?.flats?.length || 0) > 1;
 
   const totals = useMemo(() => {
     const billed = invoices.reduce((s, i) => s + Number(i.total_payable || 0), 0);
@@ -99,7 +101,9 @@ export function ServiceChargeTab() {
       propertyAddress: [b.address, b.city].filter(Boolean).join(", ") || null,
       refNo: inv.invoice_no ? `#${inv.invoice_no}` : null,
       billingMonth: inv.billing_month,
-      unitLabel: b.unitLabel,
+      // The INVOICE's own flat. An owner may hold several, and b.unitLabel is only their primary —
+      // reading it from there printed the same flat on every one of their receipts.
+      unitLabel: inv.flat_label || b.unitLabel,
       partyLabel: "Flat Owner",
       tenantName: res?.owner?.name || b.unitLabel || t("Flat Owner"),
       houseRent: 0,
@@ -120,7 +124,9 @@ export function ServiceChargeTab() {
       signatureCaption: "Authorised Signature",
       fixedNote: null,
     });
-    setReceipt({ html, fileName: `service-charge-receipt-${inv.billing_month}`, month: inv.billing_month });
+    // The flat is in the name: three receipts for one month would otherwise all save over each other.
+    const flatPart = inv.flat_label ? `-${inv.flat_label.replace(/[^A-Za-z0-9.-]+/g, "-")}` : "";
+    setReceipt({ html, fileName: `service-charge-receipt-${inv.billing_month}${flatPart}`, month: inv.billing_month });
   }
 
   function openStatement() {
@@ -173,10 +179,18 @@ export function ServiceChargeTab() {
             </div>
             <div className="min-w-0">
               <h3 className="text-base font-semibold text-heading">{res.building.name}</h3>
-              {res.building.unitLabel && (
+              {/* Every flat they hold, not just the primary one. Falls back to the single label
+                  for an account whose flats predate the roster having them. */}
+              {(res.flats?.length ? res.flats.map((f) => f.unit_label).filter(Boolean) : [res.building.unitLabel])
+                .filter(Boolean).length > 0 && (
                 <p className="mt-1 text-sm text-muted">
-                  <span>{t("Your flat")}: </span>
-                  <strong className="text-fg">{res.building.unitLabel}</strong>
+                  <span>{(res.flats?.length || 0) > 1 ? t("Your flats") : t("Your flat")}: </span>
+                  <strong className="text-fg">
+                    {(res.flats?.length
+                      ? res.flats.map((f) => f.unit_label).filter(Boolean)
+                      : [res.building.unitLabel]
+                    ).filter(Boolean).join(", ")}
+                  </strong>
                 </p>
               )}
               <p className="mt-2 text-sm text-muted">
@@ -214,7 +228,14 @@ export function ServiceChargeTab() {
             <tbody>
               {invoices.map((inv) => (
                 <tr key={inv.id} className="border-b border-line/[0.04] last:border-0">
-                  <td className="p-4 font-medium text-heading">{formatMonth(inv.billing_month)}</td>
+                  <td className="p-4 font-medium text-heading">
+                    {formatMonth(inv.billing_month)}
+                    {/* Only when it tells rows apart: an owner with one flat does not need to be
+                        told which one every month. */}
+                    {multiFlat && inv.flat_label && (
+                      <div className="text-xs font-normal text-muted">{inv.flat_label}</div>
+                    )}
+                  </td>
                   <td className="p-4 text-fg">{formatCurrency(Number(inv.total_payable || 0))}</td>
                   <td className="p-4 text-fg">{formatCurrency(Number(inv.amount_paid || 0))}</td>
                   <td className="p-4">

@@ -1,7 +1,8 @@
-- The app now actually appears in Bangla where it did not before. Plan names and descriptions, the whole Plan tab, rent and service charge lines, staff and accounts screens, and the tenant's rent view were all still showing English even with Bangla selected.
-- The building administrator console is now fully in Bangla too. It always had a language switch, but nothing on those screens changed when you used it.
-- Your printed money receipt now says Owner Copy or Tenant Copy in Bangla instead of English.
-- The Free and Premium plans have proper descriptions now, in both languages.
-- On the plan cards, "Up to 1 properties" now reads correctly, and counted sentences like days remaining read naturally in Bangla.
-- When recording rent received on a building space, the payment method list now shows Cash, bKash and Nagad properly instead of lowercase code words.
-- Notification, update and maintenance messages are translated too.
+- A flat owner can now hold several flats in a building under one login. When you add an owner you list their flats, and they manage all of them from a single account instead of signing in separately for each one.
+- Each flat has its own monthly service charge, so a shop and a three-bedroom are not billed the same amount.
+- Each flat gets its own invoice every month. You can mark one flat paid while another is still owed.
+- Adding a flat also creates it as a property in that owner's own dashboard, so they can put a tenant in it, bill rent and print receipts straight away.
+- Receipts, the cutting sheet and the accounts entries now name the flat the invoice is actually for. Before, an owner with more than one flat would have seen the same flat printed on all of them.
+- The owner's service charge statement now shows each flat separately with its own running balance, then a total across all of them.
+- You can add or remove an owner's flats at any time from Edit owner. Removing a flat stops it being billed but keeps its property, tenant and rent history in the owner's dashboard. A flat that already has invoices is deactivated rather than deleted.
+- Adding or removing flats never changes how the owner signs in.
