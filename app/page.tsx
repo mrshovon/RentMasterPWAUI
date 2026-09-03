@@ -165,8 +165,8 @@ export default function EntryGatewayPage() {
         {/* Brand panel */}
         <div className="hidden flex-col justify-between border-r border-line/[0.06] p-12 lg:flex">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Bari360" className="h-9 w-9 rounded-xl object-cover" />
-            <span className="text-sm font-black uppercase tracking-widest text-fg">
+            <img src="/logo.png" alt="Bari360" className="h-9 w-9 object-contain" />
+            <span className="text-sm font-black uppercase tracking-widest text-wordmark">
               Bari360
             </span>
           </div>

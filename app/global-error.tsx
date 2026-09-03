@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { reportClientError } from "../lib/client-log";
+import { BRAND } from "../lib/brand.generated";
 
 // =============================================================================
 // Root-layout error boundary — the last line of defence.
@@ -11,9 +12,14 @@ import { reportClientError } from "../lib/client-log";
 // replaces the entire document with it — no layout, no LanguageProvider, no globals.css.
 //
 // Which is why everything here is deliberately primitive: its own <html>/<body>, inline styles,
-// no `t()`, no theme tokens, no imports beyond the reporter. A boundary that depends on the thing
-// that just broke is not a boundary. English-only for the same reason — the translation context
-// is one of the things that is gone.
+// no `t()`, no theme tokens. A boundary that depends on the thing that just broke is not a
+// boundary. English-only for the same reason — the translation context is one of the things that
+// is gone.
+//
+// The two imports are safe by construction: the reporter, and lib/brand.generated.ts, which is a
+// generated file of frozen string literals with no imports of its own and nothing to execute.
+// The brand hexes have to be inlined here precisely BECAUSE the stylesheet may not have loaded —
+// but they should still track brand.config.json rather than being a copy that silently rots.
 // =============================================================================
 
 export default function GlobalError({
@@ -41,7 +47,7 @@ export default function GlobalError({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f6f8fb",
+          background: BRAND.surface,
           color: "#0f172a",
           fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
           padding: "24px",
@@ -86,8 +92,8 @@ export default function GlobalError({
               padding: "10px 16px",
               fontSize: "14px",
               fontWeight: 600,
-              color: "#ffffff",
-              background: "#136aba",
+              color: BRAND.btnInk,
+              background: BRAND.primary,
               border: "none",
               borderRadius: "12px",
               cursor: "pointer",

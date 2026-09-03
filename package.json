@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "gen-icons": "node scripts/gen-icons.mjs",
+    "build:brand": "node scripts/build-brand.mjs",
+    "brand": "npm run build:brand && npm run gen-icons",
     "check-i18n": "node scripts/check-i18n.mjs",
     "build:legal": "node scripts/build-legal.mjs",
     "build:check": "node scripts/build-check.mjs"

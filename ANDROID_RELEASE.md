@@ -169,6 +169,25 @@ red build simply produces no release — fix and push again.
 - Backend `lib/fcm-send.ts` + `lib/push-send.ts` — fan notifications out to browser (Web Push) and
   Android (FCM). Notification icon = the logo silhouette (`android/.../ic_stat_notify`).
 
-Regenerate every icon (web favicon/PWA + Android launcher, adaptive and notification) after
-changing the logo: `npm run gen-icons`. The source of truth is
-`public/brandImages/logo-master.jpg`.
+## Brand assets and the brand colour
+
+`brand.config.json` at the repo root is the ONE place a brand colour is typed. Change a hex
+there and run `npm run brand` — it regenerates the CSS tokens, the manifest colours, the native
+loader, every icon, the splash screens and the Android colour resources in one pass. Nothing
+else should ever contain a brand hex.
+
+- `npm run build:brand` — web only: `app/brand.css`, `lib/brand.generated.ts`,
+  `public/manifest.json` colours, `capacitor-www/index.html`.
+- `npm run gen-icons` — images + Android res, from the artwork in `public/brandImages/`:
+  `app_icon_new.jpeg.jpeg` (the mark) and `notification_icon_new.jpeg.jpeg` (the status-bar
+  silhouette). Both are opaque JPEGs; the script recovers transparency from them and repaints
+  the mark to the configured hex — see the header comment in `scripts/gen-icons.mjs`.
+
+**What a colour change does and does not need a release for.** The Android app is a thin
+remote-URL shell, so the web palette, the web/PWA icons and the FCM accent colour all go live
+on a normal deploy — no APK. The launcher icon, adaptive icon, splash screen and
+`ic_stat_notify` are compiled INTO the APK, so changing the *artwork* does need a release;
+existing installs keep the old icon until they update.
+
+The backend repo mirrors the hex once, in `rent-master-pwa/lib/brand.ts` (override with the
+`BRAND_PRIMARY_COLOR` env var). Keep it in step with `brand.config.json`.

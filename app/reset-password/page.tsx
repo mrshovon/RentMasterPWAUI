@@ -154,8 +154,8 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="flex items-center justify-center gap-3">
-          <img src="/logo.png" alt="Bari360" className="h-9 w-9 rounded-xl object-cover" />
-          <span className="text-sm font-black uppercase tracking-widest text-fg">{t("Bari360")}</span>
+          <img src="/logo.png" alt="Bari360" className="h-9 w-9 object-contain" />
+          <span className="text-sm font-black uppercase tracking-widest text-wordmark">{t("Bari360")}</span>
         </div>
 
         <div className="rounded-2xl border border-line/[0.06] bg-surface/40 p-6 backdrop-blur-xl sm:p-8">

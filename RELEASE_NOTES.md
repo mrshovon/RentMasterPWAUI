@@ -1,6 +1,6 @@
-- Fixed: if you own more than one flat in a building, the flats you held before the recent update were missing from your dashboard. They are back, and every flat you hold now appears as a property you can put a tenant in, bill rent for and print receipts from.
-- You can now mark a flat as self-occupied when you live in it yourself. It stops being counted as an empty flat you are failing to let, and it is not offered when you add a tenant.
-- A self-occupied flat shows its own badge, and the properties summary now counts occupied, self-occupied and vacant separately instead of treating anything without a tenant as vacant.
-- The occupancy percentage no longer counts the flat you live in against you.
-- Putting a tenant into a flat automatically clears the self-occupied mark.
-- Your building administrator still bills service charge on a self-occupied flat, and it still counts toward your plan's property limit.
+- Bari360 has a new look. The app icon, the logo and the notification icon have all been replaced with the new house mark.
+- The app colour is now red throughout — buttons, links, highlights and the loading screen.
+- The Bari360 name now reads in a solid dark grey instead of a colour that changed depending on which portal you were in.
+- Delete and remove buttons use a deeper red than the ordinary buttons, so they are harder to hit by mistake.
+- The startup screen now shows the Bari360 mark instead of the placeholder image it used before.
+- Notifications now arrive with the new house icon in your status bar.

@@ -1,3 +1,7 @@
+/* Brand tokens (--primary/--accent/--danger/--wordmark/--btn-ink) are GENERATED from
+   brand.config.json by `npm run brand`. Everything below is hand-written. */
+@import "./brand.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -22,17 +26,14 @@
   --muted: 71 85 105;        /* slate-600 */
   --subtle: 100 116 139;     /* slate-500 */
   --faint: 148 163 184;      /* slate-400 / placeholders */
-  --primary: 13 148 136;     /* teal-600 — readable on light; solid button fill */
-  --accent: 82 121 111;      /* sage — secondary / gradient partner */
   --success: 5 150 105;      /* emerald-600 */
   --warning: 217 119 6;      /* amber-600 */
-  --danger: 225 29 72;       /* rose-600 */
-  --btn-ink: 255 255 255;    /* text on solid primary/accent buttons */
-  /* Categorical chart series. Deliberately NOT --primary/--accent: teal vs sage measure
-     ΔE 8.1 for normal vision (and 5.6 deutan), i.e. indistinguishable as two series. This
-     teal/amber pair passes all six palette checks against BOTH the light and dark chart
-     surface, so it is intentionally identical in the two themes. Assign in fixed order —
-     chart-1 is always owners, chart-2 always tenants — never by rank. */
+  /* Categorical chart series. Deliberately NOT --primary/--accent, and deliberately NOT
+     brand-derived: two series have to be told apart by people with colour-vision deficiency,
+     which is a stricter constraint than looking on-brand. This teal/amber pair passes all six
+     palette checks against BOTH the light and dark chart surface, so it is intentionally
+     identical in the two themes and does not move when brand.config.json does. Assign in fixed
+     order — chart-1 is always owners, chart-2 always tenants — never by rank. */
   --chart-1: 13 148 136;     /* teal-600  — series 1 */
   --chart-2: 217 119 6;      /* amber-600 — series 2 */
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 30px -12px rgba(15, 23, 42, 0.18);
@@ -53,12 +54,8 @@
   --muted: 148 163 184;      /* slate-400 */
   --subtle: 100 116 139;     /* slate-500 */
   --faint: 71 85 105;        /* slate-600 */
-  --primary: 45 212 191;     /* teal-400 — bright accent on dark */
-  --accent: 148 190 158;     /* sage light */
   --success: 52 211 153;     /* emerald-400 */
   --warning: 251 191 36;     /* amber-400 */
-  --danger: 251 113 133;     /* rose-400 */
-  --btn-ink: 2 6 23;         /* dark ink on bright teal buttons (strong contrast) */
   /* Same steps as light — validated against the dark chart surface too (see the light
      block). Kept identical on purpose rather than auto-brightened: the brighter teal-400 /
      amber-400 used elsewhere in dark mode sit outside the categorical lightness band. */
@@ -83,21 +80,24 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 
-  /* Subtle mesh backdrop — soft teal/sage tints. Theme-aware (see the dark override below). */
+  /* Subtle mesh backdrop, tinted with the brand tokens rather than literals so it follows
+     brand.config.json. These were hard-coded teal for a long time and were the one surface that
+     silently stayed on the old palette after a rebrand. */
   background-image:
-    radial-gradient(60% 50% at 15% -5%, rgba(13, 148, 136, 0.06), transparent 60%),
-    radial-gradient(50% 45% at 100% 0%, rgba(82, 121, 111, 0.05), transparent 55%),
-    radial-gradient(45% 40% at 85% 110%, rgba(16, 185, 129, 0.04), transparent 55%);
+    radial-gradient(60% 50% at 15% -5%, rgb(var(--primary) / 0.07), transparent 60%),
+    radial-gradient(50% 45% at 100% 0%, rgb(var(--accent) / 0.06), transparent 55%),
+    radial-gradient(45% 40% at 85% 110%, rgb(var(--primary) / 0.04), transparent 55%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 :root[data-theme="dark"] body {
+  /* Same mesh, a touch stronger — the dark tokens are lighter, so they need more alpha to read. */
   background-image:
-    radial-gradient(60% 50% at 15% -5%, rgba(45, 212, 191, 0.10), transparent 60%),
-    radial-gradient(50% 45% at 100% 0%, rgba(148, 190, 158, 0.06), transparent 55%),
-    radial-gradient(45% 40% at 85% 110%, rgba(16, 185, 129, 0.05), transparent 55%);
+    radial-gradient(60% 50% at 15% -5%, rgb(var(--primary) / 0.10), transparent 60%),
+    radial-gradient(50% 45% at 100% 0%, rgb(var(--accent) / 0.07), transparent 55%),
+    radial-gradient(45% 40% at 85% 110%, rgb(var(--primary) / 0.05), transparent 55%);
 }
 
 /* Thin theme-aware scrollbar */

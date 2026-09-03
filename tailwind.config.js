@@ -36,6 +36,10 @@ module.exports = {
         warning: "rgb(var(--warning) / <alpha-value>)",
         danger: "rgb(var(--danger) / <alpha-value>)",
         "btn-ink": "rgb(var(--btn-ink) / <alpha-value>)",
+        // The Bari360 wordmark. Its own token, NOT --fg: the wordmark is a fixed brand ink
+        // (#3B3838) that inverts on dark, while --fg is body copy. Repointing --fg to recolour
+        // the wordmark would recolour every paragraph in the app with it.
+        wordmark: "rgb(var(--wordmark) / <alpha-value>)",
         // Categorical chart series, assigned in fixed order (1 = owners, 2 = tenants).
         "chart-1": "rgb(var(--chart-1) / <alpha-value>)",
         "chart-2": "rgb(var(--chart-2) / <alpha-value>)",
