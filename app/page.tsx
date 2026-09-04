@@ -9,7 +9,7 @@ import {
 } from "../lib/api-service";
 import { LegalLinks } from "../components/legal-links";
 import { LEGAL_VERSION } from "../content/legal/generated";
-import { Button, Modal, Field, TextInput, PasswordInput, EmailField, PhoneField } from "../components/ui";
+import { Button, Modal, Field, TextInput, PasswordInput, EmailField, PhoneField, Wordmark } from "../components/ui";
 import { validateEmail, validatePhone, isSystemLogin } from "../lib/validate";
 import { toast } from "../components/toast";
 import { DownloadAndroid } from "../components/download-android";
@@ -164,12 +164,7 @@ export default function EntryGatewayPage() {
       <div className="z-10 grid min-h-screen w-full lg:grid-cols-2">
         {/* Brand panel */}
         <div className="hidden flex-col justify-between border-r border-line/[0.06] p-12 lg:flex">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Bari360" className="h-9 w-9 object-contain" />
-            <span className="text-sm font-black uppercase tracking-widest text-wordmark">
-              Bari360
-            </span>
-          </div>
+          <Wordmark className="h-9" />
 
           <div className="max-w-md space-y-5">
             <span className="inline-block rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-primary">

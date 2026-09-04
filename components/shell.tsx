@@ -8,6 +8,7 @@ import { DownloadAndroid } from "./download-android";
 import { ThemeToggle } from "./theme-toggle";
 import { LanguageToggle } from "./language-toggle";
 import { LegalLinks } from "./legal-links";
+import { Wordmark } from "./ui";
 import { useT } from "../lib/i18n";
 
 export interface NavItem {
@@ -78,15 +79,10 @@ export function DashboardShell({
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-line/[0.08] bg-surface/60 p-5 backdrop-blur-xl md:flex">
         {/* Top band — brand + optional slot. Fixed height. */}
         <div className="shrink-0 space-y-6">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Bari360" className="h-9 w-9 object-contain" />
-            <div>
-              <div className="text-sm font-black tracking-widest text-wordmark">
-                BARI360
-              </div>
-              <div className="text-[10px] uppercase tracking-widest text-subtle">
-                {t(roleLabel)}
-              </div>
+          <div className="space-y-1.5">
+            <Wordmark className="h-7" />
+            <div className="text-[10px] uppercase tracking-widest text-subtle">
+              {t(roleLabel)}
             </div>
           </div>
 
@@ -161,11 +157,11 @@ export function DashboardShell({
             sidebar); on desktop the sidebar already provides both, so those collapse and the
             bar exists to keep theme/language reachable without opening a menu. */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line/[0.08] bg-surface/80 px-4 py-3 backdrop-blur-xl md:px-8 lg:px-10">
-          <div className="flex items-center gap-2 md:hidden">
-            <img src="/logo.png" alt="Bari360" className="h-8 w-8 object-contain" />
-            <span className="text-sm font-bold text-fg">
-              {activeTab ? t(activeTab.label) : "Bari360"}
-            </span>
+          <div className="flex min-w-0 items-center gap-2 md:hidden">
+            <Wordmark className="h-6" />
+            {activeTab && (
+              <span className="truncate text-sm font-bold text-fg">{t(activeTab.label)}</span>
+            )}
           </div>
           {/* Desktop: name the current section, so the bar isn't a lone cluster of buttons. */}
           <span className="hidden text-sm font-bold text-fg md:block">

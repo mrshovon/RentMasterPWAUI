@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Lock, ArrowRight, CheckCircle2, TriangleAlert } from "lucide-react";
 import { getSupabaseBrowser } from "../../lib/supabase-browser";
 import { apiResetComplete } from "../../lib/api-service";
-import { Button, PasswordInput } from "../../components/ui";
+import { Button, PasswordInput, Wordmark } from "../../components/ui";
 import { ThemeToggle } from "../../components/theme-toggle";
 import { useT } from "../../lib/i18n";
 
@@ -154,8 +154,7 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="flex items-center justify-center gap-3">
-          <img src="/logo.png" alt="Bari360" className="h-9 w-9 object-contain" />
-          <span className="text-sm font-black uppercase tracking-widest text-wordmark">{t("Bari360")}</span>
+          <Wordmark className="h-9" />
         </div>
 
         <div className="rounded-2xl border border-line/[0.06] bg-surface/40 p-6 backdrop-blur-xl sm:p-8">

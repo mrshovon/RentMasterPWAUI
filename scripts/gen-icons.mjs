@@ -1,39 +1,41 @@
 // Generate EVERY app icon, the Android splash, and the Android colour resources from the
-// brand mark + brand.config.json.  Run: npm run gen-icons   (or `npm run brand` for both steps)
+// brand artwork + brand.config.json.  Run: npm run gen-icons   (or `npm run brand` for both steps)
 //
 // Produces:
 //   WEB (public/)
 //     - favicon.png, logo.png                              transparent mark, sits on any surface
+//     - logo-wordmark.png, logo-wordmark-dark.png          the full lock-up, one per theme
 //     - icon-192.png, icon-512.png, apple-touch-icon.png   opaque, mark inset on ICON_BG
 //     - icon-maskable-512.png                              tighter inset for the maskable safe zone
 //   ANDROID (android/app/src/main/res/)
 //     - mipmap-*/ic_launcher.png, ic_launcher_round.png
 //     - mipmap-*/ic_launcher_foreground.png       adaptive foreground, transparent padding
 //     - drawable-*/ic_stat_notify.png             status-bar silhouette
-//     - drawable{,-land-*,-port-*}/splash.png     launch screen
+//     - drawable{,-land-*,-port-*}/splash.png     launch screen, the full lock-up
 //     - values/colors.xml, values/ic_launcher_background.xml
 //
 // ---------------------------------------------------------------------------------------
-// WHY THE SOURCES ARE MASKED RATHER THAN USED DIRECTLY
+// WHY THE ARTWORK IS REBUILT RATHER THAN USED DIRECTLY
 //
-// Both source files are JPEGs, and JPEG cannot store transparency. That breaks them in two
-// different ways, so each gets its own mask:
+// Two different reasons, one per source:
 //
-//   app_icon_new.jpeg.jpeg — the "transparent" checkerboard is BAKED IN as real #FEFEFE/#EDEDED
-//     pixels. Used as-is, the logo shows a grey grid on every surface. But the mark is the only
-//     CHROMATIC thing in the frame, so alpha can be recovered from saturation: ~106k saturated
-//     pixels vs ~282k neutral ones, with only ~5.5k in between. The opaque pixels are then
-//     repainted to the exact configured hex — the JPEG had drifted to #E33F33 — which is also
-//     what makes the logo follow a future colour change instead of freezing whatever red the
-//     artwork happened to be exported with.
+//   app_icon_logo_2.png / logo_new_2.png — real PNGs with real alpha, so nothing has to be
+//     reconstructed. They are still rebuilt pixel-by-pixel so the colours can be REPAINTED to
+//     the exact hexes in brand.config.json. That is the whole point: the artwork follows a
+//     future brand-colour change instead of freezing whatever red it was exported with.
+//     The lock-up is two-coloured, so it gets a two-way repaint keyed on saturation — the
+//     "bari36" ink is neutral, the house is not, and in the source the two do not overlap at
+//     all (29,951 saturated pixels, 15,448 neutral, zero in between).
 //
-//   notification_icon_new.jpeg.jpeg — a grey house on a solid BLACK field. Android draws
-//     status-bar icons as a flat ALPHA MASK: every colour is discarded and whatever is opaque
-//     is painted solid white. Handed this file directly, Android would render a filled white
-//     square. Alpha is recovered from luminance instead, and the result forced to pure white.
+//   notification_icon_new.jpeg.jpeg — a grey house on a solid BLACK field, and a JPEG, so it
+//     has no alpha to read. Android draws status-bar icons as a flat ALPHA MASK: every colour
+//     is discarded and whatever is opaque is painted solid white. Handed this file directly,
+//     Android would render a filled white square. Alpha is recovered from luminance instead,
+//     and the result forced to pure white.
 //
-// Both masks then trim to the mark's bounding box and re-pad to a centred square, so the glyph
-// is optically centred in every icon regardless of where it sat in the source frame.
+// The square masks then trim to the mark's bounding box and re-pad to a centred square, so the
+// glyph is optically centred in every icon regardless of where it sat in the source frame. The
+// lock-up is trimmed but NOT padded — its 2.4:1 aspect ratio is the artwork's own.
 // ---------------------------------------------------------------------------------------
 
 import sharp from "sharp";
@@ -46,9 +48,10 @@ const PUBLIC = resolve(ROOT, "public");
 
 const brand = loadBrand();
 
-// Source artwork. app_icon_new and logo_new are byte-identical, so one file serves the logo
-// and every app icon; only the notification silhouette is separate art.
-const MARK_SRC = resolve(PUBLIC, "brandImages/app_icon_new.jpeg.jpeg");
+// Source artwork. The bare house glyph drives every icon; the full lock-up drives the header
+// wordmark and the splash; the notification silhouette is separate art again.
+const MARK_SRC = resolve(PUBLIC, "brandImages/app_icon_logo_2.png");
+const WORDMARK_SRC = resolve(PUBLIC, "brandImages/logo_new_2.png");
 const NOTIFY_SRC = resolve(PUBLIC, "brandImages/notification_icon_new.jpeg.jpeg");
 
 // The mark is a bare red glyph with transparency, NOT the full-bleed disc it replaces, so the
@@ -81,25 +84,33 @@ const SPLASH = {
   "drawable-port-xxxhdpi": [1280, 1920],
 };
 
-// A bare glyph needs a tighter inset than the full-bleed disc this replaces (which used 0.76).
-// 0.62 is the adaptive icon's 66/108 safe zone — anything larger gets clipped by the launcher's
-// circular mask on stock Android.
-const ADAPTIVE_SCALE = 0.62;
-const ICON_SCALE = 0.72; // opaque square icons: room to breathe, no mask to fear
+// ---------------------------------------------------------------------------------------
+// SCALES. These read low for a reason: the house glyph is PORTRAIT (307x369 once trimmed, so
+// 0.83:1) and maskToSquare pads it to a square by its LONGER side. A scale of S therefore gives
+// the glyph S of the canvas vertically but only 0.83*S horizontally — set S by what looks right
+// across the top and bottom, not by the width, or the icon reads as cramped even though it is
+// geometrically centred.
+const ADAPTIVE_SCALE = 0.5; // adaptive foreground + maskable. Android guarantees only the centre
+                            // 72/108 = 0.667 CIRCLE is visible, and a 0.83:1 glyph has a diagonal
+                            // 1.30x its height — so 0.5 * 1.30 = 0.65 is about the largest that
+                            // keeps the house's base corners out of the round mask.
+const ICON_SCALE = 0.58; // opaque square icons: no mask to fear, but the same portrait glyph, so
+                         // this lands ~107px of top/bottom margin on a 512 canvas.
 const NOTIFY_SCALE = 0.85; // the status bar gives us the whole 24dp box
-const SPLASH_SCALE = 0.28; // fraction of the SHORT edge
+const SPLASH_WORDMARK_SCALE = 0.62; // lock-up WIDTH as a fraction of the canvas's SHORT edge
 
 /** Linear ramp with clamping — turns a channel measurement into an alpha byte. */
 const ramp = (v, lo, hi) => Math.max(0, Math.min(255, Math.round(((v - lo) / (hi - lo)) * 255)));
 
 /**
- * Rebuild an opaque JPEG as a transparent, single-colour PNG.
+ * Rebuild a source as a transparent, single-colour PNG.
  *
- * `alphaOf(r,g,b)` decides opacity per pixel; every opaque pixel is painted `rgb`. The result
- * is cropped to the mark's alpha bounding box and re-padded to a centred square.
+ * `alphaOf(r,g,b,a)` decides opacity per pixel — reading the source alpha where there is one and
+ * reconstructing it from colour where there is not. Every opaque pixel is painted `rgb`. The
+ * result is cropped to the mark's alpha bounding box and re-padded to a centred square.
  */
 async function maskToSquare(src, alphaOf, rgb) {
-  const { data, info } = await sharp(src).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
   const out = Buffer.alloc(width * height * 4);
 
@@ -111,7 +122,7 @@ async function maskToSquare(src, alphaOf, rgb) {
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * channels;
-      const a = alphaOf(data[i], data[i + 1], data[i + 2]);
+      const a = alphaOf(data[i], data[i + 1], data[i + 2], data[i + 3]);
       const o = (y * width + x) * 4;
       out[o] = rgb[0];
       out[o + 1] = rgb[1];
@@ -147,13 +158,65 @@ async function maskToSquare(src, alphaOf, rgb) {
     .then((buf) => ({ buf, rgb }));
 }
 
-/** Alpha from chroma — the checkerboard is neutral, the mark is not. */
-const chromaMask = (src, hex) =>
-  maskToSquare(src, (r, g, b) => ramp(Math.max(r, g, b) - Math.min(r, g, b), 25, 90), hexToRgb(hex));
+/** Alpha straight from the PNG — the glyph is monochrome, so it is repainted to one brand hex. */
+const alphaMask = (src, hex) => maskToSquare(src, (_r, _g, _b, a) => a, hexToRgb(hex));
 
-/** Alpha from luminance — the black field drops out, the glyph becomes pure white. */
+/** Alpha from luminance — the black JPEG field drops out, the glyph becomes pure white. */
 const lumaMask = (src) =>
   maskToSquare(src, (r, g, b) => ramp(0.299 * r + 0.587 * g + 0.114 * b, 8, 90), [255, 255, 255]);
+
+/**
+ * The full "bari36 + house" lock-up, repainted to the configured hexes and trimmed.
+ *
+ * Two colours, so the single-hex repaint above will not do: every pixel is mixed between `ink`
+ * and `primary` by its SATURATION. The wordmark ink is neutral (#3B3838, saturation 3) and the
+ * house is not (saturation 165), so the two classes are far apart — but a hard threshold would
+ * fringe the anti-aliased boundary between them, hence the same ramp the alpha masks use.
+ * Source alpha is carried through untouched.
+ *
+ * Trimmed to the alpha bounding box but deliberately NOT padded to a square: the lock-up's
+ * aspect ratio is part of the artwork, and a caller that wants margin adds its own.
+ */
+async function wordmark(src, primaryHex, inkHex) {
+  const { data, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  const [pr, pg, pb] = hexToRgb(primaryHex);
+  const [ir, ig, ib] = hexToRgb(inkHex);
+  const out = Buffer.alloc(width * height * 4);
+
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * channels;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+      const mix = ramp(Math.max(r, g, b) - Math.min(r, g, b), 25, 90) / 255;
+      const o = (y * width + x) * 4;
+      out[o] = Math.round(ir + (pr - ir) * mix);
+      out[o + 1] = Math.round(ig + (pg - ig) * mix);
+      out[o + 2] = Math.round(ib + (pb - ib) * mix);
+      out[o + 3] = a;
+      if (a > 24) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) throw new Error(`No artwork found in ${src} — is it fully transparent?`);
+
+  return sharp(out, { raw: { width, height, channels: 4 } })
+    .extract({ left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 })
+    .png()
+    .toBuffer();
+}
 
 const ensure = (dir) => mkdir(dir, { recursive: true });
 
@@ -162,9 +225,9 @@ const ensure = (dir) => mkdir(dir, { recursive: true });
  *
  * The RGB is re-flattened to `art.rgb` AFTER resizing rather than trusting the resampler.
  * Lanczos overshoots at the edges of a hard-edged glyph, and at a big reduction the overshoot
- * is the whole pixel: scaling the 1254px source straight down to a 32px favicon turned
- * #E0473B into #FF5143. Since the mark is monochrome by construction, only the ALPHA channel
- * carries information worth resampling — so keep that and repaint the colour exactly.
+ * is the whole pixel: scaling the source straight down to a 32px favicon turned #E0473B into
+ * #FF5143. Since the mark is monochrome by construction, only the ALPHA channel carries
+ * information worth resampling — so keep that and repaint the colour exactly.
  */
 async function mark(art, size) {
   const alpha = await sharp(art.buf)
@@ -187,6 +250,22 @@ async function inset(art, canvasW, scale, background, canvasH = canvasW) {
     .toBuffer();
 }
 
+/**
+ * The lock-up centred on a rectangular canvas. Unlike `inset`, the size is set by WIDTH: the
+ * artwork is 2.4x wider than it is tall, so scaling it by the short edge the way a square glyph
+ * is scaled would overflow every portrait canvas. The height follows from the aspect ratio.
+ */
+async function insetWordmark(lockup, canvasW, canvasH, scale, background) {
+  const art = await sharp(lockup)
+    .resize({ width: Math.round(Math.min(canvasW, canvasH) * scale) })
+    .png()
+    .toBuffer();
+  return sharp({ create: { width: canvasW, height: canvasH, channels: 4, background } })
+    .composite([{ input: art, gravity: "centre" }])
+    .png()
+    .toBuffer();
+}
+
 /** Circular crop for the legacy round launcher icon (Android does not round these itself). */
 async function circle(art, size) {
   const cut = Buffer.from(
@@ -199,12 +278,17 @@ async function circle(art, size) {
     .toBuffer();
 }
 
-async function genWeb(markArt) {
+async function genWeb(markArt, lockupLight, lockupDark) {
   await ensure(PUBLIC);
   // Transparent: these sit on the app's own surfaces and in the browser tab, where a white
   // plate behind the glyph would read as a sticker in dark mode.
   await writeFile(`${PUBLIC}/logo.png`, await mark(markArt, 256));
   await writeFile(`${PUBLIC}/favicon.png`, await mark(markArt, 32));
+  // Two lock-ups, not one: the "bari36" ink is near-black by definition, so on the dark theme
+  // it would vanish. components/ui.tsx <Wordmark /> swaps between them with Tailwind's dark:
+  // variant, which is wired to [data-theme="dark"] — pure CSS, so there is no hydration flash.
+  await writeFile(`${PUBLIC}/logo-wordmark.png`, lockupLight);
+  await writeFile(`${PUBLIC}/logo-wordmark-dark.png`, lockupDark);
   // Opaque: home-screen and launcher surfaces. apple-touch-icon in particular MUST be opaque —
   // iOS composites a transparent one onto black.
   const opaque = { "icon-192.png": 192, "icon-512.png": 512, "apple-touch-icon.png": 180 };
@@ -241,10 +325,16 @@ async function genNotify(notifyArt) {
   }
 }
 
-async function genSplash(markArt) {
+// The launch screen shows the full lock-up rather than the bare glyph: it is the one moment the
+// app has the whole screen and nothing else to say, so it may as well say the name. ICON_BG is
+// light, so the light-theme lock-up is the readable one on it whatever theme the app opens in.
+async function genSplash(lockupLight) {
   for (const [dir, [w, h]] of Object.entries(SPLASH)) {
     await ensure(`${RES}/${dir}`);
-    await writeFile(`${RES}/${dir}/splash.png`, await inset(markArt, w, SPLASH_SCALE, OPAQUE_BG, h));
+    await writeFile(
+      `${RES}/${dir}/splash.png`,
+      await insetWordmark(lockupLight, w, h, SPLASH_WORDMARK_SCALE, OPAQUE_BG),
+    );
   }
 }
 
@@ -274,16 +364,18 @@ async function genValues() {
   );
 }
 
-const markArt = await chromaMask(MARK_SRC, brand.light.primary);
+const markArt = await alphaMask(MARK_SRC, brand.light.primary);
 const notifyArt = await lumaMask(NOTIFY_SRC);
+const lockupLight = await wordmark(WORDMARK_SRC, brand.light.primary, brand.light.wordmark);
+const lockupDark = await wordmark(WORDMARK_SRC, brand.dark.primary, brand.dark.wordmark);
 
-await genWeb(markArt);
+await genWeb(markArt, lockupLight, lockupDark);
 await genLauncher(markArt);
 await genForeground(markArt);
 await genNotify(notifyArt);
-await genSplash(markArt);
+await genSplash(lockupLight);
 await genValues();
 
 console.log("Icons generated from", MARK_SRC.replace(ROOT, "."), "at", brand.light.primary);
-console.log("  web:     favicon, logo, icon-192/512, maskable-512, apple-touch-icon");
+console.log("  web:     favicon, logo, wordmark (light + dark), icon-192/512, maskable-512, apple-touch-icon");
 console.log("  android: launcher (+round), adaptive foreground, notification silhouette, splash x11, colours");

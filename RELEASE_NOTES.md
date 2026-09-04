@@ -1,6 +1,4 @@
-- Bari360 has a new look. The app icon, the logo and the notification icon have all been replaced with the new house mark.
-- The app colour is now red throughout — buttons, links, highlights and the loading screen.
-- The Bari360 name now reads in a solid dark grey instead of a colour that changed depending on which portal you were in.
-- Delete and remove buttons use a deeper red than the ordinary buttons, so they are harder to hit by mistake.
-- The startup screen now shows the Bari360 mark instead of the placeholder image it used before.
-- Notifications now arrive with the new house icon in your status bar.
+- The full Bari360 logo now appears in the header, in place of the small mark and the separate name text beside it.
+- The startup screen shows the full Bari360 logo instead of just the house mark.
+- The app icon has been rebalanced. The house had been sitting too close to the top and bottom edges, and on some phones the launcher was cutting the corners off its base.
+- The logo now switches to a lighter version in dark mode, so the name stays readable.
