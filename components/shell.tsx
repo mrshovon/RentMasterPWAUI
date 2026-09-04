@@ -157,13 +157,12 @@ export function DashboardShell({
             sidebar); on desktop the sidebar already provides both, so those collapse and the
             bar exists to keep theme/language reachable without opening a menu. */}
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line/[0.08] bg-surface/80 px-4 py-3 backdrop-blur-xl md:px-8 lg:px-10">
-          <div className="flex min-w-0 items-center gap-2 md:hidden">
-            <Wordmark className="h-6" />
-            {activeTab && (
-              <span className="truncate text-sm font-bold text-fg">{t(activeTab.label)}</span>
-            )}
-          </div>
-          {/* Desktop: name the current section, so the bar isn't a lone cluster of buttons. */}
+          {/* Mobile: the lock-up alone. The section name used to sit beside it and read as a
+              word stuck to the logo — and it was already on screen twice, in the PageHeader
+              directly below and on the highlighted bottom-nav tab. */}
+          <Wordmark className="h-6 md:hidden" />
+          {/* Desktop: name the current section, so the bar isn't a lone cluster of buttons.
+              There is no sidebar on mobile, which is why that trade-off differs by width. */}
           <span className="hidden text-sm font-bold text-fg md:block">
             {t(activeTab?.label ?? roleLabel)}
           </span>
