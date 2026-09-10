@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Baloo_Da_2 } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "../components/toast";
 import { ConfirmHost } from "../components/confirm";
@@ -8,6 +9,22 @@ import { AnalyticsGate } from "../components/analytics-gate";
 import { AnnouncementGate } from "../components/announcement-gate";
 import { NotificationSoundGate } from "../components/notification-sound-gate";
 import { LanguageProvider } from "../lib/i18n";
+
+// The display face — banner titles, metric values and hub-tile labels. Body copy deliberately
+// stays on the system stack (font-sans); this is opt-in per element.
+//
+// Chosen for its BENGALI coverage as much as its Latin. The app ships a full bn.ts, and most
+// rounded display faces carry no Bengali glyphs — a Bangla heading would silently fall back to
+// the system Bengali font and stop matching its English twin, which is exactly the class of
+// silent-degradation bug lib/i18n.tsx exists to avoid.
+//
+// No `weight`: the family has a variable wght axis (400-800), so one file covers every weight
+// we use instead of three static cuts.
+const display = Baloo_Da_2({
+  subsets: ["latin", "bengali"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Bari360 — Property Management",
@@ -48,7 +65,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={display.variable}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
       </head>

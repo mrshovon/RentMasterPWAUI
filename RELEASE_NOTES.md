@@ -1,4 +1,9 @@
-- The full Bari360 logo now appears in the header, in place of the small mark and the separate name text beside it.
-- The startup screen shows the full Bari360 logo instead of just the house mark.
-- The app icon has been rebalanced. The house had been sitting too close to the top and bottom edges, and on some phones the launcher was cutting the corners off its base.
-- The logo now switches to a lighter version in dark mode, so the name stays readable.
+- The Overview screen has been rebuilt. Your rent and outstanding totals sit at the top, and every part of the app now has its own card you can tap to open it, with its count on the card.
+- Each card shows a live detail: how much is due in Billing, how many requests are open, which plan you are on.
+- Tap the Overview bar to fold the whole summary away. It stays folded next time you open the app.
+- The occupancy line has an All and Occupied switch that changes what the Properties card counts.
+- The header is now a card with the Bari360 logo, a Bangla and English switch, and a bell that takes you straight to Notices. The bell shows a dot when there is something unread.
+- Headings across the app use a new rounded typeface, in both Bangla and English.
+- You can now pay for a plan online, by card or mobile banking, without leaving the app. Your plan turns on the moment the payment goes through, with no waiting for approval.
+- The old way of paying still works. If both are switched on you choose which you prefer on the payment screen.
+- The Terms and Privacy Policy have been updated to describe online payment. We still never see your card number or your mobile banking PIN.

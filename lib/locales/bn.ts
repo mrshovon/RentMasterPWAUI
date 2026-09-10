@@ -1537,4 +1537,72 @@ export const bn: Record<string, string> = {
     "এই ফ্ল্যাটে ভাড়াটিয়া আছেন। আগে খালি করুন, তারপর নিজে থাকেন হিসেবে চিহ্নিত করুন।",
   "Only a flat inside a building can be marked as self-occupied.":
     "শুধু ভবনের ভেতরের ফ্ল্যাটকেই নিজে থাকেন হিসেবে চিহ্নিত করা যায়।",
+  // ---------------------------------------------------------------- owner overview hub
+  // The launcher screen: the landlord strip, the red section banner, the money pair, the
+  // occupancy line and the tile subtitles. Numbers stay in Western digits per the note at the
+  // top of this file, so "24/7" is left as-is inside its Bangla phrase.
+  "Active Landlord": "সক্রিয় বাড়িওয়ালা",
+  Landlord: "বাড়িওয়ালা",
+  Live: "লাইভ",
+  "Summary of rent, properties & finances": "ভাড়া, সম্পত্তি ও আর্থিক সারসংক্ষেপ",
+  "Expected / month": "প্রত্যাশিত / মাস",
+  "{0} unpaid invoice": "{0}টি অপরিশোধিত ইনভয়েস",
+  "{0} unpaid invoices": "{0}টি অপরিশোধিত ইনভয়েস",
+  "{0} unit": "{0}টি ইউনিট",
+  "{0} units": "{0}টি ইউনিট",
+  "{0}% Occupied": "{0}% ভাড়া হয়েছে",
+  "Occupancy: {0}% ({1} of {2} units filled)":
+    "দখল অবস্থা: {0}% ({2}টির মধ্যে {1}টি ভাড়া হয়েছে)",
+  All: "সব",
+  "{0} registered": "{0}টি নিবন্ধিত",
+  "{0} resident": "{0} জন বাসিন্দা",
+  "{0} residents": "{0} জন বাসিন্দা",
+  "{0} due": "{0} বকেয়া",
+  "{0} active": "{0}টি চলমান",
+  "Send alerts": "সতর্কবার্তা পাঠান",
+  "Scheduled push": "নির্ধারিত নোটিফিকেশন",
+  "Guards & maids": "গার্ড ও গৃহকর্মী",
+  "Ledger & dues": "খতিয়ান ও বকেয়া",
+  "Building dues": "ভবনের বকেয়া",
+  "Your subscription": "আপনার সাবস্ক্রিপশন",
+  "24/7 Call line": "24/7 কল লাইন",
+  Preferences: "পছন্দসমূহ",
+  // ---------------------------------------------------------------- online payment (UddoktaPay)
+  // The owner's choice of payment method, the hand-off to the gateway, and the two pages the
+  // gateway sends them back to. "UddoktaPay" itself is never translated — it is a company name.
+  "Choose how you would like to pay.": "আপনি কীভাবে পরিশোধ করতে চান তা বেছে নিন।",
+  "Card, bKash, Nagad and more. Your plan turns on straight away.":
+    "কার্ড, বিকাশ, নগদ ও আরও অনেক কিছু। আপনার প্ল্যান সঙ্গে সঙ্গেই চালু হয়ে যাবে।",
+  "Send the money yourself": "নিজে টাকা পাঠান",
+  "Pay into our {0} number, then send us the transaction id. We activate it after checking.":
+    "আমাদের {0} নম্বরে টাকা পাঠিয়ে ট্রানজেকশন আইডি আমাদের দিন। যাচাই করে আমরা প্ল্যান চালু করে দেব।",
+  "You will be taken to our payment partner to finish this securely. Your plan turns on as soon as the payment goes through.":
+    "নিরাপদে পরিশোধ শেষ করতে আপনাকে আমাদের পেমেন্ট পার্টনারের কাছে নেওয়া হবে। পেমেন্ট সম্পন্ন হওয়ামাত্র আপনার প্ল্যান চালু হয়ে যাবে।",
+  "Continue to payment": "পেমেন্টে এগিয়ে যান",
+  "Choose another way to pay": "অন্য উপায়ে পরিশোধ করুন",
+  "Online payment is not available right now.": "এই মুহূর্তে অনলাইন পেমেন্ট চালু নেই।",
+
+  // Return page
+  "Confirming your payment…": "আপনার পেমেন্ট যাচাই করা হচ্ছে…",
+  "Payment is still processing": "পেমেন্ট এখনো প্রক্রিয়াধীন",
+  "We could not confirm this payment": "এই পেমেন্ট নিশ্চিত করা যায়নি",
+  "Your plan is now active. Thank you!": "আপনার প্ল্যান এখন সক্রিয়। ধন্যবাদ!",
+  "This payment has not finished yet. If money has left your account it will be applied automatically.":
+    "এই পেমেন্ট এখনো শেষ হয়নি। আপনার অ্যাকাউন্ট থেকে টাকা কেটে থাকলে তা আপনা-আপনিই যোগ হয়ে যাবে।",
+  "This payment did not go through. Nothing has been charged.":
+    "এই পেমেন্ট সম্পন্ন হয়নি। আপনার কাছ থেকে কোনো টাকা কাটা হয়নি।",
+  "We could not match this payment to an order. Please contact support.":
+    "এই পেমেন্টের সঙ্গে কোনো অর্ডার মেলানো যায়নি। অনুগ্রহ করে সহায়তায় যোগাযোগ করুন।",
+  "We could not confirm your payment just now. If money has left your account it will be applied shortly.":
+    "এই মুহূর্তে আপনার পেমেন্ট নিশ্চিত করা যায়নি। আপনার অ্যাকাউন্ট থেকে টাকা কেটে থাকলে তা শীঘ্রই যোগ হয়ে যাবে।",
+  "This link is missing its payment reference.": "এই লিংকে পেমেন্ট রেফারেন্স নেই।",
+  "Reference: {0}": "রেফারেন্স: {0}",
+  "Back to my plan": "আমার প্ল্যানে ফিরে যান",
+
+  // Cancel page
+  "Payment cancelled": "পেমেন্ট বাতিল হয়েছে",
+  "Nothing has been charged and your plan has not changed. You can try again whenever you are ready.":
+    "কোনো টাকা কাটা হয়নি এবং আপনার প্ল্যানেও কোনো পরিবর্তন হয়নি। আপনি প্রস্তুত হলে আবার চেষ্টা করতে পারেন।",
+  "If you are told a payment is already in progress, contact support and we will clear it for you.":
+    "যদি দেখানো হয় যে একটি পেমেন্ট ইতিমধ্যেই চলমান, তাহলে সহায়তায় যোগাযোগ করুন — আমরা সেটি সরিয়ে দেব।",
 };

@@ -1366,11 +1366,32 @@ export const LEGAL_DOCS = {
         "runs": [
           {
             "t": "bold",
-            "v": "We are not a payment gateway and we are not integrated with bKash."
+            "v": "Subscription payments reach us in one of two ways, and in neither of them do we handle your credentials."
           },
           {
             "t": "text",
-            "v": " Subscription payments are sent by you, out of band, to a mobile-money number we publish in the app, and an administrator matches them by hand. We store the sender number and transaction ID you type in. We never see or store your bKash PIN, your account balance, or your bank details."
+            "v": " You may send the money yourself, out of band, to a mobile-money number we publish in the app and then type in the sender number and transaction ID, which an administrator matches by hand — we store exactly what you typed. Or you may pay online, in which case you are handed to our payment processor, "
+          },
+          {
+            "t": "bold",
+            "v": "UddoktaPay"
+          },
+          {
+            "t": "text",
+            "v": ", and complete the payment on their page."
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "We never see or store your card number, your bKash PIN, your account balance, or your bank details."
+          },
+          {
+            "t": "text",
+            "v": " From an online payment we receive and keep only a payment reference, the method used (for example bKash or card), the amount, and the mobile number the payment came from — enough to match the payment to your account, show it on your record, and refund it if that becomes necessary."
           }
         ]
       },
@@ -3609,11 +3630,32 @@ export const LEGAL_DOCS = {
         "runs": [
           {
             "t": "bold",
-            "v": "আমরা পেমেন্ট গেটওয়ে নই এবং বিকাশের সঙ্গে সংযুক্ত নই।"
+            "v": "সাবস্ক্রিপশনের টাকা দুটি উপায়ের যেকোনো একটিতে আমাদের কাছে আসে, এবং কোনোটিতেই আমরা আপনার গোপন তথ্য হাতে পাই না।"
           },
           {
             "t": "text",
-            "v": " সাবস্ক্রিপশনের টাকা আপনি নিজে, অ্যাপের বাইরে, আমাদের প্রকাশিত মোবাইল ব্যাংকিং নম্বরে পাঠান এবং একজন প্রশাসক তা হাতে মিলিয়ে দেখেন। আপনার লেখা প্রেরকের নম্বর ও লেনদেন আইডি আমরা সংরক্ষণ করি। আপনার বিকাশ পিন, ব্যালান্স বা ব্যাংকের তথ্য আমরা কখনো দেখি না, সংরক্ষণও করি না।"
+            "v": " আপনি নিজে, অ্যাপের বাইরে, আমাদের প্রকাশিত মোবাইল ব্যাংকিং নম্বরে টাকা পাঠিয়ে প্রেরকের নম্বর ও লেনদেন আইডি লিখে দিতে পারেন — একজন প্রশাসক তা হাতে মিলিয়ে দেখেন এবং আপনার লেখা তথ্যই আমরা সংরক্ষণ করি। অথবা আপনি অনলাইনে পরিশোধ করতে পারেন, সেক্ষেত্রে আপনাকে আমাদের পেমেন্ট প্রসেসর "
+          },
+          {
+            "t": "bold",
+            "v": "UddoktaPay"
+          },
+          {
+            "t": "text",
+            "v": "-এর পাতায় পাঠানো হয় এবং সেখানেই পেমেন্ট সম্পন্ন হয়।"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "আপনার কার্ড নম্বর, বিকাশ পিন, ব্যালান্স বা ব্যাংকের তথ্য আমরা কখনো দেখি না, সংরক্ষণও করি না।"
+          },
+          {
+            "t": "text",
+            "v": " অনলাইন পেমেন্ট থেকে আমরা কেবল একটি পেমেন্ট রেফারেন্স, কোন উপায়ে পরিশোধ হয়েছে (যেমন বিকাশ বা কার্ড), পরিমাণ এবং যে মোবাইল নম্বর থেকে টাকা এসেছে তা পাই ও রাখি — যতটুকু হলে পেমেন্টটি আপনার অ্যাকাউন্টের সঙ্গে মেলানো, আপনার রেকর্ডে দেখানো এবং প্রয়োজনে ফেরত দেওয়া যায়।"
           }
         ]
       },
@@ -4701,7 +4743,7 @@ export const LEGAL_DOCS = {
             },
             {
               "t": "text",
-              "v": " Rent moves directly between tenant and landlord, entirely outside Bari360. We are not a bank, a payment gateway, a mobile financial service, or an escrow agent."
+              "v": " Rent moves directly between tenant and landlord, entirely outside Bari360. We are not a bank, a mobile financial service, or an escrow agent, and we never hold your tenants' money. We do accept payment for our own subscription plans through a payment processor — see section 7 — but that is money you pay *us*, and it is the only money that moves through Bari360."
             }
           ],
           [
@@ -5305,15 +5347,49 @@ export const LEGAL_DOCS = {
         "runs": [
           {
             "t": "text",
-            "v": "Bari360 has "
-          },
+            "v": "There are two ways to pay for a plan. Which one you are offered depends on what we have switched on at the time, and the payment screen tells you."
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
           {
             "t": "bold",
-            "v": "no automated payment gateway"
+            "v": "Online payment."
           },
           {
             "t": "text",
-            "v": ". Paid plans work like this:"
+            "v": " You are handed to our payment processor, "
+          },
+          {
+            "t": "bold",
+            "v": "UddoktaPay"
+          },
+          {
+            "t": "text",
+            "v": ", and pay on their page by card or mobile financial service. When the payment completes, "
+          },
+          {
+            "t": "bold",
+            "v": "your plan activates automatically"
+          },
+          {
+            "t": "text",
+            "v": " — there is no administrator step and no waiting. Bari360 never receives your card number or your mobile-money PIN."
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "Paying us directly."
+          },
+          {
+            "t": "text",
+            "v": " You choose a plan and see our mobile-money wallet number, instructions and a QR code. Then:"
           }
         ]
       },
@@ -5321,12 +5397,6 @@ export const LEGAL_DOCS = {
         "type": "list",
         "ordered": true,
         "items": [
-          [
-            {
-              "t": "text",
-              "v": "You choose a plan and see our mobile-money wallet number, instructions and a QR code."
-            }
-          ],
           [
             {
               "t": "bold",
@@ -5356,7 +5426,7 @@ export const LEGAL_DOCS = {
             },
             {
               "t": "text",
-              "v": " Nothing activates automatically."
+              "v": " On this route nothing activates automatically."
             }
           ]
         ]
@@ -5377,7 +5447,7 @@ export const LEGAL_DOCS = {
           [
             {
               "t": "text",
-              "v": "Activation is "
+              "v": "On the direct route, activation is "
             },
             {
               "t": "bold",
@@ -5403,13 +5473,35 @@ export const LEGAL_DOCS = {
           [
             {
               "t": "bold",
-              "v": "Only one payment submission may be pending at a time."
+              "v": "Only one payment may be pending at a time"
+            },
+            {
+              "t": "text",
+              "v": ", by either route. If you begin an online payment and abandon it, contact us and we will clear it for you."
             }
           ],
           [
             {
               "t": "text",
               "v": "You are responsible for entering the transaction details correctly. A wrong number sent to a wrong wallet cannot be recovered by us."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "An online payment is also subject to the payment processor's own terms."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "If a payment is reversed, charged back, or cannot be verified, we may reverse the activation it paid for."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Refunds of an online payment are made through the same processor, back to the method you paid with. A refund does not by itself cancel or change your plan."
             }
           ]
         ]
@@ -7803,7 +7895,7 @@ export const LEGAL_DOCS = {
             },
             {
               "t": "text",
-              "v": " ভাড়া সরাসরি ভাড়াটিয়া ও বাড়িওয়ালার মধ্যে, সম্পূর্ণ Bari360-এর বাইরে লেনদেন হয়। আমরা ব্যাংক নই, পেমেন্ট গেটওয়ে নই, মোবাইল ফিনান্সিয়াল সার্ভিস নই, এসক্রো এজেন্টও নই।"
+              "v": " ভাড়া সরাসরি ভাড়াটিয়া ও বাড়িওয়ালার মধ্যে, সম্পূর্ণ Bari360-এর বাইরে লেনদেন হয়। আমরা ব্যাংক নই, মোবাইল ফিনান্সিয়াল সার্ভিস নই, এসক্রো এজেন্টও নই, এবং আপনার ভাড়াটিয়ার টাকা আমরা কখনো নিজের কাছে রাখি না। তবে আমাদের নিজস্ব সাবস্ক্রিপশন প্ল্যানের টাকা আমরা একটি পেমেন্ট প্রসেসরের মাধ্যমে গ্রহণ করি — দেখুন ধারা ৭ — সেটি আপনি *আমাদের* যে টাকা দেন, এবং কেবল সেই টাকাই Bari360-এর মধ্য দিয়ে যায়।"
             }
           ],
           [
@@ -8403,15 +8495,49 @@ export const LEGAL_DOCS = {
         "runs": [
           {
             "t": "text",
-            "v": "Bari360-এ "
-          },
+            "v": "প্ল্যানের টাকা পরিশোধের দুটি উপায় আছে। কোনটি আপনি দেখবেন তা নির্ভর করে আমরা তখন কোনটি চালু রেখেছি তার ওপর, এবং পেমেন্ট স্ক্রিনেই তা জানিয়ে দেওয়া হয়।"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
           {
             "t": "bold",
-            "v": "কোনো স্বয়ংক্রিয় পেমেন্ট গেটওয়ে নেই"
+            "v": "অনলাইন পেমেন্ট।"
           },
           {
             "t": "text",
-            "v": "। সবেতন প্ল্যান এভাবে কাজ করে:"
+            "v": " আপনাকে আমাদের পেমেন্ট প্রসেসর "
+          },
+          {
+            "t": "bold",
+            "v": "UddoktaPay"
+          },
+          {
+            "t": "text",
+            "v": "-এর পাতায় পাঠানো হয় এবং সেখানে আপনি কার্ড বা মোবাইল ফিনান্সিয়াল সার্ভিস দিয়ে পরিশোধ করেন। পেমেন্ট সম্পন্ন হলে "
+          },
+          {
+            "t": "bold",
+            "v": "আপনার প্ল্যান আপনা-আপনি চালু হয়ে যায়"
+          },
+          {
+            "t": "text",
+            "v": " — কোনো প্রশাসকের অনুমোদনের অপেক্ষা করতে হয় না। Bari360 কখনো আপনার কার্ড নম্বর বা মোবাইল ব্যাংকিং পিন পায় না।"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "সরাসরি আমাদের পাঠানো।"
+          },
+          {
+            "t": "text",
+            "v": " এই উপায়ে সবেতন প্ল্যান এভাবে কাজ করে:"
           }
         ]
       },
@@ -8454,9 +8580,18 @@ export const LEGAL_DOCS = {
             },
             {
               "t": "text",
-              "v": " কিছুই স্বয়ংক্রিয়ভাবে চালু হয় না।"
+              "v": " এই উপায়ে কিছুই স্বয়ংক্রিয়ভাবে চালু হয় না।"
             }
           ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "অনলাইন পেমেন্টের ক্ষেত্রে আপনি আরও মেনে নিচ্ছেন যে, পেমেন্ট প্রসেসরের নিজস্ব শর্তাবলিও প্রযোজ্য; কোনো পেমেন্ট ফেরত, চার্জব্যাক বা যাচাই-অযোগ্য হলে আমরা সেই পেমেন্টে চালু হওয়া প্ল্যান বাতিল করতে পারি; এবং রিফান্ড একই প্রসেসরের মাধ্যমে, যে উপায়ে পরিশোধ করেছেন সেখানেই ফেরত যায়। রিফান্ড হলেই আপনার প্ল্যান নিজে থেকে বাতিল বা পরিবর্তিত হয় না।"
+          }
         ]
       },
       {

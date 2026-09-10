@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode, useState } from "react";
-import { LogOut, MoreHorizontal, X, Crown, type LucideIcon } from "lucide-react";
+import { Bell, LogOut, MoreHorizontal, X, Crown, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
 import { PushToggle } from "./push-toggle";
 import { DownloadAndroid } from "./download-android";
@@ -55,6 +55,11 @@ export function DashboardShell({
   sidebarTop,
 }: ShellProps) {
   const activeTab = nav.find((n) => n.key === active);
+  // The bell is DERIVED from nav rather than passed in: all four portals already carry a
+  // "notices" item, and owner/tenant already put their unread count on its badge. So the header
+  // gets a working bell in every console without a prop, and a portal that ever drops the tab
+  // loses the bell automatically instead of leaving a button that navigates nowhere.
+  const notices = nav.find((n) => n.key === "notices");
 
   const [moreOpen, setMoreOpen] = useState(false);
   const t = useT();
@@ -153,33 +158,59 @@ export function DashboardShell({
 
       {/* ---------------- Main column ---------------- */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top bar — every width. On mobile it carries the brand and sign out (there is no
-            sidebar); on desktop the sidebar already provides both, so those collapse and the
-            bar exists to keep theme/language reachable without opening a menu. */}
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line/[0.08] bg-surface/80 px-4 py-3 backdrop-blur-xl md:px-8 lg:px-10">
-          {/* Mobile: the lock-up alone. The section name used to sit beside it and read as a
-              word stuck to the logo — and it was already on screen twice, in the PageHeader
-              directly below and on the highlighted bottom-nav tab. */}
-          <Wordmark className="h-6 md:hidden" />
-          {/* Desktop: name the current section, so the bar isn't a lone cluster of buttons.
-              There is no sidebar on mobile, which is why that trade-off differs by width. */}
-          <span className="hidden text-sm font-bold text-fg md:block">
-            {t(activeTab?.label ?? roleLabel)}
-          </span>
-          <div className="flex items-center gap-1">
-            <LanguageToggle variant="icon" />
-            <ThemeToggle variant="icon" />
-            <button
-              onClick={onLogout}
-              className="rounded-lg p-2 text-muted hover:text-danger md:hidden"
-              aria-label={t("Sign out")}
-            >
-              <LogOut className="h-5 w-5" />
-            </button>
+        {/* Top bar — every width. A floating rounded card rather than a full-bleed bar: it is the
+            same lock-up + controls as before, restyled to match the rest of the surfaces below it.
+            On mobile it carries the brand, the role and sign out (there is no sidebar); on desktop
+            the sidebar already provides both, so those collapse and the bar names the section.
+
+            The mockup this came from shows only the language pill and the bell. The theme toggle
+            and the mobile sign-out stay anyway — with no sidebar on a phone, dropping them is the
+            difference between "not in the design" and "unreachable". */}
+        <header className="sticky top-0 z-30 bg-bg/70 px-3 pt-3 backdrop-blur-xl md:px-8 lg:px-10">
+          <div className="card-surface flex items-center justify-between gap-2 rounded-[22px] px-3 py-2.5">
+            {/* Mobile: the lock-up with the role beneath it. The section name is deliberately not
+                here — it is already on screen in the PageHeader below and on the active tab. */}
+            <div className="flex min-w-0 flex-col md:hidden">
+              <Wordmark className="h-6" />
+              <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-subtle">
+                {t(roleLabel)}
+              </span>
+            </div>
+            {/* Desktop: name the current section, so the bar isn't a lone cluster of buttons.
+                There is no sidebar on mobile, which is why that trade-off differs by width. */}
+            <span className="hidden font-display text-base font-extrabold text-heading md:block">
+              {t(activeTab?.label ?? roleLabel)}
+            </span>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <LanguageToggle variant="pill" />
+              <ThemeToggle variant="icon" />
+              {notices && (
+                <button
+                  onClick={() => onNavigate(notices.key)}
+                  aria-label={t(notices.label)}
+                  title={t(notices.label)}
+                  className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-btn-ink shadow-lg shadow-primary/25 transition active:scale-95"
+                >
+                  <Bell className="h-4 w-4" />
+                  {/* Amber, not danger: --danger (#B91C1C) on --primary (#E0473B) is two shades of
+                      the same red and the dot disappears. The ring punches it out of the button. */}
+                  {typeof notices.badge === "number" && notices.badge > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-warning ring-2 ring-surface" />
+                  )}
+                </button>
+              )}
+              <button
+                onClick={onLogout}
+                className="rounded-lg p-2 text-muted transition hover:text-danger md:hidden"
+                aria-label={t("Sign out")}
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </header>
 
-        <main className="flex-1 px-4 pb-28 pt-6 md:px-8 md:pb-10 lg:px-10">
+        <main className="flex-1 px-4 pb-28 pt-4 md:px-8 md:pb-10 lg:px-10">
           <div className="mx-auto w-full max-w-6xl animate-slide-up">
             <PushToggle />
             {/* Mobile-only download affordance (desktop uses the sidebar row). Browser-only. */}

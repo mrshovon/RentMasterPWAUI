@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Building2, Users, ReceiptText, Wrench, Megaphone,
   Plus, MapPin, KeyRound, Phone, CircleDollarSign, Home, TriangleAlert,
   CheckCircle2, Send, Circle, Inbox, Pencil, DoorOpen, FileText, Trash2, Upload, Download, X, History,
   Receipt, PenLine, Gem, Crown, Sparkles, ArrowUpCircle, Infinity as InfinityIcon, CalendarClock, Copy, RotateCcw,
-  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle, HardHat, Wallet, Info, Share2,
+  LifeBuoy, MessageSquare, Lock, Settings, MessageCircle, HardHat, Wallet, Info, Share2, CreditCard,
 } from "lucide-react";
+import { cn } from "../../lib/cn";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
 import { validateEmail, validatePhone } from "../../lib/validate";
 import { toast } from "../../components/toast";
@@ -30,7 +31,7 @@ import {
   PlanState, PlanUsage, SubscriptionResponse, SubscriptionTier,
   SupportTicket, TicketStatus, TicketCategory,
   PaymentSubmission, PaymentConfig,
-  Reminder, ReminderRecurrence, AccountProfile,
+  Reminder, ReminderRecurrence,
 } from "../../types/api";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
@@ -47,7 +48,7 @@ import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner, PasswordInput,
-  ContactIcon, EmailField, PhoneField,
+  ContactIcon, EmailField, PhoneField, SectionBanner, MetricCard, HubTile,
 } from "../../components/ui";
 
 const priorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
@@ -93,7 +94,6 @@ export default function OwnerDashboard() {
   // before that, an owner's perks only ever changed at login.
   const { plan, refreshPlan: loadPlan, clearPendingEvent } = usePlan();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [account, setAccount] = useState<AccountProfile | null>(null);
 
   // Modals
   const [ticketOpen, setTicketOpen] = useState(false);
@@ -352,17 +352,6 @@ export default function OwnerDashboard() {
     })();
   }, []);
 
-  // The signed-in account, for the "Signed in as …" line on the overview. The session in
-  // localStorage carries a name but no email, so this is the only source for it.
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await rentMasterFetch<{ data: AccountProfile }>("/api/admin/owner/profile", { role: "owner" });
-        setAccount(res.data);
-      } catch { /* non-fatal — the overview falls back to its static header */ }
-    })();
-  }, []);
-
   // Load the owner's message templates (WhatsApp receipt + rent reminder) from Settings/auth metadata.
   const loadWhatsappTemplate = async () => {
     try {
@@ -503,11 +492,11 @@ export default function OwnerDashboard() {
           properties={properties}
           tenants={tenants}
           metrics={metrics}
-          maintenance={maintenance}
+          plan={plan}
+          nav={nav}
+          onNavigate={setTab}
           sessionName={session?.name}
-          accountEmail={account?.email ?? null}
           onQuickInvoice={() => setInvoiceOpen(true)}
-          onQuickProperty={() => guardedOpen("property", () => setPropOpen(true))}
         />
       )}
 
@@ -1209,7 +1198,16 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
   );
 }
 
-/* ============================================================ PAYMENT (bKash manual) */
+/* ============================================================ PAYMENT */
+// Two ways to pay, and the admin decides which exist (Admin → Payment setup → Methods offered).
+// This modal therefore has three shapes:
+//   'manual'  — today's flow: pay-to details + a form for the transaction id.
+//   'online'  — hand off to UddoktaPay; the plan activates by itself on the way back.
+//   'choose'  — both are on, so ask first.
+//
+// `methods` comes from /api/admin/payment-config and is what actually WORKS, not what the admin
+// intended: a gateway whose key has gone missing is reported as 'manual', so this component can
+// never render a button that has nothing behind it.
 function PaymentModal({
   tier, onClose, onSubmitted,
 }: {
@@ -1221,13 +1219,25 @@ function PaymentModal({
   const [txnId, setTxnId] = useState("");
   const [amount, setAmount] = useState("");
   const [sending, setSending] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  // null until the config lands, so nothing flashes the wrong flow on open.
+  const [picked, setPicked] = useState<"manual" | "online" | null>(null);
   const providerName = config?.provider || "bKash";
+
+  const methods = config?.methods ?? "manual";
+  // With only one method there is nothing to choose, so skip straight past the chooser.
+  const view: "loading" | "choose" | "manual" | "online" =
+    !config ? "loading"
+    : methods === "manual" ? "manual"
+    : methods === "uddoktapay" ? "online"
+    : picked ?? "choose";
 
   useEffect(() => {
     setZoomed(false);
+    setPicked(null);
     if (!tier) return;
-    setSenderMsisdn(""); setTxnId(""); setAmount(String(tier.price ?? ""));
+    setSenderMsisdn(""); setTxnId(""); setAmount(String(discountedPrice(tier)));
     (async () => {
       try {
         const res = await rentMasterFetch<{ data: PaymentConfig }>("/api/admin/payment-config", { role: "owner" });
@@ -1260,10 +1270,98 @@ function PaymentModal({
     finally { setSending(false); }
   }
 
+  // Hand off to the gateway. `redirecting` is never cleared on success on purpose: the button
+  // must stay busy until the browser actually leaves, or the owner taps it twice and starts two
+  // checkouts — the second of which the server refuses with ALREADY_PENDING, leaving them stuck
+  // behind their own abandoned payment.
+  async function payOnline() {
+    if (!tier) return;
+    try {
+      setRedirecting(true);
+      const res = await rentMasterFetch<{ data: { paymentUrl: string } }>(
+        "/api/admin/payments/uddoktapay/checkout",
+        { method: "POST", role: "owner", body: JSON.stringify({ tierId: tier.id }) },
+      );
+      if (!res.data?.paymentUrl) throw new Error(t("Online payment is not available right now."));
+      // replace(), not href: the checkout is a dead end to come Back to — the return page is
+      // where the browser should land, and a Back button pointing at a spent invoice is a trap.
+      window.location.replace(res.data.paymentUrl);
+    } catch (e: any) {
+      toast.error(e.message);
+      setRedirecting(false);
+    }
+  }
+
+  const priceLabel = tier ? `৳${discountedPrice(tier)}` : "";
+
   return (
     <Modal open={!!tier} onClose={onClose} title="Complete your payment"
       subtitle={tier ? `${tier.name} · ৳${discountedPrice(tier)} / ${tenureLabel(tier)}` : undefined}>
       <div className="space-y-5">
+
+        {view === "loading" && (
+          <div className="flex items-center justify-center py-10"><Spinner className="h-6 w-6 text-primary" /></div>
+        )}
+
+        {/* ---- Both methods offered: ask which ---- */}
+        {view === "choose" && (
+          <div className="space-y-3">
+            <p className="text-xs text-muted">{t("Choose how you would like to pay.")}</p>
+            <button type="button" onClick={() => setPicked("online")}
+              className="flex w-full items-center gap-3 rounded-xl border border-line/[0.1] bg-overlay/[0.02] p-4 text-left transition hover:border-primary/40">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <CreditCard className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-heading">{t("Pay online")}</span>
+                <span className="mt-0.5 block text-[11px] text-subtle">
+                  {t("Card, bKash, Nagad and more. Your plan turns on straight away.")}
+                </span>
+              </span>
+            </button>
+            <button type="button" onClick={() => setPicked("manual")}
+              className="flex w-full items-center gap-3 rounded-xl border border-line/[0.1] bg-overlay/[0.02] p-4 text-left transition hover:border-primary/40">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-overlay/[0.06] text-muted">
+                <Wallet className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-heading">
+                  {t("Send the money yourself")}
+                </span>
+                <span className="mt-0.5 block text-[11px] text-subtle">
+                  {t("Pay into our {0} number, then send us the transaction id. We activate it after checking.").replace("{0}", providerName)}
+                </span>
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* ---- Online ---- */}
+        {view === "online" && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4 text-center">
+              <div className="flex justify-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <CreditCard className="h-6 w-6" />
+                </span>
+              </div>
+              <div className="mt-3 font-display text-2xl font-extrabold text-heading">{priceLabel}</div>
+              <p className="mt-2 text-xs text-muted">
+                {t("You will be taken to our payment partner to finish this securely. Your plan turns on as soon as the payment goes through.")}
+              </p>
+            </div>
+            <Button onClick={payOnline} loading={redirecting} icon={CreditCard} className="w-full">
+              Continue to payment
+            </Button>
+            {methods === "both" && (
+              <Button variant="ghost" onClick={() => setPicked(null)} className="w-full">Choose another way to pay</Button>
+            )}
+          </div>
+        )}
+
+        {/* ---- Manual ---- */}
+        {view === "manual" && (
+        <>
         {/* Pay-to details */}
         <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
           <div className="text-xs font-bold uppercase tracking-wider text-muted">{t("Pay with {0}").replace("{0}", providerName)}</div>
@@ -1325,7 +1423,12 @@ function PaymentModal({
             <TextInput value={txnId} onChange={(e) => setTxnId(e.target.value)} placeholder="e.g. 8N7A6B5C4D" required />
           </Field>
           <Button type="submit" loading={sending} icon={CircleDollarSign} className="w-full">Submit for approval</Button>
+          {methods === "both" && (
+            <Button variant="ghost" onClick={() => setPicked(null)} className="w-full">Choose another way to pay</Button>
+          )}
         </form>
+        </>
+        )}
       </div>
     </Modal>
   );
@@ -1407,112 +1510,219 @@ function ContactModal({
 }
 
 /* ============================================================ OVERVIEW */
+// The Overview is a HUB, not a report: a landlord strip, the two numbers that decide whether
+// today needs any action, and a launcher for every other tab. It deliberately no longer repeats
+// Properties/Tenants as headline statistics — those counts now ride on the tiles that open them,
+// which is one place instead of two that can disagree.
+
+/** Remembers whether the Overview body is expanded. Per browser, per device. */
+const OVERVIEW_OPEN_KEY = "bari360-overview-open";
+
+type TileTone = "neutral" | "primary" | "success" | "warning" | "danger";
+
 function OverviewTab({
-  properties, tenants, metrics, maintenance, onQuickInvoice, onQuickProperty,
-  sessionName, accountEmail,
+  properties, tenants, metrics, plan, nav, onNavigate, onQuickInvoice, sessionName,
 }: {
   properties: Property[]; tenants: Tenant[];
   metrics: {
     occupied: number; selfOccupied: number; vacant: number; lettable: number;
     monthlyRevenue: number; outstanding: number; unpaidCount: number; openTickets: number;
   };
-  maintenance: MaintenanceLog[];
-  onQuickInvoice: () => void; onQuickProperty: () => void;
-  sessionName?: string; accountEmail?: string | null;
+  plan: SubscriptionResponse | null;
+  /** The shell's own nav array. The tile grid is built from it so the two can never disagree
+   *  about what exists, what it is called, or what its badge says. */
+  nav: NavItem[];
+  onNavigate: (key: string) => void;
+  onQuickInvoice: () => void;
+  sessionName?: string;
 }) {
   const t = useT();
+
+  // Collapse state. Initialised to `true` and corrected on mount rather than read from storage
+  // during render: reading localStorage while rendering desynchronises the server-rendered HTML
+  // from the client's first paint. Someone who collapsed it sees one frame of the expanded
+  // layout — a flicker of POSITION, which is why this can be a plain effect while the language
+  // switch in lib/i18n.tsx needs a layout effect to avoid a flash of the wrong words.
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(OVERVIEW_OPEN_KEY) === "0") setOpen(false);
+    } catch { /* private mode / storage disabled — stay expanded */ }
+  }, []);
+  function toggleOpen() {
+    setOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(OVERVIEW_OPEN_KEY, next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  // Which number the Properties tile reports. A LENS on the same portfolio, not a filter: nothing
+  // is hidden anywhere else on the screen, and the tile still opens the full Properties tab.
+  const [lens, setLens] = useState<"all" | "occupied">("all");
+
+  // Out of the LETTABLE units. A flat the owner lives in is not a unit they failed to fill, so
+  // counting it against them makes the number mean nothing (see the metrics memo above).
+  const occupancyPct = metrics.lettable
+    ? Math.round((metrics.occupied / metrics.lettable) * 100)
+    : 0;
+
+  // Reuses the Plan tab's own status vocabulary rather than hard-coding a green "Active" pill —
+  // an owner in grace or already lapsed must not be told they are fine on the very first row of
+  // the dashboard. "Active" alone reads as a system state; here it is describing the person.
+  const status = plan ? planStatusBadge(plan.subscription) : null;
+  const statusLabel = !status ? "Landlord" : status.label === "Active" ? "Active Landlord" : status.label;
+
+  // "Toky Manjil (1 unit)". Whole phrases either side of the assembly — a bare "unit" is not a
+  // translatable string, and the parentheses are punctuation, not copy.
+  const unitCount = t(properties.length === 1 ? "{0} unit" : "{0} units")
+    .replace("{0}", String(properties.length));
+  const portfolioLine = properties.length
+    ? `${properties[0].name} (${unitCount})`
+    : t("No properties yet");
+
+  // How each tile presents itself, keyed by nav key. Everything else about a tile — its label,
+  // icon, badge and locked flag — comes straight off the nav item.
+  const tileMeta: Record<string, { sub: string; tone: TileTone; trailing?: ReactNode }> = {
+    properties: {
+      tone: "neutral",
+      sub: lens === "occupied"
+        ? t("{0} occupied").replace("{0}", String(metrics.occupied))
+        : t("{0} registered").replace("{0}", String(properties.length)),
+    },
+    tenants: {
+      tone: "neutral",
+      sub: t(tenants.length === 1 ? "{0} resident" : "{0} residents").replace("{0}", String(tenants.length)),
+    },
+    billing: { tone: "danger", sub: t("{0} due").replace("{0}", formatCurrency(metrics.outstanding)) },
+    maintenance: { tone: "warning", sub: t("{0} active").replace("{0}", String(metrics.openTickets)) },
+    notices: { tone: "neutral", sub: t("Send alerts") },
+    // NOT "auto SMS" — this app has no SMS transport at all. Reminders are scheduled push.
+    reminders: { tone: "success", sub: t("Scheduled push") },
+    staff: { tone: "neutral", sub: t("Guards & maids") },
+    accounts: { tone: "primary", sub: t("Ledger & dues") },
+    "service-charge": { tone: "neutral", sub: t("Building dues") },
+    plan: { tone: "warning", sub: plan?.subscription.tierName ?? t("Your subscription") },
+    support: {
+      tone: "success",
+      sub: t("24/7 Call line"),
+      trailing: <Phone className="h-4 w-4 shrink-0 text-success" aria-hidden />,
+    },
+    settings: { tone: "neutral", sub: t("Preferences") },
+  };
+
+  // Every tab except this one. Order, labels, badges and the add-on crowns all come from nav,
+  // whose order already matches the design.
+  const tiles = nav.filter((n) => n.key !== "overview");
+
   return (
-    <div className="space-y-8">
-      <PageHeader
-        // Greet by name like the tenant dashboard does, and name the account actually signed in —
-        // useful when someone manages more than one owner login. Both fall back to the original
-        // static header while the profile is still loading.
-        title={sessionName ? `Welcome back, ${sessionName}` : "Portfolio overview"}
-        subtitle={accountEmail
-          ? `Signed in as ${accountEmail} · Owner`
-          : "A live snapshot of your properties, income and open work."}
-        action={
-          <div className="flex gap-2">
-            <Button variant="secondary" icon={Plus} onClick={onQuickProperty}>Property</Button>
-            <Button icon={Plus} onClick={onQuickInvoice}>New invoice</Button>
-          </div>
-        }
-      />
-
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Properties" accent="indigo" icon={Building2}
-          value={properties.length}
-          // Whole phrases, not a number glued to a bare word: "vacant" and "self-occupied" on
-          // their own read as slugs to check-i18n and would ship untranslated without it noticing.
-          sub={[
-            t("{0} occupied").replace("{0}", String(metrics.occupied)),
-            metrics.selfOccupied ? t("{0} self-occupied").replace("{0}", String(metrics.selfOccupied)) : "",
-            t("{0} vacant").replace("{0}", String(metrics.vacant)),
-          ].filter(Boolean).join(" · ")} />
-        <StatCard label="Tenants" accent="cyan" icon={Users}
-          value={tenants.length} sub="Active residents" />
-        <StatCard label="Monthly rent roll" accent="emerald" icon={CircleDollarSign}
-          value={formatCurrency(metrics.monthlyRevenue)} sub="Expected per month" />
-        <StatCard label="Outstanding" accent="rose" icon={ReceiptText}
-          value={formatCurrency(metrics.outstanding)} sub={`${metrics.unpaidCount} unpaid invoice(s)`} />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="p-6">
-          <h3 className="mb-4 text-sm font-bold text-fg">{t("Occupancy")}</h3>
-          {properties.length === 0 ? (
-            <p className="text-sm text-subtle">{t("No properties yet.")}</p>
-          ) : (
-            <>
-              <div className="mb-3 flex items-end justify-between">
-                <span className="text-3xl font-black text-heading">
-                  {Math.round((metrics.occupied / metrics.lettable) * 100) || 0}%
-                </span>
-                {/* Out of the LETTABLE units. A flat the owner lives in is not a unit they failed
-                    to fill, so counting it against them makes the number mean nothing. */}
-                <span className="text-xs text-subtle">
-                  {t("{0} of {1} units filled")
-                    .replace("{0}", String(metrics.occupied))
-                    .replace("{1}", String(metrics.lettable))}
-                </span>
-              </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-surface-2">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
-                  style={{ width: `${(metrics.occupied / metrics.lettable) * 100 || 0}%` }}
-                />
-              </div>
-            </>
-          )}
-        </Card>
-
-        <Card className="p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-fg">{t("Recent maintenance")}</h3>
-            <Badge tone={metrics.openTickets ? "amber" : "emerald"}>
-              {metrics.openTickets} open
-            </Badge>
-          </div>
-          <div className="space-y-3">
-            {maintenance.slice(0, 3).map((m) => (
-              <div key={m.id} className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-lg bg-overlay/[0.04] p-1.5 text-warning">
-                  <Wrench className="h-3.5 w-3.5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-fg">{m.issue_title}</div>
-                  <div className="text-xs text-subtle">
-                    {m.properties?.name ?? "Property"} · {formatDate(m.created_at)}
-                  </div>
-                </div>
-              </div>
-            ))}
-            {maintenance.length === 0 && (
-              <p className="text-sm text-subtle">{t("No maintenance reported. 🎉")}</p>
+    <div className="space-y-3">
+      {/* ---- Who is signed in, what they own, and the one action worth a shortcut ---- */}
+      <Card className="flex items-center gap-3 p-3.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Badge tone={status?.tone ?? "slate"}>{statusLabel}</Badge>
+            {sessionName && (
+              <span className="truncate text-sm font-bold text-heading">{sessionName}</span>
             )}
           </div>
-        </Card>
-      </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+            <span className="truncate">{portfolioLine}</span>
+            {properties.length > 0 && (
+              <>
+                {/* A drawn dot, not a &middot; character: a punctuation-only text node is copy
+                    as far as check-i18n is concerned, and there is nothing here to translate. */}
+                <span className="h-1 w-1 shrink-0 rounded-full bg-faint" aria-hidden />
+                <span className="font-bold text-success">
+                  {t("{0}% Occupied").replace("{0}", String(occupancyPct))}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        <Button icon={Plus} onClick={onQuickInvoice} className="shrink-0 rounded-full">Invoice</Button>
+      </Card>
+
+      {/* ---- The section header, which is also its collapse control ---- */}
+      <SectionBanner
+        title="Overview"
+        badgeLabel="Live"
+        subtitle="Summary of rent, properties & finances"
+        icon={LayoutDashboard}
+        open={open}
+        onToggle={toggleOpen}
+      />
+
+      {open && (
+        <div className="space-y-3 animate-fade-in">
+          {/* ---- The two numbers that decide whether today needs action ---- */}
+          <div className="grid grid-cols-2 gap-3">
+            <MetricCard
+              tone="success"
+              label="Monthly rent"
+              icon={CircleDollarSign}
+              value={formatCurrency(metrics.monthlyRevenue)}
+              sub={t("Expected / month")}
+            />
+            <MetricCard
+              tone="danger"
+              label="Outstanding"
+              icon={TriangleAlert}
+              value={formatCurrency(metrics.outstanding)}
+              sub={t(metrics.unpaidCount === 1 ? "{0} unpaid invoice" : "{0} unpaid invoices")
+                .replace("{0}", String(metrics.unpaidCount))}
+            />
+          </div>
+
+          {/* ---- Occupancy, in one line, with the lens for the Properties tile ---- */}
+          <Card className="flex items-center gap-2.5 p-3.5">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-hidden />
+            <span className="min-w-0 flex-1 text-[13px] font-bold text-heading">
+              {t("Occupancy: {0}% ({1} of {2} units filled)")
+                .replace("{0}", String(occupancyPct))
+                .replace("{1}", String(metrics.occupied))
+                .replace("{2}", String(metrics.lettable))}
+            </span>
+            <div className="flex shrink-0 rounded-full border border-success/30 bg-success/10 p-0.5 text-[10px] font-bold">
+              {(["all", "occupied"] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setLens(key)}
+                  aria-pressed={lens === key}
+                  className={cn(
+                    "rounded-full px-2 py-1 transition",
+                    lens === key ? "bg-success text-btn-ink" : "text-success",
+                  )}
+                >
+                  {t(key === "all" ? "All" : "Occupied")}
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          {/* ---- The launcher ---- */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {tiles.map((item) => {
+              const meta = tileMeta[item.key];
+              return (
+                <HubTile
+                  key={item.key}
+                  label={item.label}
+                  sub={meta?.sub}
+                  icon={item.icon}
+                  tone={meta?.tone ?? "neutral"}
+                  // The lens only ever changes what the Properties tile reports.
+                  badge={item.key === "properties" && lens === "occupied" ? metrics.occupied : item.badge}
+                  locked={item.locked}
+                  trailing={meta?.trailing}
+                  onClick={() => onNavigate(item.key)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

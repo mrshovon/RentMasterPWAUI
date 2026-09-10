@@ -2,7 +2,7 @@
 
 import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, useState, type CSSProperties, type ComponentType } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, Search, Eye, EyeOff, type LucideIcon } from "lucide-react";
+import { X, Loader2, Search, Eye, EyeOff, ChevronDown, ChevronRight, Crown, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
 import { useT } from "../lib/i18n";
 import { validateEmail, validatePhone, MAX_EMAIL_LEN } from "../lib/validate";
@@ -314,6 +314,244 @@ export function Badge({
     >
       {label}
     </span>
+  );
+}
+
+// =============================================================================
+// HUB PRIMITIVES
+//
+// The three shapes the owner Overview is built from. They live here rather than in the page so
+// they follow this file's translation boundary (see the note at the top): each takes its copy as
+// plain string props and looks it up itself, so call sites keep passing English.
+//
+// Tones are named for the SEMANTIC token they resolve to (success/danger/warning/primary), unlike
+// the older accentMap/Badge palettes above, whose colour names (indigo, cyan, rose) stopped
+// describing the rendered colour after the rebrand.
+// =============================================================================
+
+type HubTone = "neutral" | "primary" | "success" | "warning" | "danger";
+
+/** Icon chip + card border, per tone. */
+const hubChip: Record<HubTone, string> = {
+  neutral: "bg-overlay/[0.05] text-muted",
+  primary: "bg-primary/10 text-primary",
+  success: "bg-success/10 text-success",
+  warning: "bg-warning/10 text-warning",
+  danger: "bg-danger/10 text-danger",
+};
+const hubBorder: Record<HubTone, string> = {
+  neutral: "border-line/[0.08]",
+  primary: "border-primary/25",
+  success: "border-success/25",
+  warning: "border-warning/30",
+  danger: "border-danger/25",
+};
+/** Filled count pill. text-btn-ink rather than text-white: on the dark theme every tone token is
+ *  a light tint and white-on-light would be unreadable, while --btn-ink flips to near-black. */
+const hubPill: Record<HubTone, string> = {
+  neutral: "bg-overlay/[0.1] text-fg",
+  primary: "bg-primary text-btn-ink",
+  success: "bg-success text-btn-ink",
+  warning: "bg-warning text-btn-ink",
+  danger: "bg-danger text-btn-ink",
+};
+
+/**
+ * The big brand-red section header that opens the Overview, doubling as its collapse control.
+ *
+ * The whole bar is the button, not a separate chevron — a 44px-tall target on a phone beats a
+ * 20px icon, and there is nothing else in the bar to click.
+ */
+export function SectionBanner({
+  title,
+  subtitle,
+  icon: Icon,
+  badgeLabel,
+  open,
+  onToggle,
+}: {
+  title: string;
+  subtitle?: string;
+  icon: LucideIcon;
+  /** Small translucent pill beside the title, e.g. "Live". */
+  badgeLabel?: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const t = useT();
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className="flex w-full items-center gap-3 rounded-[22px] bg-primary px-4 py-4 text-left text-btn-ink shadow-lg shadow-primary/25 transition active:scale-[0.99]"
+    >
+      {/* bg-btn-ink, NOT bg-white: on the dark theme --primary is a light salmon and --btn-ink is
+          near-black, so a white chip and white text would both disappear into the banner. */}
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-btn-ink/15">
+        <Icon className="h-6 w-6" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="font-display text-2xl font-extrabold leading-none">{t(title)}</span>
+          {badgeLabel && (
+            <span className="rounded-full bg-btn-ink/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+              {t(badgeLabel)}
+            </span>
+          )}
+        </span>
+        {subtitle && (
+          <span className="mt-1.5 block truncate text-xs font-medium opacity-90">{t(subtitle)}</span>
+        )}
+      </span>
+      <ChevronDown
+        className={cn("h-5 w-5 shrink-0 transition-transform", !open && "-rotate-90")}
+        aria-hidden
+      />
+    </button>
+  );
+}
+
+/**
+ * A headline number on a tinted card — the money pair at the top of the Overview.
+ *
+ * Deliberately NOT a variant of StatCard above: StatCard is the neutral 4-up tile the admin,
+ * tenant and building dashboards all still use, and this one colours its label, value, border and
+ * sub together. Folding both into one component would mean a flag that changes five things at once.
+ */
+export function MetricCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: ReactNode;
+  sub?: ReactNode;
+  icon?: LucideIcon;
+  tone: "success" | "danger";
+}) {
+  const t = useT();
+  const isDanger = tone === "danger";
+  return (
+    <div
+      className={cn(
+        "rounded-[20px] border bg-surface p-4 shadow-card",
+        isDanger ? "border-danger/25" : "border-success/25",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span
+          className={cn(
+            "text-[10px] font-bold uppercase tracking-wider",
+            isDanger ? "text-danger" : "text-heading",
+          )}
+        >
+          {t(label)}
+        </span>
+        {Icon && (
+          <span
+            className={cn(
+              "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg",
+              isDanger ? "bg-danger/10 text-danger" : "bg-success/10 text-success",
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </span>
+        )}
+      </div>
+      <div
+        className={cn(
+          "mt-2 font-display text-2xl font-extrabold leading-none tracking-tight sm:text-3xl",
+          isDanger ? "text-danger" : "text-success",
+        )}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div className={cn("mt-1.5 text-[11px]", isDanger ? "text-danger/80" : "text-subtle")}>
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One tile in the Overview's launcher grid: icon, name, one line of live detail, and a trailing
+ * marker.
+ *
+ * Trailing precedence is deliberate — a count outranks a price tag outranks a hint. A locked tab
+ * with unread items would otherwise show "VIP" and hide the number that says why to open it.
+ */
+export function HubTile({
+  label,
+  sub,
+  icon: Icon,
+  tone = "neutral",
+  badge,
+  locked,
+  trailing,
+  onClick,
+}: {
+  label: string;
+  sub?: ReactNode;
+  icon: LucideIcon;
+  tone?: HubTone;
+  badge?: number;
+  /** Paid add-on the account has not unlocked — a price tag, not a barrier. The tab still opens
+   *  and explains itself, exactly as the sidebar crown already promises. */
+  locked?: boolean;
+  /** Overrides the default chevron when the tile has a better affordance (e.g. Support's phone). */
+  trailing?: ReactNode;
+  onClick: () => void;
+}) {
+  const t = useT();
+  const hasBadge = typeof badge === "number" && badge > 0;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-2.5 rounded-[20px] border bg-surface p-3.5 text-left shadow-card transition hover:border-primary/40 active:scale-[0.98]",
+        hubBorder[tone],
+      )}
+    >
+      <span
+        className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", hubChip[tone])}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-[15px] font-extrabold leading-tight text-heading">
+          {t(label)}
+        </span>
+        {/* Wraps to two lines rather than truncating: a tile whose trailing slot holds the wide
+            VIP pill has little room left, and "Ledger &…" tells the reader nothing. Grid rows
+            stretch, so the tile beside it grows to match instead of the row going ragged. */}
+        {sub && <span className="mt-0.5 block text-[11px] leading-snug text-subtle line-clamp-2">{sub}</span>}
+      </span>
+      {hasBadge ? (
+        <span
+          className={cn(
+            "flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-bold",
+            hubPill[tone],
+          )}
+        >
+          {badge}
+        </span>
+      ) : locked ? (
+        <span
+          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-warning/15 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-warning ring-1 ring-warning/30"
+          aria-label={t("Paid add-on")}
+        >
+          <Crown className="h-3 w-3" aria-hidden /> VIP
+        </span>
+      ) : (
+        trailing ?? <ChevronRight className="h-4 w-4 shrink-0 text-faint" aria-hidden />
+      )}
+    </button>
   );
 }
 

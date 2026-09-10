@@ -71,6 +71,7 @@ const EXCLUDE = [
 const TRANSLATING_PROPS = [
   "title", "subtitle", "label", "hint", "sub", "error",
   "placeholder", "message", "confirmLabel", "cancelLabel", "roleLabel",
+  "badgeLabel", // SectionBanner's pill
 ];
 
 // Components that translate their own string children.
@@ -92,6 +93,8 @@ const TYPE_GENERICS = /^(Record|Promise|Array|Partial|Pick|Omit|Readonly|Ref|Dis
 const PROPER_NOUNS = new Set([
   "Bari360", "BARI360", "bKash", "Nagad", "WhatsApp", "Google", "Android", "iOS",
   "PDF", "SMS", "QR", "Supabase", "Vercel", "Brevo",
+  // Stays Latin in both languages — it is a tier marker on the paid-add-on tiles, not a word.
+  "VIP",
 ]);
 
 const RULES = {

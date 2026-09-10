@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, CreditCard, Megaphone, Plus, Ban, KeyRound,
   Trash2, Mail, CheckCircle2, ShieldOff, ShieldCheck, Inbox, Building2, Eye,
-  RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User,
+  RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User, Copy,
   Wallet, Upload, Image as ImageIcon, X, Check, HardHat, Settings, Wrench,
   BarChart3, Radio, Smartphone, Globe, TrendingUp, TrendingDown, Minus, EyeOff,
   ScrollText, ChevronDown, ChevronRight, RefreshCw, Archive,
@@ -22,7 +22,7 @@ import {
   AdminOwner, AdminOwnerDetail, SubscriptionTier,
   SupportTicket, TicketStatus, TicketCategory, PriorityLevel,
   PasswordResetRecord, ResetMethod, ContactMessage, ContactStatus,
-  PaymentSubmission, PaymentSubmissionStatus, PaymentConfig,
+  PaymentSubmission, PaymentSubmissionStatus, PaymentConfig, PaymentMethods, UddoktaPayConfigView,
   MaintenanceMode, NoticeScope, AccountProfile, AnalyticsSummary, DayCount,
   LogRecord, LogLevel, LogSource, LogsResponse,
   AdminBuildingRow, AdminBuildingDetail, AdminArchivedBuilding, BuildingPlanInvoice, BuildingPlanRequest,
@@ -1279,12 +1279,15 @@ const PAYMENT_FILTERS: { key: PaymentSubmissionStatus | "all"; label: string }[]
   { key: "pending", label: "Pending" },
   { key: "approved", label: "Approved" },
   { key: "rejected", label: "Rejected" },
+  { key: "refunded", label: "Refunded" },
 ];
-const PAYMENT_STATUS_TONE: Record<PaymentSubmissionStatus, "amber" | "emerald" | "rose"> = {
-  pending: "amber", approved: "emerald", rejected: "rose",
+// 'refunded' is slate, not rose: rejected is a problem to look at, refunded is a closed matter.
+// Colouring them the same would put a permanent red badge on every settled refund.
+const PAYMENT_STATUS_TONE: Record<PaymentSubmissionStatus, "amber" | "emerald" | "rose" | "slate"> = {
+  pending: "amber", approved: "emerald", rejected: "rose", refunded: "slate",
 };
 const PAYMENT_STATUS_LABEL: Record<PaymentSubmissionStatus, string> = {
-  pending: "Pending", approved: "Approved", rejected: "Rejected",
+  pending: "Pending", approved: "Approved", rejected: "Rejected", refunded: "Refunded",
 };
 
 function PaymentsTab({
@@ -1395,8 +1398,15 @@ function PaymentDecisionModal({
 }) {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState<null | "approved" | "rejected">(null);
+  const [refunding, setRefunding] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundOpen, setRefundOpen] = useState(false);
 
-  useEffect(() => { if (payment) setNotes(payment.admin_notes || ""); }, [payment]);
+  useEffect(() => {
+    if (payment) setNotes(payment.admin_notes || "");
+    setRefundOpen(false);
+    setRefundReason("");
+  }, [payment]);
 
   async function decide(status: "approved" | "rejected") {
     if (!payment) return;
@@ -1416,7 +1426,38 @@ function PaymentDecisionModal({
     finally { setSaving(null); }
   }
 
+  // Sends the money back through UddoktaPay. Deliberately does NOT touch the owner's plan: a
+  // refund and a downgrade are different decisions, and doing both here would let one mis-click
+  // lock someone out of an account they are still using. Change the plan from Owners if needed.
+  async function refund() {
+    if (!payment) return;
+    if (!refundReason.trim()) { toast.error("Give a reason — it goes to the gateway and stays on the record."); return; }
+    if (!(await confirmDialog({
+      title: `Refund ${formatCurrency(Number(payment.amount || 0))}?`,
+      message: "This sends the money back through UddoktaPay now. The owner keeps their current plan until you change it separately.",
+      confirmLabel: "Refund",
+      danger: true,
+    }))) return;
+    try {
+      setRefunding(true);
+      const res = await rentMasterFetch(`/api/super-admin/payments/${payment.id}/refund`, {
+        method: "POST", role: "admin",
+        body: JSON.stringify({ reason: refundReason.trim() }),
+      });
+      if (res.success) {
+        onSaved(res.data);
+        onClose();
+        toast.success(`Payment #${payment.payment_no} refunded.`);
+      }
+    } catch (e: any) { toast.error(e.message); }
+    finally { setRefunding(false); }
+  }
+
   const decided = payment && payment.status !== "pending";
+  const online = payment?.provider === "uddoktapay";
+  // Only a completed online payment can be sent back by API. A manual one landed in a personal
+  // wallet and has to be returned by hand, so offering the button would be a lie.
+  const refundable = online && payment?.status === "approved" && !!payment?.gateway_txn_id;
 
   return (
     <Modal open={!!payment} onClose={onClose} size="lg"
@@ -1434,14 +1475,46 @@ function PaymentDecisionModal({
             <div><div className="text-[11px] uppercase tracking-wider text-subtle">Email</div><div className="text-fg">{payment.owner?.email || payment.owner_email || "—"}</div></div>
             <div><div className="text-[11px] uppercase tracking-wider text-subtle">Plan</div><div className="text-fg">{payment.tier_name || payment.tier_id}</div></div>
             <div><div className="text-[11px] uppercase tracking-wider text-subtle">Amount</div><div className="font-semibold text-heading">{formatCurrency(Number(payment.amount || 0))}</div></div>
-            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Paid from</div><div className="font-mono text-fg">{payment.sender_msisdn || "—"}</div></div>
-            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Transaction id</div><div className="font-mono text-fg">{payment.txn_id || "—"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Method</div><div className="text-fg">{online ? `Online · ${payment.gateway_payment_method || "UddoktaPay"}` : "Manual transfer"}</div></div>
+            <div><div className="text-[11px] uppercase tracking-wider text-subtle">Transaction id</div><div className="font-mono text-fg">{payment.gateway_txn_id || payment.txn_id || "—"}</div></div>
+            {!online && <div><div className="text-[11px] uppercase tracking-wider text-subtle">Paid from</div><div className="font-mono text-fg">{payment.sender_msisdn || "—"}</div></div>}
+            {online && payment.gateway_invoice_id && <div><div className="text-[11px] uppercase tracking-wider text-subtle">Gateway invoice</div><div className="font-mono text-xs text-fg">{payment.gateway_invoice_id}</div></div>}
           </div>
 
           {decided ? (
-            <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm text-fg">
-              This payment was already <strong>{PAYMENT_STATUS_LABEL[payment.status].toLowerCase()}</strong>
-              {payment.admin_notes ? <> — {payment.admin_notes}</> : null}.
+            <div className="space-y-4">
+              <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm text-fg">
+                This payment was already <strong>{PAYMENT_STATUS_LABEL[payment.status].toLowerCase()}</strong>
+                {payment.admin_notes ? <> — {payment.admin_notes}</> : null}.
+                {payment.status === "refunded" && payment.refund_reason ? (
+                  <div className="mt-2 text-xs text-subtle">Refund reason: {payment.refund_reason}</div>
+                ) : null}
+              </div>
+
+              {refundable && !refundOpen && (
+                <Button variant="secondary" icon={RotateCcw} className="w-full" onClick={() => setRefundOpen(true)}>
+                  Refund this payment
+                </Button>
+              )}
+              {refundable && refundOpen && (
+                <div className="space-y-3 border-t border-line/[0.06] pt-4">
+                  <Field label="Refund reason" hint="Sent to the gateway and kept on this record.">
+                    <TextArea rows={2} value={refundReason} onChange={(e) => setRefundReason(e.target.value)}
+                      placeholder="e.g. Duplicate payment, charged in error…" />
+                  </Field>
+                  <div className="flex gap-3">
+                    <Button variant="ghost" className="flex-1" onClick={() => setRefundOpen(false)}>Cancel</Button>
+                    <Button variant="danger" icon={RotateCcw} className="flex-1" loading={refunding} onClick={refund}>
+                      Refund {formatCurrency(Number(payment.amount || 0))}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {online && payment.status === "approved" && !payment.gateway_txn_id && (
+                <p className="text-xs text-subtle">
+                  No gateway transaction id on file, so this cannot be refunded from here — use the Paymently dashboard.
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-4 border-t border-line/[0.06] pt-5">
@@ -2062,6 +2135,31 @@ function InvoiceSection({
     }
   }
 
+  // Generates an UddoktaPay checkout for the outstanding balance and stores it on the invoice's
+  // payment_url. The building admin is not given a self-serve button: a building contract is a
+  // negotiated arrangement, and we decide when it is ready to be paid.
+  async function generatePayLink() {
+    if (!openInvoice) return;
+    try {
+      setBusy(true);
+      const res = await rentMasterFetch<{ data: { paymentUrl: string } }>(
+        `/api/super-admin/buildings/${buildingId}/invoices/${openInvoice.id}/pay-link`,
+        { role: "admin", method: "POST" }
+      );
+      const url = res.data?.paymentUrl;
+      if (url) {
+        // Copying it is the whole point — the link is useless until it reaches the building.
+        try { await navigator.clipboard?.writeText(url); toast.success("Pay link created and copied."); }
+        catch { toast.success("Pay link created."); }
+      }
+      await onReload();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       {openInvoice && (
@@ -2098,9 +2196,25 @@ function InvoiceSection({
               <TextInput value={payRef} onChange={(e) => setPayRef(e.target.value)} />
             </Field>
           </div>
-          <div className="mt-3 flex justify-end">
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+            <Button variant="secondary" loading={busy} onClick={generatePayLink}>
+              {openInvoice.payment_url ? "New online pay link" : "Create online pay link"}
+            </Button>
             <Button loading={busy} onClick={recordPayment}>Record payment</Button>
           </div>
+          {openInvoice.payment_url && (
+            <div className="mt-3 flex items-center gap-2 rounded-lg bg-overlay/[0.03] px-3 py-2">
+              <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted">{openInvoice.payment_url}</span>
+              <Button size="sm" variant="secondary" icon={Copy}
+                onClick={() => { navigator.clipboard?.writeText(openInvoice.payment_url || ""); toast.success("Link copied."); }}>
+                Copy
+              </Button>
+            </div>
+          )}
+          <p className="mt-2 text-[11px] text-subtle">
+            Send the pay link to the building. When they pay it, the payment is recorded and the term
+            renews automatically — you do not need to record it by hand as well.
+          </p>
         </Card>
       )}
 
@@ -2311,7 +2425,7 @@ function RequestsSection({
 const MFS_PROVIDERS = ["bKash", "Nagad", "Rocket", "Upay", "mCash", "Tap", "Other"];
 
 function PaymentSetupTab() {
-  const [config, setConfig] = useState<PaymentConfig>({ provider: "bKash", walletNumber: "", instructions: "", qrUrl: null });
+  const [config, setConfig] = useState<PaymentConfig>({ provider: "bKash", walletNumber: "", instructions: "", qrUrl: null, methods: "manual" });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -2360,7 +2474,32 @@ function PaymentSetupTab() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Payment setup" subtitle="The bKash details owners pay into when upgrading a plan." />
+      <PageHeader title="Payment setup" subtitle="How owners pay you when they upgrade a plan." />
+
+      {/* Which methods owners are offered. Saved with the card below (it is one config blob), so
+          the Save button there publishes this too — hence the reminder in the hint. */}
+      <Card className="space-y-4 p-6">
+        <Field
+          label="Methods offered"
+          hint="What an owner sees on the payment screen. With both on, they choose; with one, they go straight to it. Click Save payment setup to apply."
+        >
+          <Select
+            value={config.methods}
+            onChange={(e) => setConfig((c) => ({ ...c, methods: e.target.value as PaymentMethods }))}
+          >
+            <option value="manual">Manual only — they send money and submit a transaction id</option>
+            <option value="uddoktapay">UddoktaPay only — online checkout, activates automatically</option>
+            <option value="both">Both — the owner picks</option>
+          </Select>
+        </Field>
+        {config.methods !== "manual" && (
+          <p className="text-xs text-subtle">
+            Online payment also needs a working API key below. Until one is saved, owners keep seeing
+            the manual flow — the server will not offer a checkout it cannot create.
+          </p>
+        )}
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="space-y-4 p-6">
           <Field label="Mobile payment service (MFS)" hint="Which service this number and QR belong to.">
@@ -2414,7 +2553,174 @@ function PaymentSetupTab() {
           <p className="text-xs text-subtle">Upload then click <strong>Save payment setup</strong> to publish. Owners see this QR on their payment screen.</p>
         </Card>
       </div>
+
+      <UddoktaPayCard />
     </div>
+  );
+}
+
+/**
+ * UDDOKTAPAY GATEWAY CREDENTIALS.
+ *
+ * ⭐ THE API KEYS ARE WRITE-ONLY. The GET route returns a masked `abcd…wxyz` and a boolean, never
+ * a key, so each field below shows that preview as its PLACEHOLDER and sends "" to mean "leave it
+ * alone". That is the one thing to keep in mind if this card is ever edited: an empty key field is
+ * not a request to clear the key. Same contract as BrevoConfigCard above.
+ *
+ * Sandbox and live are two independent credential pairs rather than one pair plus a switch, so
+ * flipping to sandbox to test something cannot destroy the live key.
+ */
+function UddoktaPayCard() {
+  const [cfg, setCfg] = useState<UddoktaPayConfigView | null>(null);
+  const [mode, setMode] = useState<"sandbox" | "live">("sandbox");
+  const [sandboxBaseUrl, setSandboxBaseUrl] = useState("");
+  const [liveBaseUrl, setLiveBaseUrl] = useState("");
+  // Both always start blank — see above.
+  const [sandboxApiKey, setSandboxApiKey] = useState("");
+  const [liveApiKey, setLiveApiKey] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  /** Re-hydrate every field from the server's answer, and drop whatever was typed into the key
+   *  boxes — it is stored now, and leaving it on screen would imply it is still pending. */
+  function adopt(next: UddoktaPayConfigView) {
+    setCfg(next);
+    setMode(next.mode);
+    setSandboxBaseUrl(next.sandboxBaseUrl || "");
+    setLiveBaseUrl(next.liveBaseUrl || "");
+    setSandboxApiKey("");
+    setLiveApiKey("");
+  }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: UddoktaPayConfigView }>("/api/super-admin/uddoktapay-config", { role: "admin" });
+        if (res.data) adopt(res.data);
+      } catch { /* keep defaults */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  async function save() {
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ data: UddoktaPayConfigView }>("/api/super-admin/uddoktapay-config", {
+        method: "PUT", role: "admin",
+        body: JSON.stringify({ mode, sandboxBaseUrl, liveBaseUrl, sandboxApiKey, liveApiKey }),
+      });
+      if (res.data) adopt(res.data);
+      toast.success("Gateway settings saved.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  // Saving a key proves nothing about whether it works. This asks the gateway about a made-up
+  // invoice: a reply of any kind means we reached it with a key it accepted, and no money moves.
+  async function test() {
+    try {
+      setTesting(true);
+      const res = await rentMasterFetch<{ data: { message: string } }>("/api/super-admin/uddoktapay-config", {
+        method: "POST", role: "admin",
+      });
+      toast.success(res.data?.message || "Gateway reachable.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setTesting(false); }
+  }
+
+  if (loading) return <Card className="p-6"><Spinner className="h-5 w-5 text-primary" /></Card>;
+
+  const live = mode === "live";
+
+  return (
+    <Card className="space-y-4 p-6">
+      <div>
+        <div className="text-sm font-bold text-fg">UddoktaPay (Paymently)</div>
+        <p className="mt-1 text-xs text-subtle">
+          Online checkout. When an owner pays, their plan activates by itself — no approval step.
+        </p>
+      </div>
+
+      {cfg && !cfg.encryptionReady && (
+        <Alert>
+          FIELD_ENCRYPTION_KEY is not set on the API server, so an API key cannot be stored securely.
+          Set it before connecting UddoktaPay.
+        </Alert>
+      )}
+
+      <Field label="Mode" hint="Sandbox uses UddoktaPay's shared test gateway. Live takes real money.">
+        <Select value={mode} onChange={(e) => setMode(e.target.value as "sandbox" | "live")}>
+          <option value="sandbox">Sandbox — testing</option>
+          <option value="live">Live — real payments</option>
+        </Select>
+      </Field>
+
+      {live && (
+        <Alert>
+          Live mode charges real cards. Confirm the base URL and key below belong to your production
+          Paymently install before saving.
+        </Alert>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* ---- Sandbox ---- */}
+        <div className="space-y-4 rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted">Sandbox</span>
+            {cfg?.hasSandboxKey && <Badge tone="emerald">Key stored</Badge>}
+          </div>
+          <Field label="Base URL" hint="UddoktaPay's shared sandbox, unless you run your own.">
+            <TextInput value={sandboxBaseUrl} onChange={(e) => setSandboxBaseUrl(e.target.value)}
+              placeholder="https://sandbox.uddoktapay.com/api" autoComplete="off" />
+          </Field>
+          <Field
+            label="API key"
+            hint={cfg?.hasSandboxKey
+              ? "A key is stored. Leave this blank to keep it, or paste a new one to replace it."
+              : "The public sandbox key is 982d381360a69d419689740d9f2e26ce36fb7a50."}
+          >
+            <TextInput type="password" value={sandboxApiKey}
+              placeholder={cfg?.hasSandboxKey ? cfg.sandboxKeyPreview : "982d…7a50"}
+              onChange={(e) => setSandboxApiKey(e.target.value)} autoComplete="off" />
+          </Field>
+        </div>
+
+        {/* ---- Live ---- */}
+        <div className="space-y-4 rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted">Live</span>
+            {cfg?.hasLiveKey && <Badge tone="emerald">Key stored</Badge>}
+          </div>
+          <Field label="Base URL" hint="Your Paymently install, with /api on the end.">
+            <TextInput value={liveBaseUrl} onChange={(e) => setLiveBaseUrl(e.target.value)}
+              placeholder="https://your-install.paymently.io/api" autoComplete="off" />
+          </Field>
+          <Field
+            label="API key"
+            hint={cfg?.hasLiveKey
+              ? "A key is stored. Leave this blank to keep it, or paste a new one to replace it."
+              : "From your Paymently dashboard. It is stored encrypted and never shown again."}
+          >
+            <TextInput type="password" value={liveApiKey}
+              placeholder={cfg?.hasLiveKey ? cfg.liveKeyPreview : "Paste the live API key"}
+              onChange={(e) => setLiveApiKey(e.target.value)} autoComplete="off" />
+          </Field>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Button icon={CheckCircle2} loading={saving} onClick={save} className="flex-1">Save gateway settings</Button>
+        {cfg?.activeReady && (
+          <Button variant="secondary" loading={testing} onClick={test} className="flex-1">Test connection</Button>
+        )}
+      </div>
+
+      <p className="text-xs text-subtle">
+        Webhook URL to register with UddoktaPay (optional — the return page confirms payments on its
+        own): <code className="rounded bg-overlay/[0.06] px-1 py-0.5">{"<your API domain>"}/api/payments/uddoktapay/webhook</code>
+      </p>
+    </Card>
   );
 }
 

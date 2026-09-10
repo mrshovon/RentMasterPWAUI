@@ -17,7 +17,7 @@ export function LanguageToggle({
   variant = "sidebar",
 }: {
   className?: string;
-  variant?: "sidebar" | "icon";
+  variant?: "sidebar" | "icon" | "pill";
 }) {
   const { lang, setLang, t } = useLanguage();
 
@@ -26,6 +26,28 @@ export function LanguageToggle({
   const label = isBangla ? t("Switch to English") : t("Switch to Bangla");
   // Never translated: this is the name of the target language in its own script.
   const shortName = isBangla ? "English" : "বাংলা";
+
+  // The header card's two-up pill: both scripts on screen at once, the ACTIVE one highlighted.
+  // A stronger version of the escape hatch described above — you don't have to know that the
+  // label names the target language, you can just see your own script and tap the other one.
+  if (variant === "pill") {
+    return (
+      <button
+        onClick={() => setLang(next)}
+        aria-label={label}
+        title={label}
+        className={cn(
+          "flex shrink-0 items-center gap-1 rounded-full border border-line/[0.12] bg-surface-2 px-2.5 py-1.5 text-[11px] font-bold leading-none transition hover:border-primary/40",
+          className,
+        )}
+      >
+        {/* Never translated — each half is a language's name in its own script. */}
+        <span className={isBangla ? "text-primary" : "text-muted"}>বাং</span>
+        <span className="text-faint">/</span>
+        <span className={isBangla ? "text-muted" : "text-primary"}>EN</span>
+      </button>
+    );
+  }
 
   if (variant === "icon") {
     return (

@@ -990,7 +990,10 @@ export interface ContactMessage {
 
 // ---- Payment submissions (owner manual bKash payment -> admin approval) ----
 // NB: distinct from the billing PaymentStatus (unpaid/sent/paid) defined above.
-export type PaymentSubmissionStatus = "pending" | "approved" | "rejected";
+// 'refunded' is deliberately its own state rather than a flavour of 'rejected': a rejected
+// payment never bought anything, a refunded one did and was given back. Collapsing them would
+// make the Payments queue lie about what happened.
+export type PaymentSubmissionStatus = "pending" | "approved" | "rejected" | "refunded";
 
 export interface PaymentSubmission {
   id: string;
@@ -1008,6 +1011,14 @@ export interface PaymentSubmission {
   reviewed_at: string | null;
   created_at: string;
   updated_at: string;
+  // ---- Gateway columns. Null on every manual_bkash row; set by fulfilment on an online one.
+  // gateway_invoice_id doubles as the idempotency key (unique index in ADD_UDDOKTAPAY.sql), which
+  // is why it is the one payment identifier stored in plaintext — see lib/payments/submissions.ts.
+  gateway_invoice_id?: string | null;
+  gateway_txn_id?: string | null;
+  gateway_payment_method?: string | null;
+  refunded_at?: string | null;
+  refund_reason?: string | null;
   // Attached by the admin queue endpoint only. `deleted` means the account is gone but the
   // payment was KEPT for financial audit (lib/account-purge.ts), so `email` is the snapshot
   // taken at submit time and there is no name or phone left to show.
@@ -1016,11 +1027,41 @@ export interface PaymentSubmission {
 }
 
 // ---- Payment setup (admin-configured MFS pay-to details) ----
+
+/** Which ways an owner may pay. One switch, not a selector plus an enable flag — see the note on
+ *  PaymentMethods in the backend's lib/app-settings.ts. */
+export type PaymentMethods = "manual" | "uddoktapay" | "both";
+
 export interface PaymentConfig {
   provider: string; // which MFS: bKash, Nagad, Rocket, …
   walletNumber: string;
   instructions: string;
   qrUrl: string | null;
+  // On the OWNER route this is what actually works right now, not the admin's stored intent: a
+  // gateway with no usable key is reported as "manual" so the UI never offers a dead button.
+  methods: PaymentMethods;
+}
+
+/**
+ * What the admin console is allowed to see of the gateway config.
+ *
+ * ⭐ THE KEYS ARE NOT HERE, and that is the point. The GET route returns a masked preview and a
+ * boolean; there is no route anywhere that returns the real key. An empty key field on save
+ * therefore means "keep the stored one", never "clear it" — the form cannot show what it never
+ * received. Mirrors BrevoConfigView.
+ */
+export interface UddoktaPayConfigView {
+  mode: "sandbox" | "live";
+  sandboxBaseUrl: string;
+  liveBaseUrl: string;
+  hasSandboxKey: boolean;
+  sandboxKeyPreview: string;
+  hasLiveKey: boolean;
+  liveKeyPreview: string;
+  /** False when FIELD_ENCRYPTION_KEY is missing on the server, so no key can be stored at all. */
+  encryptionReady: boolean;
+  /** Whether the currently selected mode could actually take a payment right now. */
+  activeReady: boolean;
 }
 
 // Generic envelope returned by every backend route

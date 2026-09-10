@@ -15,6 +15,9 @@ module.exports = {
           "Roboto", "Helvetica Neue", "Arial", "sans-serif",
         ],
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        // Baloo Da 2, loaded by next/font in app/layout.tsx. Opt-in per element (banner
+        // titles, metric values, hub-tile labels) — never on body copy.
+        display: ["var(--font-display)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       colors: {
         // Semantic theme tokens — resolve to CSS vars in globals.css (light default / dark override).
