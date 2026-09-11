@@ -993,7 +993,10 @@ export interface ContactMessage {
 // 'refunded' is deliberately its own state rather than a flavour of 'rejected': a rejected
 // payment never bought anything, a refunded one did and was given back. Collapsing them would
 // make the Payments queue lie about what happened.
-export type PaymentSubmissionStatus = "pending" | "approved" | "rejected" | "refunded";
+// 'cancelled' is the same argument again — the owner backed out of the gateway, or simply closed
+// the tab, so nothing was ever submitted for anyone to judge. A rejected payment shows them a red
+// "could not be approved" banner with a reason; a cancelled one should show nothing at all.
+export type PaymentSubmissionStatus = "pending" | "approved" | "rejected" | "refunded" | "cancelled";
 
 export interface PaymentSubmission {
   id: string;

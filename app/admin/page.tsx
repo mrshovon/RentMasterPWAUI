@@ -1468,14 +1468,18 @@ const PAYMENT_FILTERS: { key: PaymentSubmissionStatus | "all"; label: string }[]
   { key: "approved", label: "Approved" },
   { key: "rejected", label: "Rejected" },
   { key: "refunded", label: "Refunded" },
+  { key: "cancelled", label: "Cancelled" },
 ];
 // 'refunded' is slate, not rose: rejected is a problem to look at, refunded is a closed matter.
 // Colouring them the same would put a permanent red badge on every settled refund.
+// 'cancelled' is slate for a stronger version of the same reason — the owner backed out or their
+// tab died, no money moved, and there is nothing here for anyone to do.
 const PAYMENT_STATUS_TONE: Record<PaymentSubmissionStatus, "amber" | "emerald" | "rose" | "slate"> = {
-  pending: "amber", approved: "emerald", rejected: "rose", refunded: "slate",
+  pending: "amber", approved: "emerald", rejected: "rose", refunded: "slate", cancelled: "slate",
 };
 const PAYMENT_STATUS_LABEL: Record<PaymentSubmissionStatus, string> = {
   pending: "Pending", approved: "Approved", rejected: "Rejected", refunded: "Refunded",
+  cancelled: "Cancelled",
 };
 
 function PaymentsTab({
@@ -1672,7 +1676,11 @@ function PaymentDecisionModal({
           {decided ? (
             <div className="space-y-4">
               <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.02] p-4 text-sm text-fg">
-                This payment was already <strong>{PAYMENT_STATUS_LABEL[payment.status].toLowerCase()}</strong>
+                {/* "already cancelled" would imply somebody decided it. Nobody did — the owner
+                    backed out, or their tab died, and no money ever moved. */}
+                {payment.status === "cancelled"
+                  ? <>This payment never completed, so there is <strong>nothing to decide</strong></>
+                  : <>This payment was already <strong>{PAYMENT_STATUS_LABEL[payment.status].toLowerCase()}</strong></>}
                 {payment.admin_notes ? <> — {payment.admin_notes}</> : null}.
                 {payment.status === "refunded" && payment.refund_reason ? (
                   <div className="mt-2 text-xs text-subtle">Refund reason: {payment.refund_reason}</div>

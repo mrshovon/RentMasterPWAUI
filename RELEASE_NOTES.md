@@ -1,3 +1,7 @@
+- Cancelling a plan payment now works properly. Before, backing out still told you we had received your payment and left it waiting for approval, and you could not start another payment at all.
+- Cancelling now records the payment as cancelled, shows no approval message, and lets you try again straight away.
+- If you close the payment window without finishing, that attempt is released on its own so it never blocks you.
+- Your plan payments now show the real plan name instead of an internal code, and no longer show a transaction line when there is nothing to show.
 - The Bari360 logo is now a button. Tap it anywhere in the app to jump straight back to your Home or Overview screen.
 - On the sign-in, password reset and payment screens the logo takes you to your dashboard if you are already signed in, or to the sign-in screen if you are not.
 - The Home screen now matches the new Overview design. Your rent and what you owe sit at the top, and every part of the app has its own card you can tap to open it, with its count on the card.

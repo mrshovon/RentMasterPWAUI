@@ -1603,8 +1603,6 @@ export const bn: Record<string, string> = {
   "Payment cancelled": "পেমেন্ট বাতিল হয়েছে",
   "Nothing has been charged and your plan has not changed. You can try again whenever you are ready.":
     "কোনো টাকা কাটা হয়নি এবং আপনার প্ল্যানেও কোনো পরিবর্তন হয়নি। আপনি প্রস্তুত হলে আবার চেষ্টা করতে পারেন।",
-  "If you are told a payment is already in progress, contact support and we will clear it for you.":
-    "যদি দেখানো হয় যে একটি পেমেন্ট ইতিমধ্যেই চলমান, তাহলে সহায়তায় যোগাযোগ করুন — আমরা সেটি সরিয়ে দেব।",
 
   // ---------------------------------------------------------------- tenant home hub
   // The Home tab rebuilt as a launcher (app/tenant/page.tsx, HomeTab). Numbers stay Western
@@ -1654,4 +1652,19 @@ export const bn: Record<string, string> = {
   // Distinct from "Go to sign in" above, which names one destination; this one resolves to
   // whichever console the visitor belongs to.
   "Go to home": "হোমে যান",
+
+  // ---------------------------------------------------------------- payment cancel
+  // The cancel page writes now; it used to be static. See ADD_PAYMENT_CANCELLED.sql for why.
+  "Cancelling…": "বাতিল করা হচ্ছে…",
+  "One moment — we are releasing your payment attempt.":
+    "একটু অপেক্ষা করুন — আপনার পেমেন্ট প্রচেষ্টাটি বাতিল করা হচ্ছে।",
+  "Your payment went through": "আপনার পেমেন্ট সম্পন্ন হয়েছে",
+  "This payment completed before it was cancelled, so your plan is active. Nothing further is needed.":
+    "বাতিল করার আগেই এই পেমেন্টটি সম্পন্ন হয়ে গিয়েছিল, তাই আপনার প্ল্যান সক্রিয় আছে। আর কিছু করার প্রয়োজন নেই।",
+  // The no-transaction-id twin of the banner above: an online payment has no typed reference
+  // to quote back, so the clause is dropped rather than filled with a placeholder.
+  "We've received your payment for the {0} plan ({1}). Our team will review and activate it shortly.":
+    "আপনার {0} প্ল্যানের পেমেন্ট আমরা পেয়েছি ({1})। আমাদের টিম যাচাই করে শীঘ্রই এটি চালু করবে।",
+  "Paying online activates your plan straight away. A bKash transfer is activated once our team confirms it. The free plan never expires; paid plans renew on their billing interval and get a {0}-day grace period after expiry. A one-time plan can only be taken once — when it ends you move to the free plan and choose again.":
+    "অনলাইনে পেমেন্ট করলে আপনার প্ল্যান সঙ্গে সঙ্গেই চালু হয়। bKash-এ পাঠালে আমাদের টিম নিশ্চিত করার পর চালু হয়। ফ্রি প্ল্যানের মেয়াদ কখনো শেষ হয় না; পেইড প্ল্যান তার বিলিং সময় অনুযায়ী নবায়ন হয় এবং মেয়াদ শেষে {0} দিনের অতিরিক্ত সময় পায়। এককালীন প্ল্যান একবারই নেওয়া যায় — মেয়াদ শেষ হলে আপনি ফ্রি প্ল্যানে ফিরে গিয়ে আবার বেছে নেবেন।",
 };

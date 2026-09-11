@@ -946,15 +946,36 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
   const s = plan.subscription;
   const badge = planStatusBadge(s);
   const pendingPayment = payments.find((p) => p.status === "pending") || null;
+
+  // ⚠️ A PENDING ROW IS NOT THE SAME AS MONEY RECEIVED.
+  // The gateway checkout writes its row BEFORE redirecting to UddoktaPay, so an owner who backed
+  // out — or just closed the tab — leaves one behind with nothing attached to it. Telling them
+  // "we've received your payment, our team will review it" about that row is simply false, and it
+  // is what this whole fix exists to stop.
+  //
+  // gateway_invoice_id is the test, because it is written only at fulfilment: present means the
+  // gateway bound a real invoice to this row. A manual bKash row has no invoice id and never will,
+  // but it is real by construction — the owner typed a transaction id off their own statement.
+  const awaitingReview =
+    pendingPayment && (pendingPayment.provider !== "uddoktapay" || !!pendingPayment.gateway_invoice_id)
+      ? pendingPayment
+      : null;
+  // Gateway rows carry their identifier in a different column, and a manual row's may be absent on
+  // an old record. Never interpolate this blind — String(null) printed the literal "txn null".
+  const awaitingTxn = awaitingReview?.gateway_txn_id || awaitingReview?.txn_id || null;
+
   // Show the most recent rejection only if nothing newer (pending/approved) supersedes it.
   const latestPayment = payments[0] || null;
   const rejectedPayment = latestPayment?.status === "rejected" ? latestPayment : null;
 
-  // Free tiers activate instantly; paid tiers go through the bKash payment screen (submit -> admin
-  // approval). Custom tiers use Contact us (handled by their own button, not choose()).
+  // Free tiers activate instantly; paid tiers go to the payment screen — online through the
+  // gateway, or bKash then admin approval. Custom tiers use Contact us (their own button).
   async function choose(tier: SubscriptionTier) {
     if (Number(tier.price) > 0) {
-      if (pendingPayment) { toast.warning("You already have a payment awaiting approval."); return; }
+      // Only block on a payment that genuinely blocks. An unfinished gateway attempt does not:
+      // the checkout route retires a stale one and lets this through, so refusing here would be
+      // the client inventing a lockout the server no longer has.
+      if (awaitingReview) { toast.warning("You already have a payment awaiting approval."); return; }
       setPaymentTier(tier);
       return;
     }
@@ -1014,24 +1035,30 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
         </div>
       </Card>
 
-      {/* Payment awaiting approval */}
-      {pendingPayment && (
+      {/* Payment awaiting approval. Only for money that actually moved — see awaitingReview. */}
+      {awaitingReview && (
         <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
           <div>
             <div className="font-bold text-warning">{t("Payment awaiting approval")}</div>
             <p className="mt-0.5 text-warning/90">
-              {t("We've received your payment for the {0} plan ({1}, txn {2}). Our team will review and activate it shortly.")
-                .replace("{0}", t(pendingPayment.tier_name || pendingPayment.tier_id))
-                .replace("{1}", `৳${Number(pendingPayment.amount || 0)}`)
-                .replace("{2}", String(pendingPayment.txn_id))}
+              {/* Two keys rather than one with an empty slot: a gateway payment has no typed
+                  transaction id to quote, and "txn —" is noise in a sentence meant to reassure. */}
+              {awaitingTxn
+                ? t("We've received your payment for the {0} plan ({1}, txn {2}). Our team will review and activate it shortly.")
+                    .replace("{0}", t(awaitingReview.tier_name || awaitingReview.tier_id))
+                    .replace("{1}", formatCurrency(Number(awaitingReview.amount || 0)))
+                    .replace("{2}", awaitingTxn)
+                : t("We've received your payment for the {0} plan ({1}). Our team will review and activate it shortly.")
+                    .replace("{0}", t(awaitingReview.tier_name || awaitingReview.tier_id))
+                    .replace("{1}", formatCurrency(Number(awaitingReview.amount || 0)))}
             </p>
           </div>
         </div>
       )}
 
       {/* Last payment was rejected */}
-      {!pendingPayment && rejectedPayment && (
+      {!awaitingReview && rejectedPayment && (
         <div className="flex items-start gap-3 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
           <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
           <div>
@@ -1178,7 +1205,9 @@ function PlanTab({ plan, onReload, ownerName }: { plan: SubscriptionResponse | n
           })}
         </div>
         <p className="text-xs text-subtle">
-          {t("Paid plans are activated after our team confirms your bKash payment. The free plan never expires; paid plans renew on their billing interval and get a {0}-day grace period after expiry. A one-time plan can only be taken once — when it ends you move to the free plan and choose again.")
+          {/* Was "activated after our team confirms your bKash payment", which stopped being true
+              the day the gateway shipped — an online payment activates the plan itself. */}
+          {t("Paying online activates your plan straight away. A bKash transfer is activated once our team confirms it. The free plan never expires; paid plans renew on their billing interval and get a {0}-day grace period after expiry. A one-time plan can only be taken once — when it ends you move to the free plan and choose again.")
             .replace("{0}", "10")}
         </p>
         {/* Same clarification as the public pricing page: on this card "maintenance" is the
