@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, Users, Settings, Plus, Pencil, KeyRound, Ban, ShieldCheck,
   Unlink, Building2, CircleDollarSign, ReceiptText, Home, HardHat, Wallet, Wrench,
-  Megaphone, FileText, CreditCard, Trash2,
+  Megaphone, FileText, CreditCard, Trash2, TriangleAlert, CheckCircle2,
 } from "lucide-react";
+import { cn } from "../../lib/cn";
 import { rentMasterFetch } from "../../lib/api-service";
 import { toast } from "../../components/toast";
 import { confirmDialog } from "../../components/confirm";
@@ -14,7 +15,9 @@ import { usePresenceHeartbeat } from "../../lib/presence";
 import { useTabState } from "../../lib/use-tab";
 import { usePlan } from "../../lib/use-plan";
 import { useRevalidateOnFocus } from "../../lib/use-revalidate";
-import { Building, BuildingOwner, BuildingOwnerFlat, BuildingPlanState, Property } from "../../types/api";
+import {
+  Building, BuildingOwner, BuildingOwnerFlat, BuildingPlanState, BuildingServiceInvoice, Property,
+} from "../../types/api";
 import { formatCurrency, formatDate } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { useT } from "../../lib/i18n";
@@ -31,7 +34,7 @@ import { AccountsTab } from "../../components/accounts-tab";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea,
   PageHeader, EmptyState, FullScreenLoader, SearchInput, EmailField, PhoneField,
-  PasswordInput,
+  PasswordInput, SectionBanner, MetricCard, HubTile,
 } from "../../components/ui";
 import { validateEmail, validatePhone, memberOwnerLoginId } from "../../lib/validate";
 
@@ -45,9 +48,9 @@ import { validateEmail, validatePhone, memberOwnerLoginId } from "../../lib/vali
 // The accounts created here are ORDINARY owners — same dashboard, same features. The only
 // difference is a building_owners row, which makes their plan resolve through this building.
 //
-// Like app/admin/page.tsx, this console is exempt from check-i18n (see scripts/check-i18n.mjs):
-// it is an operator tool, and translating it is a deliberate later decision rather than a tax
-// on every phase of the build.
+// This console IS covered by check-i18n. It was exempt once, on the grounds that it is an
+// operator tool; that call was overturned when DashboardShell started showing a language
+// toggle here, so every new string needs a lib/locales/bn.ts entry.
 // =====================================================================================
 
 export default function BuildingAdminDashboard() {
@@ -59,6 +62,10 @@ export default function BuildingAdminDashboard() {
   const [building, setBuilding] = useState<Building | null>(null);
   const [owners, setOwners] = useState<BuildingOwner[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
+  // Every service-charge invoice this building has ever raised, not just the current month:
+  // the Overview reports what is still OWED, and arrears do not expire at a month boundary.
+  // The Service charge tab keeps its own month-scoped fetch; it answers a different question.
+  const [invoices, setInvoices] = useState<BuildingServiceInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<BuildingOwner | null>(null);
@@ -70,17 +77,21 @@ export default function BuildingAdminDashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [b, o, p] = await Promise.allSettled([
+      const [b, o, p, inv] = await Promise.allSettled([
         rentMasterFetch<{ data: Building }>("/api/admin/building"),
         rentMasterFetch<{ data: BuildingOwner[] }>("/api/admin/building/owners"),
         // The building's OWN rentable space, from the ordinary owner route — it already scopes on
         // owner_id, which for this caller is the building admin's uid.
         rentMasterFetch<{ data: Property[] }>("/api/admin/properties"),
+        rentMasterFetch<{ data: BuildingServiceInvoice[] }>("/api/admin/building/invoices"),
       ]);
       if (b.status === "fulfilled") setBuilding(b.value.data);
       else toast.error((b.reason as Error).message);
       if (o.status === "fulfilled") setOwners(o.value.data || []);
       if (p.status === "fulfilled") setProperties(p.value.data || []);
+      // Best-effort, like its two siblings above: a dashboard with no money figures still
+      // beats a dashboard that refuses to render at all.
+      if (inv.status === "fulfilled") setInvoices(inv.value.data || []);
     } finally {
       setLoading(false);
     }
@@ -126,12 +137,36 @@ export default function BuildingAdminDashboard() {
 
   const metrics = useMemo(() => {
     const active = owners.filter((o) => o.is_active);
+    // Per FLAT, not per owner. owners.default_service_charge is frozen at the roster level and
+    // under-reports every owner who holds more than one flat — the same sum OwnersTab already
+    // does for its own column. Falls back to the roster figure for a pre-flats row.
+    const activeFlats = active.flatMap((o) =>
+      o.flats?.length ? o.flats.filter((f) => f.is_active) : []);
+    // Owners with no flats row at all (pre-ADD_BUILDING_OWNER_FLATS) still carry their charge
+    // on the roster, and dropping them would silently under-report the monthly total.
+    const flatlessCharge = active
+      .filter((o) => !o.flats?.length)
+      .reduce((sum, o) => sum + Number(o.default_service_charge || 0), 0);
+    const unpaid = invoices.filter((i) => i.payment_status !== "paid");
     return {
       owners: owners.length,
       active: active.length,
-      monthlyServiceCharge: active.reduce((sum, o) => sum + Number(o.default_service_charge || 0), 0),
+      flats: activeFlats.length + active.filter((o) => !o.flats?.length).length,
+      monthlyServiceCharge:
+        activeFlats.reduce((sum, f) => sum + Number(f.default_service_charge || 0), 0) + flatlessCharge,
+      invoiceCount: invoices.length,
+      // What is still OWED — a partly-paid invoice contributes only its remaining balance.
+      outstanding: unpaid.reduce(
+        (sum, i) => sum + Math.max(0, Number(i.total_payable || 0) - Number(i.amount_paid || 0)),
+        0,
+      ),
+      unpaidCount: unpaid.length,
+      settledCount: invoices.length - unpaid.length,
+      collectionPct: invoices.length
+        ? Math.round(((invoices.length - unpaid.length) / invoices.length) * 100)
+        : 0,
     };
-  }, [owners]);
+  }, [owners, invoices]);
 
   const nav: NavItem[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
@@ -171,7 +206,15 @@ export default function BuildingAdminDashboard() {
       <BuildingPlanBanner state={planState} onOpen={() => setTab("plan")} />
 
       {tab === "overview" && (
-        <OverviewTab building={building} metrics={metrics} onAdd={() => setCreateOpen(true)} />
+        <OverviewTab
+          building={building}
+          metrics={metrics}
+          planState={planState}
+          properties={properties}
+          nav={nav}
+          onNavigate={setTab}
+          onAdd={() => setCreateOpen(true)}
+        />
       )}
       {tab === "plan" && <BuildingPlanTab building={building} />}
       {tab === "owners" && (
@@ -230,37 +273,217 @@ export default function BuildingAdminDashboard() {
 }
 
 /* ============================================================ OVERVIEW */
+// The console landing screen is a HUB, matching the owner Overview (app/owner/page.tsx): a
+// building strip, the two numbers that decide whether this month needs any action, and a launcher
+// for every other tab. The old 3-up StatCard row is gone — the metric pair and the collection line
+// say the same things in one place instead of two that can disagree.
+//
+// The "Your plan" card stays below the hub: it is the only screen in the app that says what the
+// Whole Building plan actually covers.
+
+/** Remembers whether the Overview body is expanded. Per browser, per device. */
+const OVERVIEW_OPEN_KEY = "bari360-building-overview-open";
+
+type TileTone = "neutral" | "primary" | "success" | "warning" | "danger";
 
 function OverviewTab({
-  building,
-  metrics,
-  onAdd,
+  building, metrics, planState, properties, nav, onNavigate, onAdd,
 }: {
   building: Building | null;
-  metrics: { owners: number; active: number; monthlyServiceCharge: number };
+  metrics: {
+    owners: number; active: number; flats: number; monthlyServiceCharge: number;
+    invoiceCount: number; outstanding: number;
+    unpaidCount: number; settledCount: number; collectionPct: number;
+  };
+  /** The contract's live state, for the Plan tile's one line of detail. Null until it loads, or
+   *  if the request failed — the tile then falls back to naming the plan rather than a date. */
+  planState: BuildingPlanState | null;
+  properties: Property[];
+  /** The shell's own nav array. The tile grid is built from it so the two can never disagree
+   *  about what exists, what it is called, or what its badge says. */
+  nav: NavItem[];
+  onNavigate: (key: string) => void;
   onAdd: () => void;
 }) {
   const t = useT();
+
+  // Initialised to `true` and corrected on mount rather than read from storage during render:
+  // reading localStorage while rendering desynchronises the server-rendered HTML from the
+  // client's first paint.
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(OVERVIEW_OPEN_KEY) === "0") setOpen(false);
+    } catch { /* private mode / storage disabled — stay expanded */ }
+  }, []);
+  function toggleOpen() {
+    setOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(OVERVIEW_OPEN_KEY, next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  // Which number the Service charge tile reports. A LENS on the same invoices, not a filter:
+  // nothing is hidden anywhere else on the screen, and the tile still opens the full tab.
+  const [lens, setLens] = useState<"all" | "unpaid">("all");
+
+  // Whole phrases either side of the assembly — a bare "flats" is not a translatable string.
+  const flatCount = t(metrics.flats === 1 ? "{0} flat" : "{0} flats").replace("{0}", String(metrics.flats));
+  const ownerCount = t(metrics.owners === 1 ? "{0} owner" : "{0} owners").replace("{0}", String(metrics.owners));
+
+  // The Plan tile's line. Days beat a date when the clock is running out, and the honest answer
+  // while planState is still in flight is the plan's name, not a guess at its expiry.
+  const planSub = !planState
+    ? t("Whole Building")
+    : planState.status === "locked"
+      ? t("Locked — renew to continue")
+      : planState.status === "grace" && planState.daysLeftInGrace != null
+        ? t("{0} days left in grace").replace("{0}", String(planState.daysLeftInGrace))
+        : planState.warnExpiringSoon && planState.daysUntilExpiry != null
+          ? t("{0} days left").replace("{0}", String(planState.daysUntilExpiry))
+          : planState.expiryDate
+            ? t("Active until {0}").replace("{0}", formatDate(planState.expiryDate))
+            : t("Whole Building");
+
+  // How each tile presents itself, keyed by nav key. Everything else about a tile — its label,
+  // icon, badge and locked flag — comes straight off the nav item.
+  const tileMeta: Record<string, { sub: ReactNode; tone: TileTone }> = {
+    plan: { tone: "warning", sub: planSub },
+    owners: { tone: "neutral", sub: `${ownerCount}, ${flatCount}` },
+    invoices: {
+      tone: metrics.outstanding > 0 ? "danger" : "success",
+      sub: lens === "unpaid"
+        ? t("{0} unpaid").replace("{0}", String(metrics.unpaidCount))
+        : t("{0} due").replace("{0}", formatCurrency(metrics.outstanding)),
+    },
+    spaces: {
+      tone: "neutral",
+      sub: t(properties.length === 1 ? "{0} building-owned unit" : "{0} building-owned units")
+        .replace("{0}", String(properties.length)),
+    },
+    staff: { tone: "neutral", sub: t("Guards & maids") },
+    accounts: { tone: "primary", sub: t("Ledger & dues") },
+    notices: { tone: "neutral", sub: t("Send alerts") },
+    reports: { tone: "primary", sub: t("Statements & income") },
+    setup: { tone: "neutral", sub: t("Amenities & sources") },
+    settings: { tone: "neutral", sub: t("Preferences") },
+  };
+
+  // Every tab except this one. Order, labels, badges and the add-on crowns all come from nav.
+  const tiles = nav.filter((n) => n.key !== "overview");
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={building?.name || "Your building"}
-        subtitle={building?.address || "Add an address in Settings so it prints on your notices."}
-        action={<Button icon={Plus} onClick={onAdd}>Add owner</Button>}
+    <div className="space-y-3">
+      {/* ---- Which building this is, how big it is, and the one creation action ---- */}
+      <Card className="flex items-center gap-3 p-3.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Badge tone="indigo">Whole Building</Badge>
+            <span className="truncate text-sm font-bold text-heading">
+              {building?.name || t("Your building")}
+            </span>
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+            <span className="truncate">
+              {building?.address || t("Add an address in Settings so it prints on your notices.")}
+            </span>
+            {metrics.flats > 0 && (
+              <>
+                {/* A drawn dot, not a middot character: a punctuation-only text node is copy as
+                    far as check-i18n is concerned, and there is nothing here to translate. */}
+                <span className="h-1 w-1 shrink-0 rounded-full bg-faint" aria-hidden />
+                <span className="font-bold text-success">{flatCount}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <Button icon={Plus} onClick={onAdd} className="shrink-0 rounded-full">Add owner</Button>
+      </Card>
+
+      {/* ---- The section header, which is also its collapse control ---- */}
+      <SectionBanner
+        title="Overview"
+        badgeLabel="Live"
+        subtitle="Service charge, owners & building finances"
+        icon={LayoutDashboard}
+        open={open}
+        onToggle={toggleOpen}
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Owners" value={metrics.owners} icon={Users} accent="indigo" />
-        <StatCard label="Active" value={metrics.active} icon={ShieldCheck} accent="emerald" />
-        <StatCard
-          label="Service charge / month"
-          value={formatCurrency(metrics.monthlyServiceCharge)}
-          sub="Sum of every active owner's default"
-          icon={CircleDollarSign}
-          accent="amber"
-        />
-      </div>
+      {open && (
+        <div className="space-y-3 animate-fade-in">
+          {/* ---- The two numbers that decide whether this month needs action ---- */}
+          <div className="grid grid-cols-2 gap-3">
+            <MetricCard
+              tone="success"
+              label="Service charge / month"
+              icon={CircleDollarSign}
+              value={formatCurrency(metrics.monthlyServiceCharge)}
+              sub={t("Sum of every active flat")}
+            />
+            <MetricCard
+              tone="danger"
+              label="Outstanding"
+              icon={TriangleAlert}
+              value={formatCurrency(metrics.outstanding)}
+              sub={t(metrics.unpaidCount === 1 ? "{0} unpaid invoice" : "{0} unpaid invoices")
+                .replace("{0}", String(metrics.unpaidCount))}
+            />
+          </div>
 
+          {/* ---- Collection, in one line, with the lens for the Service charge tile ---- */}
+          <Card className="flex items-center gap-2.5 p-3.5">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-hidden />
+            <span className="min-w-0 flex-1 text-[13px] font-bold text-heading">
+              {metrics.invoiceCount
+                ? t("Collection: {0}% ({1} of {2} invoices settled)")
+                    .replace("{0}", String(metrics.collectionPct))
+                    .replace("{1}", String(metrics.settledCount))
+                    .replace("{2}", String(metrics.invoiceCount))
+                : t("No service-charge invoices raised yet.")}
+            </span>
+            <div className="flex shrink-0 rounded-full border border-success/30 bg-success/10 p-0.5 text-[10px] font-bold">
+              {(["all", "unpaid"] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setLens(key)}
+                  aria-pressed={lens === key}
+                  className={cn(
+                    "rounded-full px-2 py-1 transition",
+                    lens === key ? "bg-success text-btn-ink" : "text-success",
+                  )}
+                >
+                  {t(key === "all" ? "All" : "Unpaid")}
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          {/* ---- The launcher ---- */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {tiles.map((item) => {
+              const meta = tileMeta[item.key];
+              return (
+                <HubTile
+                  key={item.key}
+                  label={item.label}
+                  sub={meta?.sub}
+                  icon={item.icon}
+                  tone={meta?.tone ?? "neutral"}
+                  // The lens only ever changes what the Service charge tile reports.
+                  badge={item.key === "invoices" && lens === "unpaid" ? metrics.unpaidCount : item.badge}
+                  locked={item.locked}
+                  onClick={() => onNavigate(item.key)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ---- Kept below the hub: the only screen that says what the plan covers ---- */}
       <Card className="p-5">
         <h3 className="text-sm font-semibold text-heading">{t("Your plan")}</h3>
         {/* One key, with the plan name slotted in: Bangla puts the name elsewhere in the

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, ReactNode, useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, CreditCard, Megaphone, Plus, Ban, KeyRound,
   Trash2, Mail, CheckCircle2, ShieldOff, ShieldCheck, Inbox, Building2, Eye,
@@ -42,6 +42,7 @@ import { OwnerProfileCard } from "../../components/profile-card";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner,
+  SectionBanner, MetricCard, HubTile,
   EmailField, PhoneField,
 } from "../../components/ui";
 import { validateEmail, validatePhone, buildingAdminLoginId, isSystemLogin } from "../../lib/validate";
@@ -352,47 +353,16 @@ export default function AdminDashboard() {
       {error && <div className="mb-6"><Alert>{error}</Alert></div>}
 
       {tab === "overview" && (
-        <div className="space-y-8">
-          {/* Greets by name like the tenant dashboard, and names the account signed in. Both
-              fall back to the static header while the profile request is still in flight. */}
-          <PageHeader
-            title={session?.name ? `Welcome back, ${session.name}` : "Admin overview"}
-            subtitle={account?.email
-              ? `Signed in as ${account.email} · Super Admin`
-              : "Platform-wide owners and subscriptions."}
-          />
-          {/* Platform-wide user counts (owners + tenants) come from the analytics endpoint —
-              the owners list alone cannot see tenants. Falls back to the owner-only figures
-              while that request is in flight or if it fails. */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-            <StatCard label="Users online now" accent="emerald" icon={Radio}
-              value={stats ? stats.onlineNow.total : metrics.onlineOwners} />
-            <StatCard label="Total platform users" accent="indigo" icon={Users}
-              value={stats ? stats.totals.allUsers : metrics.total} />
-            <StatCard label="Owner accounts" accent="amber" icon={Building2} value={metrics.total} />
-          </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Active" accent="emerald" icon={CheckCircle2} value={metrics.active} />
-            <StatCard label="Suspended" accent="rose" icon={Ban} value={metrics.suspended} />
-            <StatCard label="On a plan" accent="indigo" icon={CreditCard} value={metrics.subscribed} />
-            <StatCard label="Tenants" accent="cyan" icon={Users} value={stats ? stats.totals.tenants : "—"} />
-          </div>
-          <Card className="p-6">
-            <h3 className="mb-4 text-sm font-bold text-fg">Recently added owners</h3>
-            <div className="space-y-3">
-              {owners.slice(0, 5).map((o) => (
-                <div key={o.id} className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-heading">{o.name || "—"}</div>
-                    <div className="truncate text-xs text-subtle">{o.email}</div>
-                  </div>
-                  <Badge tone={o.suspended ? "rose" : "emerald"}>{o.suspended ? "Suspended" : "Active"}</Badge>
-                </div>
-              ))}
-              {owners.length === 0 && <p className="text-sm text-subtle">No owner accounts yet.</p>}
-            </div>
-          </Card>
-        </div>
+        <OverviewTab
+          owners={owners}
+          metrics={metrics}
+          stats={stats}
+          account={account}
+          nav={nav}
+          sessionName={session?.name}
+          onNavigate={setTab}
+          onAddOwner={() => setCreateOpen(true)}
+        />
       )}
 
       {tab === "analytics" && <AnalyticsTab />}
@@ -616,6 +586,224 @@ function SignupChart({ ownerSeries, tenantSeries }: { ownerSeries: DayCount[]; t
         </>
       )}
     </Card>
+  );
+}
+
+/* ============================================================ OVERVIEW */
+// The console landing screen is a HUB, matching the owner Overview (app/owner/page.tsx): an
+// operator strip, the two numbers that decide whether today needs any action, and a launcher for
+// every other tab.
+//
+// The old top row (Users online / Total platform users / Owner accounts) is gone — the metric pair
+// and the platform line now carry all three, and saying a number twice is two places that can
+// disagree. The four account-state tiles stay below the hub because nothing else on this screen
+// carries them, and so does the recent-owners list.
+//
+// The big change is the DANGER card. pendingPayments, openTickets, newMessages and
+// buildingsNeedingAttention were all computed for the nav badges and shown nowhere on the landing
+// screen; an operator had to read the sidebar to discover there was a queue at all.
+
+/** Remembers whether the Overview body is expanded. Per browser, per device. */
+const OVERVIEW_OPEN_KEY = "bari360-admin-overview-open";
+
+type TileTone = "neutral" | "primary" | "success" | "warning" | "danger";
+
+function OverviewTab({
+  owners, metrics, stats, account, nav, sessionName, onNavigate, onAddOwner,
+}: {
+  owners: AdminOwner[];
+  metrics: {
+    total: number; active: number; suspended: number; subscribed: number;
+    openTickets: number; newMessages: number; pendingPayments: number;
+    buildingsNeedingAttention: number; onlineOwners: number;
+  };
+  /** Platform-wide counts. Null while the request is in flight, or if it failed — every read of
+   *  it here falls back to the owners-list figures rather than rendering a blank. */
+  stats: AnalyticsSummary | null;
+  account: AccountProfile | null;
+  /** The shell's own nav array. The tile grid is built from it so the two can never disagree
+   *  about what exists, what it is called, or what its badge says. */
+  nav: NavItem[];
+  sessionName?: string;
+  onNavigate: (key: string) => void;
+  onAddOwner: () => void;
+}) {
+  // Initialised to `true` and corrected on mount rather than read from storage during render:
+  // reading localStorage while rendering desynchronises the server-rendered HTML from the
+  // client's first paint.
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(OVERVIEW_OPEN_KEY) === "0") setOpen(false);
+    } catch { /* private mode / storage disabled — stay expanded */ }
+  }, []);
+  function toggleOpen() {
+    setOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(OVERVIEW_OPEN_KEY, next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  // Which number the Owners tile reports. A LENS on the same list, not a filter: nothing is
+  // hidden anywhere else on the screen, and the tile still opens the full Owners tab.
+  const [lens, setLens] = useState<"all" | "active">("all");
+
+  const onlineNow = stats ? stats.onlineNow.total : metrics.onlineOwners;
+  const allUsers = stats ? stats.totals.allUsers : metrics.total;
+  const tenants = stats ? stats.totals.tenants : null;
+
+  // "Needs attention" is one number an operator can act on, not a sum for its own sake: every
+  // part of it is a queue with a human waiting at the other end.
+  const needsAttention =
+    metrics.pendingPayments + metrics.openTickets + metrics.newMessages + metrics.buildingsNeedingAttention;
+
+  // How each tile presents itself, keyed by nav key. Everything else about a tile — its label,
+  // icon and badge — comes straight off the nav item.
+  const tileMeta: Record<string, { sub: ReactNode; tone: TileTone }> = {
+    analytics: { tone: "primary", sub: "Growth & presence" },
+    owners: {
+      tone: "neutral",
+      sub: lens === "active" ? `${metrics.active} active` : `${metrics.total} accounts`,
+    },
+    subscriptions: { tone: "warning", sub: "Tiers & add-ons" },
+    payments: { tone: "danger", sub: `${metrics.pendingPayments} pending` },
+    buildings: { tone: "warning", sub: `${metrics.buildingsNeedingAttention} need attention` },
+    "payment-setup": { tone: "neutral", sub: "Gateway & bKash" },
+    notices: { tone: "primary", sub: "Broadcast to owners" },
+    tickets: { tone: "warning", sub: `${metrics.openTickets} open` },
+    messages: { tone: "primary", sub: `${metrics.newMessages} new` },
+    "reset-log": { tone: "neutral", sub: "Password audit" },
+    logs: { tone: "neutral", sub: "Errors & requests" },
+    settings: { tone: "neutral", sub: "Brevo, legal & app" },
+  };
+
+  // Every tab except this one. Order, labels and badges all come from nav.
+  const tiles = nav.filter((n) => n.key !== "overview");
+
+  return (
+    <div className="space-y-3">
+      {/* ---- Who is signed in, how big the platform is, and the one creation action ---- */}
+      <Card className="flex items-center gap-3 p-3.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Badge tone="indigo">Super Admin</Badge>
+            {sessionName && (
+              <span className="truncate text-sm font-bold text-heading">{sessionName}</span>
+            )}
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+            {/* The stored session carries no email — /api/admin/owner/profile is the only source,
+                so this line stays name-only until that request lands. */}
+            <span className="truncate">{account?.email || "Platform-wide owners and subscriptions."}</span>
+            <span className="h-1 w-1 shrink-0 rounded-full bg-faint" aria-hidden />
+            <span className="font-bold text-success">{onlineNow} online now</span>
+          </div>
+        </div>
+        <Button icon={Plus} onClick={onAddOwner} className="shrink-0 rounded-full">Owner</Button>
+      </Card>
+
+      {/* ---- The section header, which is also its collapse control ---- */}
+      <SectionBanner
+        title="Overview"
+        badgeLabel="Live"
+        subtitle="Platform health, queues & accounts"
+        icon={LayoutDashboard}
+        open={open}
+        onToggle={toggleOpen}
+      />
+
+      {open && (
+        <div className="space-y-3 animate-fade-in">
+          {/* ---- The two numbers that decide whether today needs action ---- */}
+          <div className="grid grid-cols-2 gap-3">
+            <MetricCard
+              tone="success"
+              label="Users online now"
+              icon={Radio}
+              value={onlineNow}
+              sub={`${allUsers} total platform users`}
+            />
+            <MetricCard
+              tone="danger"
+              label="Needs attention"
+              icon={LifeBuoy}
+              value={needsAttention}
+              sub={`${metrics.pendingPayments} payments · ${metrics.openTickets} tickets · ${metrics.newMessages} messages`}
+            />
+          </div>
+
+          {/* ---- The platform, in one line, with the lens for the Owners tile ---- */}
+          <Card className="flex items-center gap-2.5 p-3.5">
+            <Users className="h-5 w-5 shrink-0 text-success" aria-hidden />
+            <span className="min-w-0 flex-1 text-[13px] font-bold text-heading">
+              {metrics.total} owners
+              {tenants === null ? "" : ` · ${tenants} tenants`}
+              {` · ${metrics.subscribed} on a plan`}
+            </span>
+            <div className="flex shrink-0 rounded-full border border-success/30 bg-success/10 p-0.5 text-[10px] font-bold">
+              {(["all", "active"] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setLens(key)}
+                  aria-pressed={lens === key}
+                  className={cn(
+                    "rounded-full px-2 py-1 transition",
+                    lens === key ? "bg-success text-btn-ink" : "text-success",
+                  )}
+                >
+                  {key === "all" ? "All" : "Active"}
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          {/* ---- The launcher ---- */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {tiles.map((item) => {
+              const meta = tileMeta[item.key];
+              return (
+                <HubTile
+                  key={item.key}
+                  label={item.label}
+                  sub={meta?.sub}
+                  icon={item.icon}
+                  tone={meta?.tone ?? "neutral"}
+                  // The lens only ever changes what the Owners tile reports.
+                  badge={item.key === "owners" && lens === "active" ? metrics.active : item.badge}
+                  onClick={() => onNavigate(item.key)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ---- Kept below the hub: account state, which nothing else on this screen carries ---- */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Active" accent="emerald" icon={CheckCircle2} value={metrics.active} />
+        <StatCard label="Suspended" accent="rose" icon={Ban} value={metrics.suspended} />
+        <StatCard label="On a plan" accent="indigo" icon={CreditCard} value={metrics.subscribed} />
+        <StatCard label="Tenants" accent="cyan" icon={Users} value={tenants ?? "—"} />
+      </div>
+
+      <Card className="p-6">
+        <h3 className="mb-4 text-sm font-bold text-fg">Recently added owners</h3>
+        <div className="space-y-3">
+          {owners.slice(0, 5).map((o) => (
+            <div key={o.id} className="flex items-center justify-between">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-heading">{o.name || "—"}</div>
+                <div className="truncate text-xs text-subtle">{o.email}</div>
+              </div>
+              <Badge tone={o.suspended ? "rose" : "emerald"}>{o.suspended ? "Suspended" : "Active"}</Badge>
+            </div>
+          ))}
+          {owners.length === 0 && <p className="text-sm text-subtle">No owner accounts yet.</p>}
+        </div>
+      </Card>
+    </div>
   );
 }
 

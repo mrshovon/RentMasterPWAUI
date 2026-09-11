@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard, CreditCard, Wrench, Bell, Plus, TriangleAlert,
   Megaphone, ReceiptText, CircleDollarSign, Send, Upload, X, CheckCircle2,
@@ -27,11 +27,17 @@ import { translateNoticeText } from "../../lib/notice-i18n";
 import { useUnreadNotices } from "../../lib/notices-seen";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
-  PageHeader, EmptyState, Alert, FullScreenLoader,
+  PageHeader, EmptyState, Alert, FullScreenLoader, SectionBanner, MetricCard, HubTile,
 } from "../../components/ui";
 
 const statusTone: Record<PaymentStatus, "emerald" | "amber" | "cyan" | "rose"> = {
   paid: "emerald", sent: "amber", partial: "cyan", unpaid: "rose",
+};
+/** Human labels for the invoice status. Elsewhere in this file the raw enum is rendered as a
+ *  Badge child, which reads fine on its own; this map exists so the Home hub can drop the status
+ *  into a longer sub-line without shipping a bare lowercase enum value into a sentence. */
+const paymentStatusLabel: Record<PaymentStatus, string> = {
+  paid: "Paid", sent: "Awaiting confirmation", partial: "Partly paid", unpaid: "Unpaid",
 };
 const priorityTone: Record<PriorityLevel, "slate" | "amber" | "rose"> = {
   low: "slate", medium: "amber", high: "rose", urgent: "rose",
@@ -147,7 +153,12 @@ export default function TenantDashboard() {
     const amountDue = dueLedger
       ? Math.max(0, Number(dueLedger.total_payable || 0) - Number(dueLedger.amount_paid || 0))
       : 0;
-    return { dueLedger, openTickets, totalPaid, amountDue };
+    return {
+      dueLedger, openTickets, totalPaid, amountDue,
+      // What the Home hub's Rent tile counts under each lens.
+      ledgerCount: ledgers.length,
+      unpaidCount: ledgers.filter((l) => l.payment_status !== "paid").length,
+    };
   }, [ledgers, logs]);
 
   /** One invoice's installments, oldest first. */
@@ -232,73 +243,19 @@ export default function TenantDashboard() {
       {error && <div className="mb-6"><Alert>{error}</Alert></div>}
 
       {tab === "overview" && (
-        <div className="space-y-8">
-          <PageHeader title={`Welcome back${session?.name ? `, ${session.name}` : ""}`}
-            subtitle="Here's the current status of your suite." />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatCard label="Amount due" accent={metrics.dueLedger ? "rose" : "emerald"} icon={CircleDollarSign}
-              value={formatCurrency(metrics.amountDue)}
-              sub={metrics.dueLedger ? `${formatMonth(metrics.dueLedger.billing_month, lang)} · ${metrics.dueLedger.payment_status}` : "All settled 🎉"} />
-            <StatCard label="Open requests" accent="amber" icon={Wrench}
-              value={metrics.openTickets} sub="In progress" />
-            <StatCard label="Notices" accent="indigo" icon={Bell}
-              value={notices.length} sub="From management" />
-          </div>
-
-          {profile && (
-            <ResidenceCard
-              profile={profile}
-              onServiceBreakdown={() => setServiceModalOpen(true)}
-              onRentHistory={() => setRentHistoryOpen(true)}
-            />
-          )}
-
-          {metrics.dueLedger && (
-            <Card className="flex flex-col items-start gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-sm font-bold text-fg">{t("Rent for {0}").replace("{0}", formatMonth(metrics.dueLedger.billing_month, lang))}</div>
-                <div className="mt-1 text-xs text-muted">
-                  {t("Rent {0} · Service {1}")
-                    .replace("{0}", formatCurrency(metrics.dueLedger.rent_amount))
-                    .replace("{1}", formatCurrency(metrics.dueLedger.service_charge))}
-                  {Number(metrics.dueLedger.extra_charge) > 0 &&
-                    ` · ${t("Extra {0}").replace("{0}", formatCurrency(metrics.dueLedger.extra_charge))}`}
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1 text-right">
-                <div className="text-2xl font-black text-success">{formatCurrency(metrics.amountDue)}</div>
-                {Number(metrics.dueLedger.amount_paid) > 0 && (
-                  <div className="text-[11px] text-muted">
-                    {t("{0} of {1} paid")
-                      .replace("{0}", formatCurrency(metrics.dueLedger.amount_paid))
-                      .replace("{1}", formatCurrency(metrics.dueLedger.total_payable))}
-                  </div>
-                )}
-                <Badge tone={statusTone[metrics.dueLedger.payment_status]}>{metrics.dueLedger.payment_status}</Badge>
-                <button type="button" onClick={() => setBreakdown(metrics.dueLedger!)}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary transition hover:underline">
-                  <Info className="h-3 w-3" /> Charge breakdown
-                </button>
-              </div>
-            </Card>
-          )}
-
-          <Card className="space-y-3 p-6">
-            <div className="flex items-center gap-2">
-              <Megaphone className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-bold text-fg">{t("Latest notice")}</h3>
-            </div>
-            {notices[0] ? (
-              <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.03] p-4">
-                <h4 className="font-bold text-primary">{translateNoticeText(notices[0].title, t)}</h4>
-                <p className="mt-1 text-sm text-fg">{translateNoticeText(notices[0].content, t)}</p>
-                <p className="mt-2 font-mono text-[10px] text-subtle">{formatDate(notices[0].created_at, lang)}</p>
-              </div>
-            ) : (
-              <p className="text-sm text-subtle">{t("No announcements right now.")}</p>
-            )}
-          </Card>
-        </div>
+        <HomeTab
+          profile={profile}
+          notices={notices}
+          metrics={metrics}
+          nav={nav}
+          sessionName={session?.name}
+          onNavigate={setTab}
+          onNewRequest={() => setTicketOpen(true)}
+          onPayRent={() => metrics.dueLedger && markRentAsSent(metrics.dueLedger.id)}
+          onBreakdown={() => metrics.dueLedger && setBreakdown(metrics.dueLedger)}
+          onServiceBreakdown={() => setServiceModalOpen(true)}
+          onRentHistory={() => setRentHistoryOpen(true)}
+        />
       )}
 
       {tab === "billing" && (
@@ -527,6 +484,268 @@ export default function TenantDashboard() {
   );
 }
 
+/* ============================================================ HOME */
+// The tenant Home is a HUB, matching the owner Overview (app/owner/page.tsx): a resident strip,
+// the two numbers that decide whether this month needs any action, and a launcher for every other
+// tab. The old 3-up StatCard row and the standalone due-rent callout are gone — both said the same
+// thing the metric pair and the rent line now say, in two more places that could disagree.
+//
+// What did NOT move up here: ResidenceCard and the latest notice. ResidenceCard is the only route
+// to the service-charge breakdown and rent-history modals, so deleting it would strand both.
+
+/** Remembers whether the Home body is expanded. Per browser, per device. */
+const HOME_OPEN_KEY = "bari360-tenant-home-open";
+
+type TileTone = "neutral" | "primary" | "success" | "warning" | "danger";
+
+function HomeTab({
+  profile, notices, metrics, nav, sessionName,
+  onNavigate, onNewRequest, onPayRent, onBreakdown, onServiceBreakdown, onRentHistory,
+}: {
+  profile: TenantProfile | null;
+  notices: Notice[];
+  metrics: {
+    dueLedger?: BillingLedger; openTickets: number; totalPaid: number; amountDue: number;
+    ledgerCount: number; unpaidCount: number;
+  };
+  /** The shell's own nav array. The tile grid is built from it so the two can never disagree
+   *  about what exists, what it is called, or what its badge says. */
+  nav: NavItem[];
+  sessionName?: string;
+  onNavigate: (key: string) => void;
+  onNewRequest: () => void;
+  onPayRent: () => void;
+  onBreakdown: () => void;
+  onServiceBreakdown: () => void;
+  onRentHistory: () => void;
+}) {
+  const t = useT();
+  const lang = useLang();
+
+  // Initialised to `true` and corrected on mount rather than read from storage during render:
+  // reading localStorage while rendering desynchronises the server-rendered HTML from the
+  // client's first paint. Someone who collapsed it sees one frame of the expanded layout.
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(HOME_OPEN_KEY) === "0") setOpen(false);
+    } catch { /* private mode / storage disabled — stay expanded */ }
+  }, []);
+  function toggleOpen() {
+    setOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(HOME_OPEN_KEY, next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  // Which number the Rent tile reports. A LENS on the same ledger, not a filter: nothing is
+  // hidden anywhere else on the screen, and the tile still opens the full Rent tab.
+  const [lens, setLens] = useState<"all" | "due">("all");
+
+  const due = metrics.dueLedger;
+  const monthlyRent =
+    Number(profile?.tenant.monthly_rent || 0) + Number(profile?.tenant.service_charge || 0);
+  const paidOnDue = due ? Number(due.amount_paid || 0) : 0;
+  const payableOnDue = due ? Number(due.total_payable || 0) : 0;
+
+  // "Toky Manjil (Flat 3B)". Whole phrases either side of the assembly — a bare "Flat" is not a
+  // translatable string, and the parentheses are punctuation, not copy.
+  // Two steps, not one nested template: the i18n scanner reads a `${}` that itself contains a
+  // quoted string as the end of the template, and everything after it in the file desyncs.
+  const flatPart = profile?.property?.flat_no
+    ? t("Flat {0}").replace("{0}", profile.property.flat_no)
+    : "";
+  const flatLine = flatPart
+    ? `${profile!.property!.name} (${flatPart})`
+    : profile?.property?.name || t("Your residence");
+
+  // How each tile presents itself, keyed by nav key. Everything else about a tile — its label,
+  // icon and badge — comes straight off the nav item.
+  const tileMeta: Record<string, { sub: ReactNode; tone: TileTone }> = {
+    billing: {
+      tone: metrics.amountDue > 0 ? "danger" : "success",
+      sub: metrics.amountDue > 0
+        ? t("{0} due").replace("{0}", formatCurrency(metrics.amountDue))
+        : t("All settled"),
+    },
+    maintenance: { tone: "warning", sub: t("{0} active").replace("{0}", String(metrics.openTickets)) },
+    notices: { tone: "neutral", sub: t("From management") },
+    documents: { tone: "primary", sub: t("Agreements & receipts") },
+    settings: { tone: "neutral", sub: t("Preferences") },
+  };
+
+  // Every tab except this one. Order, labels and badges all come from nav.
+  const tiles = nav.filter((n) => n.key !== "overview");
+
+  return (
+    <div className="space-y-3">
+      {/* ---- Who is signed in, where they live, and the actions worth a shortcut ---- */}
+      <Card className="flex items-center gap-3 p-3.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <Badge tone={due ? "amber" : "emerald"}>{due ? "Rent due" : "All settled"}</Badge>
+            {sessionName && (
+              <span className="truncate text-sm font-bold text-heading">{sessionName}</span>
+            )}
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
+            <span className="truncate">{flatLine}</span>
+            {monthlyRent > 0 && (
+              <>
+                {/* A drawn dot, not a middot character: a punctuation-only text node is copy as
+                    far as check-i18n is concerned, and there is nothing here to translate. */}
+                <span className="h-1 w-1 shrink-0 rounded-full bg-faint" aria-hidden />
+                <span className="font-bold text-success">
+                  {t("{0}/month").replace("{0}", formatCurrency(monthlyRent))}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        {/* The pay button is absent unless the invoice is still unpaid — its absence IS the
+            information, and "I've sent it" on an invoice already flagged as sent is a lie. */}
+        <div className="flex shrink-0 items-center gap-2">
+          {due && due.payment_status === "unpaid" && (
+            <Button size="sm" icon={Send} onClick={onPayRent} className="rounded-full">
+              I&apos;ve sent it
+            </Button>
+          )}
+          <Button size="sm" variant="secondary" icon={Plus} onClick={onNewRequest} className="rounded-full">
+            Request
+          </Button>
+        </div>
+      </Card>
+
+      {/* ---- The section header, which is also its collapse control ---- */}
+      <SectionBanner
+        title="Home"
+        badgeLabel="Live"
+        subtitle="Your rent, requests & notices"
+        icon={LayoutDashboard}
+        open={open}
+        onToggle={toggleOpen}
+      />
+
+      {open && (
+        <div className="space-y-3 animate-fade-in">
+          {/* ---- The two numbers that decide whether this month needs action ---- */}
+          <div className="grid grid-cols-2 gap-3">
+            <MetricCard
+              tone="success"
+              label="Monthly rent"
+              icon={CircleDollarSign}
+              value={formatCurrency(monthlyRent)}
+              sub={t("Rent + service charge")}
+            />
+            <MetricCard
+              tone="danger"
+              label="Amount due"
+              icon={TriangleAlert}
+              value={formatCurrency(metrics.amountDue)}
+              sub={due
+                ? `${formatMonth(due.billing_month, lang)} · ${t(paymentStatusLabel[due.payment_status])}`
+                : t("All settled")}
+            />
+          </div>
+
+          {/* ---- The open invoice, in one line, with the lens for the Rent tile ---- */}
+          <Card className="flex items-center gap-2.5 p-3.5">
+            {due
+              ? <TriangleAlert className="h-5 w-5 shrink-0 text-warning" aria-hidden />
+              : <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-hidden />}
+            <span className="min-w-0 flex-1 text-[13px] font-bold text-heading">
+              {due
+                ? t("Rent for {0}: {1} of {2} paid")
+                    .replace("{0}", formatMonth(due.billing_month, lang))
+                    .replace("{1}", formatCurrency(paidOnDue))
+                    .replace("{2}", formatCurrency(payableOnDue))
+                : profile?.tenant.due_date
+                  ? t("No rent due — next bill on the {0}").replace("{0}", ordinalDay(profile.tenant.due_date))
+                  : t("No rent due right now.")}
+            </span>
+            {/* The breakdown link lived on the due-rent card this hub replaced. It has to survive
+                somewhere or BillBreakdownModal becomes unreachable from Home. */}
+            {due && (
+              <button
+                type="button"
+                onClick={onBreakdown}
+                aria-label={t("Charge breakdown")}
+                title={t("Charge breakdown")}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition hover:bg-primary/20"
+              >
+                <Info className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            )}
+            <div className="flex shrink-0 rounded-full border border-success/30 bg-success/10 p-0.5 text-[10px] font-bold">
+              {(["all", "due"] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setLens(key)}
+                  aria-pressed={lens === key}
+                  className={cn(
+                    "rounded-full px-2 py-1 transition",
+                    lens === key ? "bg-success text-btn-ink" : "text-success",
+                  )}
+                >
+                  {t(key === "all" ? "All" : "Due")}
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          {/* ---- The launcher ---- */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {tiles.map((item) => {
+              const meta = tileMeta[item.key];
+              return (
+                <HubTile
+                  key={item.key}
+                  label={item.label}
+                  sub={meta?.sub}
+                  icon={item.icon}
+                  tone={meta?.tone ?? "neutral"}
+                  // The lens only ever changes what the Rent tile reports.
+                  badge={item.key === "billing"
+                    ? (lens === "due" ? metrics.unpaidCount : metrics.ledgerCount)
+                    : item.badge}
+                  onClick={() => onNavigate(item.key)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ---- Kept below the hub: the residence details and the latest bulletin ---- */}
+      {profile && (
+        <ResidenceCard
+          profile={profile}
+          onServiceBreakdown={onServiceBreakdown}
+          onRentHistory={onRentHistory}
+        />
+      )}
+
+      <Card className="space-y-3 p-6">
+        <div className="flex items-center gap-2">
+          <Megaphone className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-bold text-fg">{t("Latest notice")}</h3>
+        </div>
+        {notices[0] ? (
+          <div className="rounded-xl border border-line/[0.06] bg-overlay/[0.03] p-4">
+            <h4 className="font-bold text-primary">{translateNoticeText(notices[0].title, t)}</h4>
+            <p className="mt-1 text-sm text-fg">{translateNoticeText(notices[0].content, t)}</p>
+            <p className="mt-2 font-mono text-[10px] text-subtle">{formatDate(notices[0].created_at, lang)}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-subtle">{t("No announcements right now.")}</p>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 /* ============================================================ RESIDENCE CARDS */
 // Compact property card pinned to the top of the desktop sidebar.
 function PropertySidebarCard({ profile }: { profile: TenantProfile }) {
@@ -541,7 +760,7 @@ function PropertySidebarCard({ profile }: { profile: TenantProfile }) {
         </div>
         <div className="min-w-0">
           <div className="truncate text-xs font-bold text-heading">{p.name}</div>
-          <div className="truncate text-[10px] text-subtle">Flat {p.flat_no}</div>
+          <div className="truncate text-[10px] text-subtle">{t("Flat {0}").replace("{0}", p.flat_no)}</div>
         </div>
       </div>
       <div className="mt-2.5 flex items-start gap-1.5 text-[10px] leading-relaxed text-muted">

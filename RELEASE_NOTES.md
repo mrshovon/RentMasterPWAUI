@@ -1,9 +1,9 @@
-- The Overview screen has been rebuilt. Your rent and outstanding totals sit at the top, and every part of the app now has its own card you can tap to open it, with its count on the card.
-- Each card shows a live detail: how much is due in Billing, how many requests are open, which plan you are on.
-- Tap the Overview bar to fold the whole summary away. It stays folded next time you open the app.
-- The occupancy line has an All and Occupied switch that changes what the Properties card counts.
-- The header is now a card with the Bari360 logo, a Bangla and English switch, and a bell that takes you straight to Notices. The bell shows a dot when there is something unread.
-- Headings across the app use a new rounded typeface, in both Bangla and English.
-- You can now pay for a plan online, by card or mobile banking, without leaving the app. Your plan turns on the moment the payment goes through, with no waiting for approval.
-- The old way of paying still works. If both are switched on you choose which you prefer on the payment screen.
-- The Terms and Privacy Policy have been updated to describe online payment. We still never see your card number or your mobile banking PIN.
+- The Home screen now matches the new Overview design. Your rent and what you owe sit at the top, and every part of the app has its own card you can tap to open it, with its count on the card.
+- Each card shows a live detail: how much is due in Rent, how many requests are open, how many documents you have.
+- Tap the Home bar to fold the summary away. It stays folded next time you open the app.
+- The rent line has an All and Due switch that changes what the Rent card counts, and a button that opens the charge breakdown.
+- If rent is owed you can flag it as sent straight from Home, and raise a maintenance request from the same row.
+- Your residence details and the latest notice are still there, below the new cards.
+- Building admins get the same screen: service charge per month and what is outstanding at the top, a collection line with an All and Unpaid switch, and a card for every tab.
+- The building service charge total now counts every flat. Owners who hold more than one flat were being under-counted before.
+- The flat number on the sidebar card now shows in Bangla when the app is set to Bangla.

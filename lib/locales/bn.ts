@@ -1605,4 +1605,48 @@ export const bn: Record<string, string> = {
     "কোনো টাকা কাটা হয়নি এবং আপনার প্ল্যানেও কোনো পরিবর্তন হয়নি। আপনি প্রস্তুত হলে আবার চেষ্টা করতে পারেন।",
   "If you are told a payment is already in progress, contact support and we will clear it for you.":
     "যদি দেখানো হয় যে একটি পেমেন্ট ইতিমধ্যেই চলমান, তাহলে সহায়তায় যোগাযোগ করুন — আমরা সেটি সরিয়ে দেব।",
+
+  // ---------------------------------------------------------------- tenant home hub
+  // The Home tab rebuilt as a launcher (app/tenant/page.tsx, HomeTab). Numbers stay Western
+  // digits, per this file’s standing rule; ordinalDay() still emits an English suffix (“5th”),
+  // which is why the next-bill sentence puts the date before তারিখে rather than inflecting it.
+  "Your rent, requests & notices": "আপনার ভাড়া, অনুরোধ ও নোটিশ",
+  "Flat {0}": "ফ্ল্যাট {0}",
+  "{0}/month": "{0}/মাস",
+  "Rent + service charge": "ভাড়া + সার্ভিস চার্জ",
+  "All settled": "সব পরিশোধিত",
+  "Awaiting confirmation": "নিশ্চিতকরণের অপেক্ষায়",
+  "Rent for {0}: {1} of {2} paid": "{0} মাসের ভাড়া: {2} এর মধ্যে {1} পরিশোধিত",
+  "No rent due — next bill on the {0}": "কোনো ভাড়া বাকি নেই — পরবর্তী বিল {0} তারিখে",
+  "No rent due right now.": "এই মুহূর্তে কোনো ভাড়া বাকি নেই।",
+  "Agreements & receipts": "চুক্তি ও রসিদ",
+  "Request": "অনুরোধ",
+
+  // ---------------------------------------------------------------- building overview hub
+  // The building console landing screen rebuilt as a launcher (app/building/page.tsx,
+  // OverviewTab). Bangla has no plural -s, so each singular/plural English pair maps to one
+  // Bangla string — both forms still need their own key, because the English is the key.
+  "Your building": "আপনার ভবন",
+  "Add owner": "মালিক যোগ করুন",
+  "Add an address in Settings so it prints on your notices.":
+    "সেটিংসে ঠিকানা যোগ করুন যাতে তা আপনার নোটিশে ছাপা হয়।",
+  "Service charge, owners & building finances": "সার্ভিস চার্জ, মালিক ও ভবনের হিসাব",
+  "Sum of every active flat": "প্রতিটি সক্রিয় ফ্ল্যাটের যোগফল",
+  "Collection: {0}% ({1} of {2} invoices settled)":
+    "আদায়: {0}% ({2}টির মধ্যে {1}টি ইনভয়েস পরিশোধিত)",
+  "No service-charge invoices raised yet.": "এখনো কোনো সার্ভিস চার্জ ইনভয়েস তৈরি হয়নি।",
+  "{0} flat": "{0}টি ফ্ল্যাট",
+  "{0} flats": "{0}টি ফ্ল্যাট",
+  "{0} owner": "{0} জন মালিক",
+  "{0} owners": "{0} জন মালিক",
+  "{0} unpaid": "{0}টি অপরিশোধিত",
+  "{0} building-owned unit": "{0}টি ভবন-মালিকানাধীন ইউনিট",
+  "{0} building-owned units": "{0}টি ভবন-মালিকানাধীন ইউনিট",
+  "Statements & income": "বিবরণী ও আয়",
+  "Amenities & sources": "সুবিধা ও উৎস",
+  // The Plan tile's one line of detail, in the order the console checks them.
+  "Locked — renew to continue": "লক করা — চালিয়ে যেতে নবায়ন করুন",
+  "{0} days left in grace": "গ্রেস পিরিয়ডে {0} দিন বাকি",
+  "{0} days left": "{0} দিন বাকি",
+  "Active until {0}": "{0} পর্যন্ত সক্রিয়",
 };
