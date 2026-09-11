@@ -1,3 +1,5 @@
+- The Bari360 logo is now a button. Tap it anywhere in the app to jump straight back to your Home or Overview screen.
+- On the sign-in, password reset and payment screens the logo takes you to your dashboard if you are already signed in, or to the sign-in screen if you are not.
 - The Home screen now matches the new Overview design. Your rent and what you owe sit at the top, and every part of the app has its own card you can tap to open it, with its count on the card.
 - Each card shows a live detail: how much is due in Rent, how many requests are open, how many documents you have.
 - Tap the Home bar to fold the summary away. It stays folded next time you open the app.

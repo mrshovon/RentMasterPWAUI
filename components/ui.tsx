@@ -1,11 +1,13 @@
 "use client";
 
-import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, useState, type CSSProperties, type ComponentType } from "react";
+import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes, useState, type CSSProperties, type ComponentType, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, Search, Eye, EyeOff, ChevronDown, ChevronRight, Crown, type LucideIcon } from "lucide-react";
 import { cn } from "../lib/cn";
 import { useT } from "../lib/i18n";
 import { validateEmail, validatePhone, MAX_EMAIL_LEN } from "../lib/validate";
+// Safe direction: lib/api-service.ts imports no component, so this cannot cycle.
+import { getStoredSession } from "../lib/api-service";
 
 // NOTE ON TRANSLATION: the primitives below take their text as plain string props, so they
 // translate it themselves. That is what makes the dashboards translatable without editing every
@@ -103,6 +105,56 @@ export function Wordmark({ className }: { className?: string }) {
       <img src="/logo-wordmark.png" alt="Bari360" className="h-full w-auto object-contain dark:hidden" />
       <img src="/logo-wordmark-dark.png" alt="Bari360" className="hidden h-full w-auto object-contain dark:block" />
     </span>
+  );
+}
+
+/**
+ * The lock-up as a way home, for the PUBLIC pages.
+ *
+ * Inside DashboardShell the equivalent is a plain button calling onNavigate: there, home is a
+ * hash tab that is already mounted, and a link would be a full page load to reach it. Out here it
+ * is a real navigation, so this is a real anchor.
+ *
+ * href is the login screen, which is the honest answer with JS off and the right thing to open in
+ * a new tab — app/page.tsx already bounces an already-signed-in visitor on to their own console,
+ * so that route still lands correctly, just via one extra hop. The handler skips the hop when it
+ * can read the session itself.
+ *
+ * The session is read IN THE HANDLER, never during render: getStoredSession() returns null on the
+ * server, so reading it while rendering would desynchronise the first paint from the server HTML.
+ * A click can only happen after hydration, which is what makes this need no effect and no
+ * loading state.
+ *
+ * The <a> becomes the flex item in place of Wordmark's span, so it repeats that span's layout
+ * classes — see the note above about what happens to this lock-up in a flex row without them.
+ */
+export function WordmarkLink({ className }: { className?: string }) {
+  const t = useT();
+
+  function go(e: MouseEvent<HTMLAnchorElement>) {
+    // Ctrl/cmd/shift-click and middle-click mean open-elsewhere. Leave them to the browser; they
+    // land on the login screen, which forwards a signed-in visitor anyway.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    const role = getStoredSession()?.role;
+    if (!role) return;
+    e.preventDefault();
+    // The stored role IS the dashboard route segment — see StoredSession in lib/api-service.ts.
+    // assign, not replace: this is ordinary navigation and the back button should still work.
+    window.location.assign(`/${role}`);
+  }
+
+  return (
+    <a
+      href="/"
+      onClick={go}
+      aria-label={t("Go to home")}
+      title={t("Go to home")}
+      className={cn("inline-flex shrink-0 items-center rounded-lg transition active:scale-95", className ?? "h-8")}
+    >
+      {/* No className here: the anchor above already carries the height, and passing it twice
+          would nest two sized boxes. */}
+      <Wordmark className="h-full" />
+    </a>
   );
 }
 

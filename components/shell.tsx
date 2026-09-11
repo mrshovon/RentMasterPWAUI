@@ -60,9 +60,23 @@ export function DashboardShell({
   // gets a working bell in every console without a prop, and a portal that ever drops the tab
   // loses the bell automatically instead of leaving a button that navigates nowhere.
   const notices = nav.find((n) => n.key === "notices");
+  // Same trick for the lock-up: clicking the brand goes home. Derived, not a prop, so it names
+  // the tab the way that portal names it — the tenant calls it Home, everyone else Overview —
+  // and a portal that ever drops the tab loses the affordance instead of keeping a dead logo.
+  const home = nav.find((n) => n.key === "overview");
 
   const [moreOpen, setMoreOpen] = useState(false);
   const t = useT();
+
+  // Hoisted so the clickable and non-clickable forms below cannot drift apart.
+  const mobileBrand = (
+    <>
+      <Wordmark className="h-6" />
+      <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-subtle">
+        {t(roleLabel)}
+      </span>
+    </>
+  );
 
   // Mobile bottom bar: keep it to a single non-scrolling row. Up to 5 items fit as equal tabs;
   // beyond that, show the first 4 + a "More" button that opens a sheet with the rest.
@@ -85,7 +99,19 @@ export function DashboardShell({
         {/* Top band — brand + optional slot. Fixed height. */}
         <div className="shrink-0 space-y-6">
           <div className="space-y-1.5">
-            <Wordmark className="h-7" />
+            {home ? (
+              <button
+                type="button"
+                onClick={() => onNavigate(home.key)}
+                aria-label={t(home.label)}
+                title={t(home.label)}
+                className="inline-flex shrink-0 items-center rounded-lg transition active:scale-95"
+              >
+                <Wordmark className="h-7" />
+              </button>
+            ) : (
+              <Wordmark className="h-7" />
+            )}
             <div className="text-[10px] uppercase tracking-widest text-subtle">
               {t(roleLabel)}
             </div>
@@ -170,12 +196,23 @@ export function DashboardShell({
           <div className="card-surface flex items-center justify-between gap-2 rounded-[22px] px-3 py-2.5">
             {/* Mobile: the lock-up with the role beneath it. The section name is deliberately not
                 here — it is already on screen in the PageHeader below and on the active tab. */}
-            <div className="flex min-w-0 flex-col md:hidden">
-              <Wordmark className="h-6" />
-              <span className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-subtle">
-                {t(roleLabel)}
-              </span>
-            </div>
+            {/* The whole cluster is the button, not just the mark: with no sidebar on a phone
+                this is the only way home, and the role caption under it is part of the lock-up.
+                items-start is load-bearing — a flex-col stretches its children by default, and a
+                stretched Wordmark silently renders centred (see its note in ui.tsx). */}
+            {home ? (
+              <button
+                type="button"
+                onClick={() => onNavigate(home.key)}
+                aria-label={t(home.label)}
+                title={t(home.label)}
+                className="flex min-w-0 flex-col items-start text-left transition active:scale-95 md:hidden"
+              >
+                {mobileBrand}
+              </button>
+            ) : (
+              <div className="flex min-w-0 flex-col md:hidden">{mobileBrand}</div>
+            )}
             {/* Desktop: name the current section, so the bar isn't a lone cluster of buttons.
                 There is no sidebar on mobile, which is why that trade-off differs by width. */}
             <span className="hidden font-display text-base font-extrabold text-heading md:block">

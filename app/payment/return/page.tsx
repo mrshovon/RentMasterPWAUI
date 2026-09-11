@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Clock, TriangleAlert, XCircle } from "lucide-react";
 import { rentMasterFetch } from "../../../lib/api-service";
-import { Button, Card, Spinner, Wordmark } from "../../../components/ui";
+import { Button, Card, Spinner, WordmarkLink } from "../../../components/ui";
 import { useT } from "../../../lib/i18n";
 
 // =====================================================================================
@@ -100,7 +100,7 @@ function ReturnInner() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg p-4">
       <Card className="w-full max-w-md space-y-5 p-7 text-center">
-        <div className="flex justify-center"><Wordmark className="h-7" /></div>
+        <div className="flex justify-center"><WordmarkLink className="h-7" /></div>
 
         {loading ? (
           <div className="flex flex-col items-center gap-3 py-8">

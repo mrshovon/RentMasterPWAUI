@@ -1,7 +1,7 @@
 "use client";
 
 import { XCircle } from "lucide-react";
-import { Button, Card, Wordmark } from "../../../components/ui";
+import { Button, Card, WordmarkLink } from "../../../components/ui";
 import { useT } from "../../../lib/i18n";
 
 // =====================================================================================
@@ -19,7 +19,7 @@ export default function PaymentCancelledPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg p-4">
       <Card className="w-full max-w-md space-y-5 p-7 text-center">
-        <div className="flex justify-center"><Wordmark className="h-7" /></div>
+        <div className="flex justify-center"><WordmarkLink className="h-7" /></div>
         <div className="flex justify-center">
           <XCircle className="h-12 w-12 text-muted" aria-hidden />
         </div>

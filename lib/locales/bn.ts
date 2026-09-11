@@ -1649,4 +1649,9 @@ export const bn: Record<string, string> = {
   "{0} days left in grace": "গ্রেস পিরিয়ডে {0} দিন বাকি",
   "{0} days left": "{0} দিন বাকি",
   "Active until {0}": "{0} পর্যন্ত সক্রিয়",
+
+  // The brand lock-up doubles as the way home on the public pages (WordmarkLink in ui.tsx).
+  // Distinct from "Go to sign in" above, which names one destination; this one resolves to
+  // whichever console the visitor belongs to.
+  "Go to home": "হোমে যান",
 };
