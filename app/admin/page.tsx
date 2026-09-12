@@ -7,7 +7,7 @@ import {
   RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User, Copy,
   Wallet, Upload, Image as ImageIcon, X, Check, HardHat, Settings, Wrench,
   BarChart3, Radio, Smartphone, Globe, TrendingUp, TrendingDown, Minus, EyeOff,
-  ScrollText, ChevronDown, ChevronRight, RefreshCw, Archive,
+  ScrollText, ChevronDown, ChevronRight, RefreshCw, Archive, LogIn,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
@@ -32,6 +32,7 @@ import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { AppSettingsCard } from "../../components/app-settings-card";
 import { AnnouncementModal, type Announcement } from "../../components/announcement-gate";
+import { LoginPopupModal, type LoginPopup } from "../../components/login-popup-gate";
 // The legal editor previews through the REAL renderer and the REAL parser, so what an admin
 // approves is literally what /terms and /privacy will show. LEGAL_DOCS is the compiled fallback
 // the editor publishes when its textarea is left empty.
@@ -3615,6 +3616,7 @@ function AdminSettingsTab() {
       <PageHeader title="Settings" subtitle="Platform controls and this device's preferences." />
       <OwnerProfileCard />
       <AnnouncementCard />
+      <LoginPopupCard />
       <MaintenanceCard />
       <LegalDocsCard />
       <BrevoConfigCard />
@@ -4024,6 +4026,188 @@ function AnnouncementCard() {
   );
 }
 
+/* ============================================================ LOGIN POPUP CARD */
+// The popup strangers see on the sign-in screen, on a phone. A sibling of AnnouncementCard above,
+// with two differences that both come from the audience.
+//
+// It is BILINGUAL: this is the first thing a visitor reads, and half of them read Bangla. The admin
+// writes both editions rather than us machine-translating marketing copy nobody proofread. An
+// unwritten Bangla edition falls back to English at render time, and the save warns about it.
+//
+// And it is PHONE-ONLY by decision, so the Preview here is what a phone would show — the real
+// LoginPopupModal, so a preview cannot drift from what ships.
+function LoginPopupCard() {
+  const EMPTY: LoginPopup = {
+    enabled: false, titleEn: "", titleBn: "", bodyEn: "", bodyBn: "", imageUrl: null, updatedAt: "",
+  };
+  const [draft, setDraft] = useState<LoginPopup>(EMPTY);
+  const [saved, setSaved] = useState<LoginPopup>(EMPTY);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [previewing, setPreviewing] = useState<"en" | "bn" | null>(null);
+  const [lang, setLang] = useState<"en" | "bn">("en");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: LoginPopup }>("/api/super-admin/login-popup", { role: "admin" });
+        if (res.data) { setDraft(res.data); setSaved(res.data); }
+      } catch (e: any) { toast.error(e.message); }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    try {
+      setUploading(true);
+      const url = await uploadFile(file, { role: "owner", folder: "login-popup" });
+      setDraft((d) => ({ ...d, imageUrl: url }));
+      toast.success("Image uploaded — remember to Save.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setUploading(false); }
+  }
+
+  async function save(nextEnabled = draft.enabled) {
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ data: LoginPopup; warning?: string }>("/api/super-admin/login-popup", {
+        method: "PATCH", role: "admin",
+        body: JSON.stringify({
+          enabled: nextEnabled,
+          titleEn: draft.titleEn, titleBn: draft.titleBn,
+          bodyEn: draft.bodyEn, bodyBn: draft.bodyBn,
+          imageUrl: draft.imageUrl,
+        }),
+      });
+      setDraft(res.data);
+      setSaved(res.data);
+      toast.success(res.data.enabled ? "Login popup is showing." : "Login popup is hidden.");
+      // Surfaced rather than swallowed: publishing an English-only popup to a bilingual audience is
+      // a decision, and the admin should make it knowingly.
+      if (res.warning) toast.warning(res.warning);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  const title = lang === "bn" ? draft.titleBn : draft.titleEn;
+  const body = lang === "bn" ? draft.bodyBn : draft.bodyEn;
+  const setTitle = (v: string) => setDraft((d) => (lang === "bn" ? { ...d, titleBn: v } : { ...d, titleEn: v }));
+  const setBody = (v: string) => setDraft((d) => (lang === "bn" ? { ...d, bodyBn: v } : { ...d, bodyEn: v }));
+
+  return (
+    <Card className="p-6">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <div className="rounded-lg bg-primary/10 p-2 text-primary"><LogIn className="h-4 w-4" /></div>
+          <div>
+            <h3 className="text-sm font-bold text-heading">Login popup</h3>
+            <p className="text-xs text-subtle">
+              Shown on the sign-in screen, on phones only, every time it is opened. Signed-in users
+              never see it. You never see it either — use Preview.
+            </p>
+          </div>
+        </div>
+        <Badge tone={saved.enabled ? "emerald" : "slate"}>{saved.enabled ? "Showing" : "Hidden"}</Badge>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-subtle">Loading…</p>
+      ) : (
+        <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-4">
+              {/* One image for both languages — it is a picture, not prose — so only the text is
+                  per-language and the selector sits over the text fields alone. */}
+              <div className="flex gap-1 rounded-xl bg-overlay/[0.04] p-1">
+                {(["en", "bn"] as const).map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setLang(l)}
+                    className={
+                      "flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition " +
+                      (lang === l ? "bg-primary text-btn-ink shadow-sm" : "text-muted hover:text-fg")
+                    }
+                  >
+                    {l === "en" ? "English" : "Bangla"}
+                    {(l === "en" ? draft.titleEn || draft.bodyEn : draft.titleBn || draft.bodyBn) ? " ✓" : ""}
+                  </button>
+                ))}
+              </div>
+
+              <Field label="Title" hint="Leave the title and details blank to show only the image.">
+                <TextInput maxLength={120} value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={lang === "bn" ? "যেমন: ঈদের ছুটিতে সহায়তা" : "e.g. Manage your rent in one place"} />
+              </Field>
+              <Field label="Details">
+                <TextArea rows={5} maxLength={1000} value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder={lang === "bn" ? "যা জানাতে চান।" : "What you want visitors to know."} />
+              </Field>
+            </div>
+
+            <div className="space-y-3">
+              <div className="text-sm font-bold text-fg">Image <span className="font-normal text-subtle">(shared by both languages)</span></div>
+              <div className="flex items-center justify-center rounded-xl border border-dashed border-line/[0.12] bg-overlay/[0.02] p-4">
+                {draft.imageUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={draft.imageUrl} alt="Login popup" className="max-h-52 w-full rounded-lg object-contain" />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-8 text-subtle">
+                    <ImageIcon className="h-10 w-10" />
+                    <span className="text-xs">No image uploaded yet</span>
+                  </div>
+                )}
+              </div>
+              <label className="block">
+                <input type="file" accept="image/*" className="hidden" onChange={onPickImage} />
+                <span className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-line/[0.1] bg-overlay/[0.03] px-4 py-2.5 text-sm font-semibold text-fg transition hover:bg-overlay/[0.06]">
+                  {uploading ? <Spinner className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
+                  {draft.imageUrl ? "Replace image" : "Upload image"}
+                </span>
+              </label>
+              {draft.imageUrl && (
+                <Button type="button" variant="secondary" icon={Trash2} className="w-full"
+                  onClick={() => setDraft((d) => ({ ...d, imageUrl: null }))}>
+                  Remove image
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="secondary" loading={saving}>Save popup</Button>
+            <Button type="button" variant="secondary" icon={Eye} onClick={() => setPreviewing("en")}>Preview English</Button>
+            <Button type="button" variant="secondary" icon={Eye} onClick={() => setPreviewing("bn")}>Preview Bangla</Button>
+            {saved.enabled ? (
+              <Button type="button" variant="danger" icon={EyeOff} loading={saving} onClick={() => save(false)}>
+                Hide it
+              </Button>
+            ) : (
+              <Button type="button" icon={Power} loading={saving} onClick={() => save(true)}>
+                Show it
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-subtle">
+            Saving publishes immediately while it is showing. Write both languages — a visitor reading
+            Bangla sees the English text only because there is nothing else to show them.
+          </p>
+        </form>
+      )}
+
+      {previewing && (
+        <LoginPopupModal popup={draft} lang={previewing} onClose={() => setPreviewing(null)} />
+      )}
+    </Card>
+  );
+}
+
 /* ------------------------------------------------------------ LEGAL DOCUMENTS */
 
 // Edit the Terms and the Privacy Policy without a developer, a build step and a deploy.
@@ -4057,6 +4241,11 @@ const LEGAL_EDITOR_DOCS = [
   { doc: "terms" as const, lang: "bn" as const, label: "Terms — Bangla", key: "termsBn" as const },
   { doc: "privacy" as const, lang: "en" as const, label: "Privacy — English", key: "privacyEn" as const },
   { doc: "privacy" as const, lang: "bn" as const, label: "Privacy — Bangla", key: "privacyBn" as const },
+  // About us is informational, not binding. It rides this editor because it is the same problem —
+  // a long bilingual document that must be editable without a deploy — but the Effective date
+  // above does NOT govern it, and nothing consents to it.
+  { doc: "about" as const, lang: "en" as const, label: "About — English", key: "aboutEn" as const },
+  { doc: "about" as const, lang: "bn" as const, label: "About — Bangla", key: "aboutBn" as const },
 ];
 
 function LegalDocsCard() {
@@ -4162,11 +4351,13 @@ function LegalDocsCard() {
     <Card className="p-6">
       <div className="mb-1 flex items-center gap-2">
         <ScrollText className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-bold text-heading">Terms &amp; Privacy Policy</h3>
+        <h3 className="text-sm font-bold text-heading">Terms, Privacy &amp; About us</h3>
       </div>
       <p className="mb-5 text-xs text-muted">
-        Published at /terms and /privacy, readable without an account. Each document opens with the
-        text that is live right now — edit it and publish, or revert to the version built into the app.
+        Published at /terms, /privacy and /about, readable without an account. Each document opens
+        with the text that is live right now — edit it and publish, or revert to the version built
+        into the app. The effective date below governs the Terms and Privacy Policy only; About us
+        is informational and nobody consents to it.
       </p>
 
       {loading ? (

@@ -268,7 +268,7 @@ export async function apiTermsVersion(): Promise<string> {
 // failure path returns null rather than throwing, because the caller already holds a complete
 // document: a backend that is down must leave the published policy readable, not blank.
 export async function apiLegalDoc(
-  doc: "privacy" | "terms",
+  doc: "privacy" | "terms" | "about",
   lang: "en" | "bn",
 ): Promise<string | null> {
   try {

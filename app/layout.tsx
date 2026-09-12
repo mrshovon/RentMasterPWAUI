@@ -9,6 +9,7 @@ import { AnalyticsGate } from "../components/analytics-gate";
 import { AnnouncementGate } from "../components/announcement-gate";
 import { NotificationSoundGate } from "../components/notification-sound-gate";
 import { DeepLinkGate } from "../components/deep-link-gate";
+import { LoginPopupGate } from "../components/login-popup-gate";
 import { LanguageProvider } from "../lib/i18n";
 
 // The display face — banner titles, metric values and hub-tile labels. Body copy deliberately
@@ -81,6 +82,9 @@ export default function RootLayout({
           <UpdateGate />
           {/* Before MaintenanceGate on purpose: if both ever fire at once, the maintenance
               portal mounts second and lands on top, which is the one that must be read. */}
+          {/* Signed-out login screen only, and phones only. Its own gate rather than a mode of
+              AnnouncementGate, which requires a session and skips "/" by design. */}
+          <LoginPopupGate />
           <AnnouncementGate />
           <MaintenanceGate />
           {/* Renders nothing — loads GA/GTM if the admin has configured and enabled it. */}

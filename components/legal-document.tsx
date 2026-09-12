@@ -23,6 +23,7 @@ import type { LegalBlock, LegalDoc, LegalRun } from "../content/legal/generated"
 function resolveHref(href: string): string {
   if (/PRIVACY_POLICY\.(en|bn)\.md$/i.test(href)) return "/privacy";
   if (/TERMS_AND_CONDITIONS\.(en|bn)\.md$/i.test(href)) return "/terms";
+  if (/ABOUT_US\.(en|bn)\.md$/i.test(href)) return "/about";
   return href;
 }
 

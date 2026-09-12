@@ -1670,4 +1670,10 @@ export const bn: Record<string, string> = {
 
   // The payment result pages return to the Plan tab on their own after 30s.
   "Returning automatically in {0}s": "{0} সেকেন্ডে স্বয়ংক্রিয়ভাবে ফিরে যাবে",
+
+  // ---------------------------------------------------------------- about us
+  // Two keys for one page, on purpose: the compact links row (Privacy · Terms · About) needs a
+  // short word, while the document footer has room for the full phrase. পরিচিতি is the short one.
+  "About": "পরিচিতি",
+  "About us": "আমাদের সম্পর্কে",
 };

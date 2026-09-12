@@ -10865,7 +10865,1206 @@ export const LEGAL_DOCS = {
         ]
       }
     ]
+  },
+  "aboutEn": {
+    "title": "Bari360 — About us",
+    "blocks": [
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "Last updated:"
+          },
+          {
+            "t": "text",
+            "v": " [EFFECTIVE DATE] "
+          },
+          {
+            "t": "bold",
+            "v": "Applies to:"
+          },
+          {
+            "t": "text",
+            "v": " the Bari360 web application at "
+          },
+          {
+            "t": "code",
+            "v": "https://www.bari360.space"
+          },
+          {
+            "t": "text",
+            "v": " and the Bari360 Android application (package "
+          },
+          {
+            "t": "code",
+            "v": "com.rentmaster.app"
+          },
+          {
+            "t": "text",
+            "v": ")."
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "This page is published in English and Bangla. It is informational: it describes what Bari360 is and what it does. The binding documents are the "
+          },
+          {
+            "t": "link",
+            "v": "Terms and Conditions",
+            "href": "./TERMS_AND_CONDITIONS.en.md"
+          },
+          {
+            "t": "text",
+            "v": " and the "
+          },
+          {
+            "t": "link",
+            "v": "Privacy Policy",
+            "href": "./PRIVACY_POLICY.en.md"
+          },
+          {
+            "t": "text",
+            "v": "."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "What Bari360 is"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Bari360 is a property and tenancy management service for landlords and tenants in Bangladesh."
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Most rental housing here is managed on paper and over the phone: rent recorded in a notebook, receipts written by hand, repairs requested by knocking on a door, and a dispute settled by whoever remembers the month more confidently. That works until it does not, and when it stops working it is usually the tenant who has no record."
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Bari360 keeps that record for both sides. The owner issues an invoice; the tenant sees the same invoice on their own phone. The tenant reports a leak; the owner sees it with the photographs attached and the date it was raised. Nothing depends on either party's memory."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Who it is for"
+          }
+        ]
+      },
+      {
+        "type": "table",
+        "head": [
+          [
+            {
+              "t": "text",
+              "v": "Role"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "How they get an account"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "What they use it for"
+            }
+          ]
+        ],
+        "rows": [
+          [
+            [
+              {
+                "t": "bold",
+                "v": "Owner"
+              },
+              {
+                "t": "text",
+                "v": " (landlord)"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "Registers themselves"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "Their properties, tenants, rent and records"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "t": "bold",
+                "v": "Tenant"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "Added by their owner"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "Their own rent, receipts, requests and notices"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "t": "bold",
+                "v": "Building admin"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "Set up by us, for a whole building"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "Every flat in one building, and its service charges"
+              }
+            ]
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "What it does"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "For owners"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "Properties and tenants, with rent, service charge, advance and due date held per unit"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Monthly rent invoices, part-payments, and printable receipts"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Maintenance requests from tenants, with photographs and a resolution trail"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Notices to one tenant or to everybody"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Scheduled reminders, delivered as app notifications"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Staff and salary records, and a simple income and expense ledger"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Documents — agreements, receipts and anything else worth keeping beside the tenancy"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "For tenants"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "What is owed this month, what has been paid, and the full history"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Their own receipts, downloadable"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Raising a repair request and following it to resolution"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Notices from their owner"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "The agreement and documents their owner has shared with them"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "For a whole building"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "Every flat in the building on one roster, including owners who hold more than one"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Service-charge invoices per flat, with collection tracked"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Building notices, statements and reports"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "What it does not do"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "We are deliberate about this, because it is the part people assume wrongly."
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "We do not handle rent money."
+            },
+            {
+              "t": "text",
+              "v": " Rent is paid between tenant and owner exactly as it always was — cash, bKash, bank transfer, whatever they already use. Bari360 records that it happened. It is not an escrow, not a payment gateway for rent, and it never holds anyone's rent."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "We are not an agent or a broker."
+            },
+            {
+              "t": "text",
+              "v": " We do not find tenants, let property, or take a commission on a tenancy."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "We do not give legal advice."
+            },
+            {
+              "t": "text",
+              "v": " The app holds records that may be useful in a dispute; it does not tell anyone what their rights are."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "We do not maintain buildings."
+            },
+            {
+              "t": "text",
+              "v": " The Whole Building plan covers the software and our support of it — not lifts, plumbing or the building itself."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "The one money that does reach us is a subscription for the service, paid by the owner or by a building. That is described in the "
+          },
+          {
+            "t": "link",
+            "v": "Terms and Conditions",
+            "href": "./TERMS_AND_CONDITIONS.en.md"
+          },
+          {
+            "t": "text",
+            "v": "."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Languages, and where it runs"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Bari360 is fully bilingual: every screen is available in Bangla and in English, and each person chooses their own — an owner working in English and their tenant reading Bangla see the same data in their own language."
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "It runs in any modern browser at "
+          },
+          {
+            "t": "code",
+            "v": "https://www.bari360.space"
+          },
+          {
+            "t": "text",
+            "v": ", and as an Android application. The Android app is the same service, so anything done in one appears in the other."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Who operates it"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Operator:"
+            },
+            {
+              "t": "text",
+              "v": " [LEGAL ENTITY NAME]"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Registered address:"
+            },
+            {
+              "t": "text",
+              "v": " [REGISTERED ADDRESS]"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Registration / trade licence:"
+            },
+            {
+              "t": "text",
+              "v": " [TRADE LICENCE / REG. NO.]"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "How to reach us"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Email:"
+            },
+            {
+              "t": "text",
+              "v": " [SUPPORT EMAIL]"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Phone:"
+            },
+            {
+              "t": "text",
+              "v": " [SUPPORT PHONE]"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Owners signed in to Bari360 can also raise a support ticket from the Support tab, which reaches us with the account details already attached."
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "If your concern is about privacy or your personal data, the contact for that is [GRIEVANCE CONTACT], and what we do with it is set out in the "
+          },
+          {
+            "t": "link",
+            "v": "Privacy Policy",
+            "href": "./PRIVACY_POLICY.en.md"
+          },
+          {
+            "t": "text",
+            "v": "."
+          }
+        ]
+      }
+    ]
+  },
+  "aboutBn": {
+    "title": "বাড়ি৩৬০ — আমাদের সম্পর্কে (About us)",
+    "blocks": [
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "সর্বশেষ হালনাগাদ:"
+          },
+          {
+            "t": "text",
+            "v": " [EFFECTIVE DATE] "
+          },
+          {
+            "t": "bold",
+            "v": "প্রযোজ্য:"
+          },
+          {
+            "t": "text",
+            "v": " "
+          },
+          {
+            "t": "code",
+            "v": "https://www.bari360.space"
+          },
+          {
+            "t": "text",
+            "v": " ঠিকানার Bari360 ওয়েব অ্যাপ্লিকেশন এবং Bari360 অ্যান্ড্রয়েড অ্যাপ্লিকেশন (প্যাকেজ "
+          },
+          {
+            "t": "code",
+            "v": "com.rentmaster.app"
+          },
+          {
+            "t": "text",
+            "v": ")।"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "এই পাতাটি ইংরেজি ও বাংলা — দুই ভাষায় প্রকাশিত। এটি কেবল তথ্যমূলক: বাড়ি৩৬০ কী এবং কী কাজ করে তা এখানে বলা হয়েছে। আইনত বাধ্যতামূলক দলিল হলো "
+          },
+          {
+            "t": "link",
+            "v": "শর্তাবলি",
+            "href": "./TERMS_AND_CONDITIONS.bn.md"
+          },
+          {
+            "t": "text",
+            "v": " এবং "
+          },
+          {
+            "t": "link",
+            "v": "গোপনীয়তা নীতি",
+            "href": "./PRIVACY_POLICY.bn.md"
+          },
+          {
+            "t": "text",
+            "v": "।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "বাড়ি৩৬০ কী"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "বাড়ি৩৬০ বাংলাদেশের বাড়িওয়ালা ও ভাড়াটিয়াদের জন্য একটি প্রপার্টি ও ভাড়া ব্যবস্থাপনা সেবা।"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "আমাদের দেশে ভাড়া বাড়ির হিসাব বেশিরভাগ সময় খাতা-কলমে আর ফোনে চলে: খাতায় লেখা ভাড়া, হাতে লেখা রসিদ, দরজায় কড়া নেড়ে মেরামতের অনুরোধ, আর ঝামেলা বাধলে যিনি মাসটা বেশি জোর দিয়ে মনে করতে পারেন তাঁর কথাই টেকে। এভাবে একটা সময় পর্যন্ত চলে — তারপর আর চলে না, আর তখন সাধারণত ভাড়াটিয়ার হাতেই কোনো প্রমাণ থাকে না।"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "বাড়ি৩৬০ দুই পক্ষের জন্যই সেই হিসাব রাখে। বাড়িওয়ালা ইনভয়েস দেন; ভাড়াটিয়া সেই একই ইনভয়েস নিজের ফোনে দেখতে পান। ভাড়াটিয়া পানি পড়ার কথা জানান; বাড়িওয়ালা ছবিসহ সেটি দেখেন, কবে জানানো হয়েছিল তা-ও দেখেন। কারও স্মৃতির উপর কিছু নির্ভর করে না।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "কাদের জন্য"
+          }
+        ]
+      },
+      {
+        "type": "table",
+        "head": [
+          [
+            {
+              "t": "text",
+              "v": "ভূমিকা"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "অ্যাকাউন্ট কীভাবে পান"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "কী কাজে লাগে"
+            }
+          ]
+        ],
+        "rows": [
+          [
+            [
+              {
+                "t": "bold",
+                "v": "মালিক"
+              },
+              {
+                "t": "text",
+                "v": " (বাড়িওয়ালা)"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "নিজে নিবন্ধন করেন"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "নিজের সম্পত্তি, ভাড়াটিয়া, ভাড়া ও হিসাব"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "t": "bold",
+                "v": "ভাড়াটিয়া"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "মালিক যুক্ত করে দেন"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "নিজের ভাড়া, রসিদ, অনুরোধ ও নোটিশ"
+              }
+            ]
+          ],
+          [
+            [
+              {
+                "t": "bold",
+                "v": "ভবন প্রশাসক"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "পুরো ভবনের জন্য আমরা সেট করে দিই"
+              }
+            ],
+            [
+              {
+                "t": "text",
+                "v": "ভবনের প্রতিটি ফ্ল্যাট ও সার্ভিস চার্জ"
+              }
+            ]
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "কী কী করা যায়"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "মালিকদের জন্য"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "সম্পত্তি ও ভাড়াটিয়া — প্রতিটি ইউনিটের ভাড়া, সার্ভিস চার্জ, অগ্রিম ও নির্ধারিত তারিখসহ"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "মাসিক ভাড়ার ইনভয়েস, আংশিক পরিশোধ, এবং ছাপানোর উপযোগী রসিদ"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "ভাড়াটিয়ার পাঠানো মেরামতের অনুরোধ — ছবিসহ, সমাধানের পূর্ণ ধারাবাহিকতাসহ"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "একজন ভাড়াটিয়াকে বা সবাইকে নোটিশ পাঠানো"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "নির্ধারিত সময়ে রিমাইন্ডার, অ্যাপ নোটিফিকেশন হিসেবে"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "কর্মী ও বেতনের হিসাব, এবং সহজ আয়-ব্যয়ের খাতা"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "ডকুমেন্ট — চুক্তিপত্র, রসিদ এবং ভাড়ার সঙ্গে রাখার মতো যা কিছু"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "ভাড়াটিয়াদের জন্য"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "এ মাসে কত বাকি, কত পরিশোধ হয়েছে, এবং পুরো ইতিহাস"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "নিজের রসিদ, ডাউনলোড করার সুযোগসহ"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "মেরামতের অনুরোধ পাঠানো এবং সমাধান পর্যন্ত তা অনুসরণ করা"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "মালিকের পাঠানো নোটিশ"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "মালিক যেসব চুক্তিপত্র ও ডকুমেন্ট শেয়ার করেছেন"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "পুরো ভবনের জন্য"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "ভবনের প্রতিটি ফ্ল্যাট এক তালিকায় — একাধিক ফ্ল্যাটের মালিকসহ"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "ফ্ল্যাটভিত্তিক সার্ভিস চার্জ ইনভয়েস, আদায়ের হিসাবসহ"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "ভবনের নোটিশ, বিবরণী ও রিপোর্ট"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "যা আমরা করি না"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "এই অংশটি আমরা স্পষ্ট করে বলি, কারণ এখানেই মানুষ সবচেয়ে বেশি ভুল ধারণা করেন।"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "আমরা ভাড়ার টাকা হাতে নিই না।"
+            },
+            {
+              "t": "text",
+              "v": " ভাড়া আগের মতোই ভাড়াটিয়া ও মালিকের মধ্যে পরিশোধ হয় — নগদ, বিকাশ, ব্যাংক ট্রান্সফার, যেভাবে তাঁরা এমনিতেই করেন। বাড়ি৩৬০ শুধু সেটি ঘটেছে বলে লিখে রাখে। এটি এসক্রো নয়, ভাড়ার জন্য পেমেন্ট গেটওয়ে নয়, এবং কারও ভাড়ার টাকা কখনো আমাদের কাছে থাকে না।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "আমরা দালাল বা এজেন্ট নই।"
+            },
+            {
+              "t": "text",
+              "v": " আমরা ভাড়াটিয়া খুঁজে দিই না, বাড়ি ভাড়া দিই না, এবং ভাড়ার উপর কোনো কমিশন নিই না।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "আমরা আইনি পরামর্শ দিই না।"
+            },
+            {
+              "t": "text",
+              "v": " ঝামেলার সময় কাজে লাগতে পারে এমন রেকর্ড অ্যাপে থাকে; কিন্তু কার কী অধিকার, তা অ্যাপ বলে দেয় না।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "আমরা ভবনের রক্ষণাবেক্ষণ করি না।"
+            },
+            {
+              "t": "text",
+              "v": " হোল বিল্ডিং প্ল্যানে সফটওয়্যার ও তার সহায়তা অন্তর্ভুক্ত — লিফট, পানির লাইন বা ভবন নিজে নয়।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "যে টাকাটি সত্যিই আমাদের কাছে আসে, তা হলো সেবার সাবস্ক্রিপশন, যা মালিক বা ভবন পরিশোধ করেন। সে বিষয়ে বিস্তারিত আছে "
+          },
+          {
+            "t": "link",
+            "v": "শর্তাবলিতে",
+            "href": "./TERMS_AND_CONDITIONS.bn.md"
+          },
+          {
+            "t": "text",
+            "v": "।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "ভাষা ও যেখানে চলে"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "বাড়ি৩৬০ সম্পূর্ণ দ্বিভাষিক: প্রতিটি স্ক্রিন বাংলা ও ইংরেজি দুই ভাষাতেই আছে, এবং প্রত্যেকে নিজের ভাষা নিজে বেছে নেন — ইংরেজিতে কাজ করা একজন মালিক ও বাংলায় পড়া তাঁর ভাড়াটিয়া একই তথ্য নিজের ভাষায় দেখেন।"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "যেকোনো আধুনিক ব্রাউজারে "
+          },
+          {
+            "t": "code",
+            "v": "https://www.bari360.space"
+          },
+          {
+            "t": "text",
+            "v": " ঠিকানায় এটি চলে, এবং অ্যান্ড্রয়েড অ্যাপ্লিকেশন হিসেবেও। অ্যান্ড্রয়েড অ্যাপটি একই সেবা, তাই একটিতে করা কাজ অন্যটিতেও দেখা যায়।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "পরিচালনায়"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "পরিচালনাকারী:"
+            },
+            {
+              "t": "text",
+              "v": " [LEGAL ENTITY NAME]"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "নিবন্ধিত ঠিকানা:"
+            },
+            {
+              "t": "text",
+              "v": " [REGISTERED ADDRESS]"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "নিবন্ধন / ট্রেড লাইসেন্স:"
+            },
+            {
+              "t": "text",
+              "v": " [TRADE LICENCE / REG. NO.]"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "যোগাযোগ"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "ইমেইল:"
+            },
+            {
+              "t": "text",
+              "v": " [SUPPORT EMAIL]"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "ফোন:"
+            },
+            {
+              "t": "text",
+              "v": " [SUPPORT PHONE]"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "বাড়ি৩৬০-তে সাইন ইন করা মালিকেরা Support ট্যাব থেকেও সহায়তার অনুরোধ পাঠাতে পারেন — অ্যাকাউন্টের তথ্য তাতে এমনিতেই যুক্ত হয়ে আমাদের কাছে পৌঁছায়।"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "আপনার বিষয়টি যদি গোপনীয়তা বা ব্যক্তিগত তথ্য নিয়ে হয়, তার জন্য যোগাযোগ [GRIEVANCE CONTACT], এবং সেই তথ্য নিয়ে আমরা কী করি তা বলা আছে "
+          },
+          {
+            "t": "link",
+            "v": "গোপনীয়তা নীতিতে",
+            "href": "./PRIVACY_POLICY.bn.md"
+          },
+          {
+            "t": "text",
+            "v": "।"
+          }
+        ]
+      }
+    ]
   }
 } as unknown as {
   privacyEn: LegalDoc; privacyBn: LegalDoc; termsEn: LegalDoc; termsBn: LegalDoc;
+  aboutEn: LegalDoc; aboutBn: LegalDoc;
 };

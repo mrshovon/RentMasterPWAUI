@@ -39,7 +39,7 @@ export function LegalPage({
   en: LegalDoc;
   bn: LegalDoc;
   /** Which document this page is, so the override can be looked up. */
-  doc: "privacy" | "terms";
+  doc: "privacy" | "terms" | "about";
 }) {
   const lang = useLang();
   const t = useT();
@@ -92,6 +92,10 @@ export function LegalPage({
           <span aria-hidden="true">·</span>
           <Link href="/terms" className="transition hover:text-primary">
             {t("Terms & Conditions")}
+          </Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/about" className="transition hover:text-primary">
+            {t("About us")}
           </Link>
           <span aria-hidden="true">·</span>
           <Link href="/" className="transition hover:text-primary">

@@ -27,6 +27,10 @@ export function LegalLinks({ className = "" }: { className?: string }) {
       <Link href="/terms" className="transition hover:text-primary">
         {t("Terms")}
       </Link>
+      <span aria-hidden="true">·</span>
+      <Link href="/about" className="transition hover:text-primary">
+        {t("About")}
+      </Link>
     </span>
   );
 }

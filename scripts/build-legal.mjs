@@ -44,6 +44,10 @@ const DOCS = [
   { key: 'privacyBn', file: 'PRIVACY_POLICY.bn.md' },
   { key: 'termsEn', file: 'TERMS_AND_CONDITIONS.en.md' },
   { key: 'termsBn', file: 'TERMS_AND_CONDITIONS.bn.md' },
+  // About us rides the same pipeline. It is informational rather than binding — nothing consents
+  // to it and it is deliberately not part of LEGAL_VERSION, which is read from termsEn below.
+  { key: 'aboutEn', file: 'ABOUT_US.en.md' },
+  { key: 'aboutBn', file: 'ABOUT_US.bn.md' },
 ];
 
 const missing = DOCS.filter((d) => !fs.existsSync(path.join(SRC, d.file)));
@@ -95,6 +99,7 @@ export const LEGAL_VERSION = ${JSON.stringify(version)};
 
 export const LEGAL_DOCS = ${JSON.stringify(parsed, null, 2)} as unknown as {
   privacyEn: LegalDoc; privacyBn: LegalDoc; termsEn: LegalDoc; termsBn: LegalDoc;
+  aboutEn: LegalDoc; aboutBn: LegalDoc;
 };
 `;
 
@@ -107,7 +112,10 @@ const srcBody = `${banner}
  * edit starts from the text that is actually published rather than from an empty box. The
  * console saves an OVERRIDE on top of this, so these strings stay the built-in fallback.
  */
-export const LEGAL_SOURCE: Record<"privacyEn" | "privacyBn" | "termsEn" | "termsBn", string> =
+export const LEGAL_SOURCE: Record<
+  "privacyEn" | "privacyBn" | "termsEn" | "termsBn" | "aboutEn" | "aboutBn",
+  string
+> =
   ${JSON.stringify(raw, null, 2)};
 `;
 fs.writeFileSync(OUT_SRC, srcBody, 'utf8');
