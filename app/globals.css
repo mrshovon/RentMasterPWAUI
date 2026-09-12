@@ -36,6 +36,14 @@
      order — chart-1 is always owners, chart-2 always tenants — never by rank. */
   --chart-1: 13 148 136;     /* teal-600  — series 1 */
   --chart-2: 217 119 6;      /* amber-600 — series 2 */
+  /* ANDROID'S green, not ours — it tints the robot on the download-the-app control, where the
+     whole point is to look like Android. Hand-written here rather than in brand.css for the
+     same reason as the chart pair above: brand.css is generated from brand.config.json by
+     `npm run brand`, and this colour must NOT follow the Bari360 brand when that changes.
+     Unlike the chart pair it is NOT identical across themes: #3DDC84, the mascot green, is
+     about 1.8:1 on the light surface and reads as a smudge at 18px, so light gets Android's
+     darker green instead. Both are genuine Android greens; only the legible one is used. */
+  --android: 15 157 88;      /* #0F9D58 — Android green, darkened for a light surface */
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 30px -12px rgba(15, 23, 42, 0.18);
   --scrollbar: 203 213 225;  /* slate-300 */
   --scrollbar-hover: 148 163 184;
@@ -61,6 +69,9 @@
      amber-400 used elsewhere in dark mode sit outside the categorical lightness band. */
   --chart-1: 13 148 136;
   --chart-2: 217 119 6;
+  /* The mascot green itself. On the dark surface it has the contrast the light theme
+     cannot give it, so this is the one place the real #3DDC84 is used. */
+  --android: 61 220 132;     /* #3DDC84 — Android mascot green */
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
   --scrollbar: 30 41 59;     /* slate-800 */
   --scrollbar-hover: 51 65 85;

@@ -1667,4 +1667,7 @@ export const bn: Record<string, string> = {
     "আপনার {0} প্ল্যানের পেমেন্ট আমরা পেয়েছি ({1})। আমাদের টিম যাচাই করে শীঘ্রই এটি চালু করবে।",
   "Paying online activates your plan straight away. A bKash transfer is activated once our team confirms it. The free plan never expires; paid plans renew on their billing interval and get a {0}-day grace period after expiry. A one-time plan can only be taken once — when it ends you move to the free plan and choose again.":
     "অনলাইনে পেমেন্ট করলে আপনার প্ল্যান সঙ্গে সঙ্গেই চালু হয়। bKash-এ পাঠালে আমাদের টিম নিশ্চিত করার পর চালু হয়। ফ্রি প্ল্যানের মেয়াদ কখনো শেষ হয় না; পেইড প্ল্যান তার বিলিং সময় অনুযায়ী নবায়ন হয় এবং মেয়াদ শেষে {0} দিনের অতিরিক্ত সময় পায়। এককালীন প্ল্যান একবারই নেওয়া যায় — মেয়াদ শেষ হলে আপনি ফ্রি প্ল্যানে ফিরে গিয়ে আবার বেছে নেবেন।",
+
+  // The payment result pages return to the Plan tab on their own after 30s.
+  "Returning automatically in {0}s": "{0} সেকেন্ডে স্বয়ংক্রিয়ভাবে ফিরে যাবে",
 };

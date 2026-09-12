@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Clock, TriangleAlert, XCircle } from "lucide-react";
 import { rentMasterFetch } from "../../../lib/api-service";
 import { Button, Card, Spinner, WordmarkLink } from "../../../components/ui";
+import { useAutoReturn } from "../../../lib/use-auto-return";
 import { useT } from "../../../lib/i18n";
 
 // =====================================================================================
@@ -23,6 +24,9 @@ import { useT } from "../../../lib/i18n";
 // 'already_fulfilled', which this page renders as success, because from the payer's point of
 // view it is one.
 // =====================================================================================
+
+/** Long enough to read the outcome, short enough not to feel stranded in a browser tab. */
+const RETURN_SECONDS = 30;
 
 type Outcome = "activated" | "already_fulfilled" | "pending" | "failed" | "mismatch" | "unconfigured";
 
@@ -91,6 +95,10 @@ function ReturnInner() {
     })();
   }, [invoiceId, t]);
 
+  // Parked while loading: a countdown that expires behind a spinner would yank the outcome
+  // off screen before the payer ever saw it.
+  const secondsLeft = useAutoReturn("/owner#plan", RETURN_SECONDS, !loading);
+
   const good = outcome === "activated" || outcome === "already_fulfilled";
   const waiting = outcome === "pending";
 
@@ -133,9 +141,16 @@ function ReturnInner() {
         )}
 
         {!loading && (
-          <Button className="w-full" onClick={() => window.location.replace("/owner#plan")}>
-            Back to my plan
-          </Button>
+          <div className="space-y-2">
+            <Button className="w-full" onClick={() => window.location.replace("/owner#plan")}>
+              Back to my plan
+            </Button>
+            {secondsLeft !== null && (
+              <p className="text-[11px] text-subtle">
+                {t("Returning automatically in {0}s").replace("{0}", String(secondsLeft))}
+              </p>
+            )}
+          </div>
         )}
       </Card>
     </main>

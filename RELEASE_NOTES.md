@@ -1,4 +1,8 @@
-- Cancelling a plan payment now works properly. Before, backing out still told you we had received your payment and left it waiting for approval, and you could not start another payment at all.
+- Paying from the app now brings you back to the app. Before, the payment opened in Chrome and left you there, with the cancel screen never reaching your account.
+- The cancel and payment-complete screens now return you to your plan on their own after 30 seconds, and the button still works if you do not want to wait.
+- Cancelling a payment now always registers, even when the payment screen opened in a browser.
+- The download-the-app button now shows the Android robot in Android green.
+- Cancelling a plan payment works properly. Before, backing out still told you we had received your payment and left it waiting for approval, and you could not start another payment at all.
 - Cancelling now records the payment as cancelled, shows no approval message, and lets you try again straight away.
 - If you close the payment window without finishing, that attempt is released on its own so it never blocks you.
 - Your plan payments now show the real plan name instead of an internal code, and no longer show a transaction line when there is nothing to show.

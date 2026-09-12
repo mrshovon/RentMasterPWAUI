@@ -22,6 +22,38 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!--
+              App Links for the payment result pages.
+
+              WHY: paying opens the gateway, and the gateway is a different origin, so Capacitor
+              hands it to Chrome. When the gateway then redirects to our own cancel/return URL,
+              Android had nothing registered and kept the user in Chrome — stranded in a browser
+              with no session, while the app sat on the payment screen behind it. This filter is
+              what lets Android hand those two URLs back to the app.
+
+              SCOPED TO /payment ON PURPOSE. Without pathPrefix this would swallow every
+              bari360.space link on the device, so sharing /plans or /terms with a friend who has
+              the app installed would open the app instead of a web page. Only the two URLs the
+              gateway sends people to belong to the app.
+
+              autoVerify needs https://www.bari360.space/.well-known/assetlinks.json to list this
+              package and the RELEASE keystore's SHA-256. Verification is silent when it fails —
+              links simply keep opening in the browser — so check it with:
+                  adb shell pm get-app-links com.rentmaster.app
+
+              MainActivity is launchMode="singleTask" (above), so this arrives through onNewIntent
+              on the existing task rather than starting a second copy of the app.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="www.bari360.space"
+                    android:pathPrefix="/payment" />
+            </intent-filter>
+
         </activity>
 
         <provider

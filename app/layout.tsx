@@ -8,6 +8,7 @@ import { MaintenanceGate } from "../components/maintenance-gate";
 import { AnalyticsGate } from "../components/analytics-gate";
 import { AnnouncementGate } from "../components/announcement-gate";
 import { NotificationSoundGate } from "../components/notification-sound-gate";
+import { DeepLinkGate } from "../components/deep-link-gate";
 import { LanguageProvider } from "../lib/i18n";
 
 // The display face — banner titles, metric values and hub-tile labels. Body copy deliberately
@@ -74,6 +75,9 @@ export default function RootLayout({
           {children}
           <Toaster />
           <ConfirmHost />
+          {/* First: it only routes, and a deep link should land before anything else
+              decides what to show on the page it lands on. */}
+          <DeepLinkGate />
           <UpdateGate />
           {/* Before MaintenanceGate on purpose: if both ever fire at once, the maintenance
               portal mounts second and lands on top, which is the one that must be read. */}

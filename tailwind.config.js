@@ -46,6 +46,10 @@ module.exports = {
         // Categorical chart series, assigned in fixed order (1 = owners, 2 = tenants).
         "chart-1": "rgb(var(--chart-1) / <alpha-value>)",
         "chart-2": "rgb(var(--chart-2) / <alpha-value>)",
+        // Android's own brand green, for the download-the-app robot. Deliberately outside
+        // brand.config.json — it belongs to Android, not to us, and must not move when the
+        // Bari360 brand does. Defined per theme in globals.css; see the note there.
+        android: "rgb(var(--android) / <alpha-value>)",
         // Back-compat alias — the brand accent now points at the primary token.
         brand: {
           DEFAULT: "rgb(var(--primary) / <alpha-value>)",

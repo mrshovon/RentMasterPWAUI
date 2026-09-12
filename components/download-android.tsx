@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Smartphone } from "lucide-react";
+import { AndroidIcon } from "./ui";
+import { cn } from "../lib/cn";
 import { isBrowser } from "../lib/platform";
 import { fetchLatestRelease } from "../lib/updates";
 import { LATEST_APK_URL } from "../lib/app-config";
@@ -51,9 +52,9 @@ export function DownloadAndroid({ variant = "link" }: { variant?: "link" | "side
           download
           aria-label={tip}
           title={tip}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted transition hover:bg-success/10 hover:text-success focus-visible:bg-success/10 focus-visible:text-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/40"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-android transition hover:bg-android/10 focus-visible:bg-android/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-android/40"
         >
-          <Smartphone className="h-[18px] w-[18px]" />
+          <AndroidIcon className="h-[18px] w-[18px]" />
         </a>
         <span
           role="tooltip"
@@ -71,11 +72,13 @@ export function DownloadAndroid({ variant = "link" }: { variant?: "link" | "side
       download
       className={
         sidebar
-          ? "flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-muted transition hover:bg-success/10 hover:text-success"
-          : "inline-flex items-center gap-2 text-xs font-semibold text-muted transition hover:text-success"
+          ? "flex w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-muted transition hover:bg-android/10 hover:text-heading"
+          : "inline-flex items-center gap-2 text-xs font-semibold text-muted transition hover:text-heading"
       }
     >
-      <Smartphone className={sidebar ? "h-[18px] w-[18px]" : "h-4 w-4"} />
+      {/* Only the glyph is green. A whole row in Android green would read as a status message
+          rather than as a brand mark sitting on one control. */}
+      <AndroidIcon className={cn("text-android", sidebar ? "h-[18px] w-[18px]" : "h-4 w-4")} />
       {label}
     </a>
   );

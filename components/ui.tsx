@@ -75,6 +75,44 @@ export function ContactIcon({ className }: { className?: string }) {
 }
 
 // -----------------------------------------------------------------------------
+// AndroidIcon — the robot, for the download-the-app control.
+// -----------------------------------------------------------------------------
+// The only hand-written <svg> in the codebase, and it earns the exception twice over. lucide has
+// no Android glyph at all (its `Bot` is a square-headed robot that reads as "chatbot"), and the
+// CSS-mask trick ContactIcon uses above cannot help: a mask paints everything in currentColor, so
+// the one thing being asked for here — Android's OWN green, not the colour of the text beside it —
+// is exactly what it cannot do. Same reason Wordmark ships two images instead of one mask.
+//
+// `fill="currentColor"` rather than a baked-in hex, so the colour still comes from a token and the
+// call site decides it (text-android). See --android in globals.css for why that token is defined
+// per theme instead of once.
+//
+// ⚠️ The Android robot is Google's mark, reproduced under CC BY 3.0, and it is used here only to
+// label a link that genuinely downloads an Android app — not as our own branding. If it ever ends
+// up somewhere that implies Android endorses Bari360, that is a trademark problem, not a CSS one.
+export function AndroidIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      focusable="false"
+      className={cn("shrink-0", className ?? "h-4 w-4")}
+    >
+      {/* The head: a half-disc with two antennae, and two eyes knocked out of it. evenodd is what
+          makes the eyes HOLES rather than same-coloured discs — with the default nonzero rule the
+          eye subpaths would merge into the body and the robot would be blind. Holes also mean the
+          eyes show whatever is behind the glyph, so it works on any surface in either theme. */}
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993.0001.5511-.4482.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4483.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.2439 13.8533 7.8508 12 7.8508s-3.5902.3931-5.1367 1.0989L4.841 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3435-4.1021-2.6892-7.5743-6.1185-9.4396"
+      />
+    </svg>
+  );
+}
+
+// -----------------------------------------------------------------------------
 // Wordmark — the full "bari36 + house" lock-up, for headers.
 // -----------------------------------------------------------------------------
 // Replaces the mark + a separate "Bari360" text node that four screens used to assemble by

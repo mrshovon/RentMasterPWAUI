@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.rentmaster.app",
+      "sha256_cert_fingerprints": [
+        "83:BE:28:79:66:D6:7C:76:02:B4:C2:A6:A7:C2:54:10:1B:84:B8:F3:66:C5:00:CA:3A:E1:81:55:81:51:01:F5"
+      ]
+    }
+  }
+]
