@@ -1,3 +1,5 @@
+- You can now run several announcements and several sign-in banners at once, each switched on or off on its own, in the order you choose. When more than one is showing, they become a single popup you swipe through.
+- Announcements are now written in both Bangla and English, the same as the sign-in banners.
 - A new About us page, in Bangla and English, linked beside Privacy and Terms.
 - A welcome popup can now be shown on the sign-in screen on phones, with its own picture and wording in both languages.
 - Update notices now reach you properly. The app was sometimes checking a cached answer and concluding it was already up to date, so new versions had to be installed by hand.

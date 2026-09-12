@@ -1676,4 +1676,11 @@ export const bn: Record<string, string> = {
   // short word, while the document footer has room for the full phrase. পরিচিতি is the short one.
   "About": "পরিচিতি",
   "About us": "আমাদের সম্পর্কে",
+
+  // ---------------------------------------------------------------- popup carousel
+  // Several active announcements or login banners become ONE swipeable modal. Only this chrome is
+  // translated — the admin writes their own Bangla and English editions of the content itself.
+  "Next": "পরবর্তী",
+  "Previous": "পূর্ববর্তী",
+  "Go to {0}": "{0} নম্বরে যান",
 };

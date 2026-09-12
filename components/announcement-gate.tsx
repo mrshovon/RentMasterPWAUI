@@ -1,38 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Modal, Button } from "./ui";
+import { PopupCarousel, type PopupSet } from "./popup-carousel";
 import { BACKEND_API_BASE, getStoredSession } from "../lib/api-service";
-import { useT } from "../lib/i18n";
 
 // =============================================================================
 // Announcement popup — mounted once at the app root (next to MaintenanceGate).
 //
-// The super-admin writes one announcement (admin → Settings → Announcement) and every owner and
-// tenant sees it as a modal when they open the app, for as long as it is switched on.
+// The super-admin writes a LIST of announcements (admin → Settings → Announcements) and every owner
+// and tenant sees the active ones as a single swipeable modal when they open the app, for as long as
+// they are switched on.
 //
-// Deliberately NOT remembered once dismissed: the admin's switch is the only thing that stops it.
-// That is the behaviour that was asked for — it is an announcement, not a notice — and it is also
-// the escape hatch, since there is no per-user state that could get stuck.
+// Deliberately NOT remembered once dismissed: the admin's switches are the only thing that stops
+// them. That is the behaviour that was asked for — these are announcements, not notices — and it is
+// also the escape hatch, since there is no per-user state that could get stuck.
 //
-// The admin never sees it. They have a Preview button in the editor instead, which is what keeps
-// them able to reach the switch and turn it back off — same rule as the maintenance gate.
+// The admin never sees them. They have a Preview button in the editor instead, which is what keeps
+// them able to reach the switches and turn them back off — same rule as the maintenance gate.
 // =============================================================================
 
-export interface Announcement {
-  enabled: boolean;
-  title: string;
-  body: string;
-  imageUrl: string | null;
-  updatedAt: string;
-}
-
 export function AnnouncementGate() {
-  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
+  const [set, setSet] = useState<PopupSet | null>(null);
   const [open, setOpen] = useState(false);
   // The version last put on screen, so returning from the background does not re-open the same
-  // popup the user just closed — but a NEW announcement still gets through. A ref, not state:
-  // it is read inside the effect's own callback and must never re-run it.
+  // popups the user just closed — but an edited list still gets through. A ref, not state: it is
+  // read inside the effect's own callback and must never re-run it.
   const shownVersion = useRef<string | null>(null);
 
   useEffect(() => {
@@ -42,17 +34,18 @@ export function AnnouncementGate() {
       const url = `${BACKEND_API_BASE}/api/app/announcement`;
       try {
         const res = await fetch(url, { cache: "no-store" });
-        // Never fail silently: a blocked read looks identical to "no announcement", which is
+        // Never fail silently: a blocked read looks identical to "no announcements", which is
         // exactly how a missing CORS header hid a whole feature on this project once before.
         if (!res.ok) {
           console.warn(`[announcement] check returned ${res.status} from ${url} — showing nothing.`);
           return;
         }
         const json = await res.json();
-        const next = json?.data as Announcement | undefined;
-        if (cancelled || !next?.enabled) return;
-        setAnnouncement(next);
-        if (shownVersion.current === next.updatedAt) return; // already shown this exact one
+        const next = json?.data as PopupSet | undefined;
+        // The route already strips inactive items, so anything here is meant to be seen.
+        if (cancelled || !next?.items?.length) return;
+        setSet(next);
+        if (shownVersion.current === next.updatedAt) return; // already shown this exact list
         shownVersion.current = next.updatedAt;
         setOpen(true);
       } catch (err) {
@@ -80,55 +73,13 @@ export function AnnouncementGate() {
     return () => { cancelled = true; remove?.(); };
   }, []);
 
-  if (!open || !announcement) return null;
+  if (!open || !set?.items.length) return null;
 
-  // Signed-out screens are not where an announcement belongs, and the admin is never shown it.
+  // Signed-out screens are not where an announcement belongs, and the admin is never shown them.
   const role = getStoredSession()?.role;
   if (!role || role === "admin") return null;
   const path = typeof window !== "undefined" ? window.location.pathname : "";
   if (path === "/" || path.startsWith("/reset-password")) return null;
 
-  return (
-    <AnnouncementModal announcement={announcement} onClose={() => setOpen(false)} />
-  );
-}
-
-/**
- * The popup itself. Exported so the admin editor can preview exactly what users get — there is no
- * second rendering of this anywhere, so a preview cannot drift from the real thing.
- */
-export function AnnouncementModal({
-  announcement,
-  onClose,
-}: {
-  announcement: Announcement;
-  onClose: () => void;
-}) {
-  const t = useT();
-  const [imageFailed, setImageFailed] = useState(false);
-  const showImage = !!announcement.imageUrl && !imageFailed;
-
-  return (
-    // An empty title is intentional and supported: an image-only announcement gets a bare header
-    // strip with just the ✕, which is the "only image" mode the admin can choose.
-    <Modal open onClose={onClose} title={announcement.title || ""} size="md">
-      <div className="space-y-4">
-        {showImage && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={announcement.imageUrl!}
-            alt={announcement.title || "Announcement"}
-            onError={() => setImageFailed(true)}
-            className="max-h-[50vh] w-full rounded-xl object-contain"
-          />
-        )}
-        {/* The admin's own words are prose they typed and are not ours to rewrite — same rule as
-            lib/notice-i18n.ts and the maintenance gate. Only our chrome is translated. */}
-        {announcement.body && (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg">{announcement.body}</p>
-        )}
-        <Button className="w-full" onClick={onClose}>{t("Got it")}</Button>
-      </div>
-    </Modal>
-  );
+  return <PopupCarousel items={set.items} onClose={() => setOpen(false)} />;
 }

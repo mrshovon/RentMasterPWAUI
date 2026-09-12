@@ -65,6 +65,12 @@ const EXCLUDE = [
   "app/admin/page.tsx",     // super-admin console — intentionally English
   "app/global-error.tsx",   // runs with the LanguageProvider gone; English by necessity
   "app/sw.ts",              // service worker: no React context at all
+  // Rendered ONLY by app/admin/page.tsx, so it inherits that file's English-only decision. It sits
+  // in components/ rather than in the page purely because the announcements and the login banners
+  // share it; that is a code-organisation choice and must not quietly drag the admin console into
+  // scope. ⚠️ The popup CONTENT it produces is bilingual, and the modal that shows that content to
+  // real users (components/popup-carousel.tsx) is NOT excluded — its chrome is translated.
+  "components/popup-list-editor.tsx",
 ];
 
 // Props that the primitives in components/ui.tsx translate for their caller.
