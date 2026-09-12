@@ -6,7 +6,7 @@
 // it to the system installer; in a browser it just opens the download.
 // =============================================================================
 
-import { APP_VERSION, LATEST_RELEASE_API, RELEASES_PAGE, LATEST_APK_URL } from "./app-config";
+import { APP_VERSION, LATEST_RELEASE_API, RELEASES_PAGE, LATEST_APK_URL, APK_ASSET_NAME } from "./app-config";
 import { BACKEND_API_BASE } from "./api-service";
 import { isNativeApp } from "./platform";
 
@@ -65,7 +65,16 @@ export function isNewer(latest: string, current: string): boolean {
 export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
   // 1. Our cached proxy (public route — no session token needed).
   try {
-    const res = await fetch(`${BACKEND_API_BASE}/api/app/latest-release`, { cache: "no-store" });
+    // ⭐ The `_` is a cache-buster, and it is not belt-and-braces paranoia.
+    // `cache: "no-store"` governs the HTTP cache only — the request still goes through the
+    // service worker, whose network-first runtime cache once served a stale version here and made
+    // updates undeliverable (see NEVER_CACHE in app/sw.ts). That exemption is the real fix, but it
+    // only takes effect once the NEW service worker has activated, and the launch that matters is
+    // the one still being served by the OLD one. A unique URL misses any cache either way.
+    const res = await fetch(
+      `${BACKEND_API_BASE}/api/app/latest-release?_=${Date.now()}`,
+      { cache: "no-store" },
+    );
     if (res.ok) {
       const j = await res.json();
       if (j?.success && j.version) {
@@ -94,7 +103,11 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
       return null;
     }
     const json = await res.json();
-    const asset = (json.assets || []).find((a: any) => /\.apk$/i.test(a.name));
+    // Prefer the asset we deliberately name, not whichever .apk GitHub happens to list first —
+    // the release carries a legacy app-release.apk alongside it, and that one sorts earlier.
+    const assets = (json.assets || []) as any[];
+    const asset =
+      assets.find((a) => a?.name === APK_ASSET_NAME) || assets.find((a) => /\.apk$/i.test(a?.name));
     return {
       version: String(json.tag_name || "").replace(/^v/i, ""),
       notes: json.body || "",

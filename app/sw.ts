@@ -25,7 +25,22 @@ declare const self: ServiceWorkerGlobalScope;
 // A cached /api/admin/subscription would re-grant a plan that has just ended — silently
 // re-enabling paid tabs the app had already locked, which is the exact bug the whole plan-refresh
 // path exists to prevent. Better to show nothing than to show a stale yes.
-const NEVER_CACHE = ["/api/admin/subscription", "/api/logs", "/api/app/maintenance"];
+// ⭐ /api/app/latest-release is here because leaving it out made the in-app update popup
+// UNDELIVERABLE, which is the worst thing a caching bug can do to an app that updates itself.
+// The handler below is network-first with no expiration plugin, so once a launch was slow enough
+// to hit the timeout it served the last cached body forever — a perfectly well-formed
+// {"success":true,"version":"<the version you already have>"}. fetchLatestRelease() cannot tell
+// that apart from a live answer, so checkForUpdate() concluded "up-to-date", the popup never
+// opened, and the only way to get a new build was to uninstall and reinstall by hand.
+//
+// Note that { cache: "no-store" } on the fetch in lib/updates.ts does NOT protect against this:
+// that flag governs the HTTP cache, and the request still passes through this service worker.
+const NEVER_CACHE = [
+  "/api/admin/subscription",
+  "/api/logs",
+  "/api/app/maintenance",
+  "/api/app/latest-release",
+];
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,

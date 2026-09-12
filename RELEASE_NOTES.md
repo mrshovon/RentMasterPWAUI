@@ -1,3 +1,4 @@
+- Update notices now reach you properly. The app was sometimes checking a cached answer and concluding it was already up to date, so new versions had to be installed by hand.
 - Paying from the app now brings you back to the app. Before, the payment opened in Chrome and left you there, with the cancel screen never reaching your account.
 - The cancel and payment-complete screens now return you to your plan on their own after 30 seconds, and the button still works if you do not want to wait.
 - Cancelling a payment now always registers, even when the payment screen opened in a browser.

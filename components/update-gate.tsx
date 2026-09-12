@@ -46,9 +46,19 @@ export function UpdateGate() {
 
   const run = useCallback(async () => {
     if (Date.now() - lastCheck.current < RECHECK_THROTTLE_MS) return;
-    lastCheck.current = Date.now();
     const { hasUpdate, latest, reason, current, versionSource } = await checkForUpdate();
     console.info(`[updates] installed=${current} (${versionSource}) latest=${latest?.version ?? "?"} -> ${reason}`);
+
+    // ⭐ Throttle only a check that actually reached the server, and stamp it AFTER the await.
+    // Stamping before it meant a failed check — no signal, a rate limit, a cold start — burned the
+    // whole window, so the next resume was refused a retry for a minute over an answer we never
+    // got. A failure is not an answer, and must not be cached as one.
+    //
+    // Deliberately silent on screen: a toast on every cold start with patchy signal is noise, and
+    // UpdateCheckButton in Settings reports the real reason on demand.
+    if (reason === "check-failed") return;
+    lastCheck.current = Date.now();
+
     if (!hasUpdate || !latest) return;
     setRelease(latest);
     if (!dismissed.current) setOpen(true);
@@ -93,6 +103,14 @@ export function UpdateGate() {
       await startUpgrade(release, setPercent);
       // The Android installer has taken over; leave the modal up behind it so the user lands
       // somewhere sensible if they back out of the system prompt.
+      //
+      // ⚠️ But STOP being busy. Once FileOpener.open() resolves we are blind: the OS always shows
+      // its own confirmation, and the first time it may divert to "Install unknown apps". Someone
+      // who denies that, or simply backs out, used to return to a modal spinning forever with
+      // Cancel disabled — a dead end whose only exit was force-quitting the app. The resume
+      // listener re-checks anyway, so if the install did succeed this modal is about to go away
+      // on its own.
+      setBusy(false);
     } catch {
       toast.error("Could not download the update. Opening the download page instead.");
       setBusy(false);

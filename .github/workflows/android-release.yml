@@ -168,6 +168,34 @@ jobs:
           # versionCode must increase forever. The offset keeps it clear of the hand-managed
           # codes (up to 4) used before this workflow existed.
           VERSION_CODE=$(( 1000 + ${{ github.run_number }} ))
+          # ⭐ REFUSE TO GO BACKWARDS.
+          # The patch number is github.run_number, which resets to 1 if this workflow is ever
+          # renamed or recreated — and it has been rewritten once already. A v1.1.1 published
+          # after v1.1.45 is LOWER, so isNewer() in lib/updates.ts would correctly answer "no
+          # update" to every installed app, forever, with nothing anywhere reporting a fault.
+          # One API call turns that silent permanent outage into a build error.
+          #
+          # Only the newest published release matters, so a missing/absent tag (the very first
+          # release) passes: `latest` is empty and the guard is skipped.
+          LATEST=$(curl -fsSL \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
+            | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).tag_name || ''" 2>/dev/null || true)
+          LATEST="${LATEST#v}"
+          if [ -n "$LATEST" ]; then
+            # Fail unless VERSION is STRICTLY greater: equal is also wrong (the tag already exists).
+            HIGHEST=$(printf '%s\n%s\n' "$LATEST" "$VERSION" | sort -V | tail -n1)
+            if [ "$VERSION" = "$LATEST" ] || [ "$HIGHEST" != "$VERSION" ]; then
+              echo "::error::Version would go BACKWARDS: latest published is v$LATEST, this run would publish v$VERSION."
+              echo "::error::github.run_number has almost certainly been reset. Bump \"version\" in package.json (e.g. to 1.2.0) so releases become 1.2.x, then re-run."
+              exit 1
+            fi
+            echo "Version check OK: v$LATEST -> v$VERSION"
+          else
+            echo "No published release yet — skipping the monotonic version check."
+          fi
+
           echo "version=$VERSION"           >> "$GITHUB_OUTPUT"
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "Building v$VERSION (versionCode $VERSION_CODE)"
