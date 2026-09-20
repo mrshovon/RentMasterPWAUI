@@ -1,3 +1,6 @@
+- The lettering used across the app can now be changed from the admin panel, separately for English and for Bangla, and it applies to everyone.
+- Bangla now gets a proper font of its own instead of borrowing whichever one your phone happens to have, so Bangla and English finally look like they belong together.
+- Your own font can be added too, either by uploading the file or by giving a link to it.
 - You can now run several announcements and several sign-in banners at once, each switched on or off on its own, in the order you choose. When more than one is showing, they become a single popup you swipe through.
 - Announcements are now written in both Bangla and English, the same as the sign-in banners.
 - A new About us page, in Bangla and English, linked beside Privacy and Terms.

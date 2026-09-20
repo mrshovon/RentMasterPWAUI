@@ -7,7 +7,7 @@ import {
   RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User, Copy,
   Wallet, Upload, Image as ImageIcon, X, Check, HardHat, Settings, Wrench,
   BarChart3, Radio, Smartphone, Globe, TrendingUp, TrendingDown, Minus, EyeOff,
-  ScrollText, ChevronDown, ChevronRight, RefreshCw, Archive, LogIn,
+  ScrollText, ChevronDown, ChevronRight, RefreshCw, Archive, LogIn, Type,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
@@ -47,6 +47,12 @@ import {
 } from "../../components/ui";
 import { validateEmail, validatePhone, buildingAdminLoginId, isSystemLogin } from "../../lib/validate";
 import { PLAN_ADDONS, AddonKey, addonsOnTier, FREE_TIER_ID } from "../../lib/addons";
+import {
+  LATIN_FONTS, BANGLA_FONTS, buildStack, EMPTY_FONT_CONFIG,
+  type FontConfigView, type FontSlotView, type CustomFontView,
+} from "../../lib/font-catalog";
+import { isSafeFontUrl, fontFormatFor } from "../../lib/font-validate";
+import { applyFontsOnThisDevice } from "../../components/font-gate";
 
 const ticketStatusTone: Record<TicketStatus, "slate" | "indigo" | "cyan" | "emerald"> = {
   submitted: "slate", assigned: "indigo", in_progress: "cyan", done: "emerald",
@@ -3620,6 +3626,7 @@ function AdminSettingsTab() {
       <LegalDocsCard />
       <BrevoConfigCard />
       <AnalyticsConfigCard />
+      <FontConfigCard />
       {/* NB: AppSettingsCard is this DEVICE's push/update preferences — despite the name it
           has nothing to do with the app_settings table the two cards above write to. */}
       <AppSettingsCard />
@@ -3874,6 +3881,330 @@ function AnalyticsConfigCard() {
         <Button type="submit" loading={saving} icon={BarChart3}>Save analytics settings</Button>
       </form>
     </Card>
+  );
+}
+
+/* ------------------------------------------------------------ SYSTEM FONTS */
+
+/**
+ * The typeface the whole app renders in, for both scripts, changeable without a redeploy.
+ *
+ * TWO SLOTS, not one. `body` drives Tailwind's font-sans, which sits on <body> and therefore
+ * reaches every screen; `heading` drives font-display, which is what banner titles, metric
+ * values and hub-tile labels use. Parameterising only the first would have left the largest
+ * text in the app unmoved when the admin changed the font, which reads as a broken feature.
+ *
+ * EACH SLOT HAS AN ENGLISH FACE AND A BANGLA FACE, and they are not alternatives — they are
+ * both in the same stack at the same time. Bengali codepoints do not exist in Latin faces, so
+ * the browser falls through to the Bangla one per glyph on its own. That is why there is no
+ * rule here tied to the language toggle, and it is the only arrangement that renders a MIXED
+ * string correctly. This app is full of them: every money figure is ৳ (which is Bengali,
+ * U+09F3) followed by Western digits, in both languages.
+ */
+function FontConfigCard() {
+  const [config, setConfig] = useState<FontConfigView>(EMPTY_FONT_CONFIG);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await rentMasterFetch<{ data: FontConfigView }>("/api/super-admin/font-config", { role: "admin" });
+        if (res.data) setConfig({ ...EMPTY_FONT_CONFIG, ...res.data });
+      } catch { /* keep the defaults — the form still saves */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  function patchSlot(which: "body" | "heading", patch: Partial<FontSlotView>) {
+    setConfig((c) => ({ ...c, [which]: { ...c[which], ...patch } }));
+  }
+
+  async function save() {
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ data: FontConfigView; message: string }>(
+        "/api/super-admin/font-config",
+        { method: "PUT", role: "admin", body: JSON.stringify({ body: config.body, heading: config.heading }) },
+      );
+      setConfig(res.data);
+      // Apply it to this device immediately. Without this the admin saves, sees nothing change,
+      // and reasonably concludes it did not work — the gate only refetches on a fresh load.
+      applyFontsOnThisDevice(res.data);
+      toast.success(res.message);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function reset() {
+    const ok = await confirmDialog({
+      title: "Reset fonts?",
+      message: "Everyone goes back to the typeface the app shipped with. Any uploaded font file stays in storage.",
+      confirmLabel: "Reset",
+    });
+    if (!ok) return;
+    try {
+      setSaving(true);
+      const res = await rentMasterFetch<{ data: FontConfigView; message: string }>(
+        "/api/super-admin/font-config",
+        { method: "PUT", role: "admin", body: JSON.stringify(EMPTY_FONT_CONFIG) },
+      );
+      setConfig(res.data);
+      applyFontsOnThisDevice(res.data);
+      toast.success("Fonts reset to the built-in typeface.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSaving(false); }
+  }
+
+  if (loading) return <Card className="flex items-center justify-center p-8"><Spinner /></Card>;
+
+  return (
+    <Card className="p-6">
+      <h3 className="flex items-center gap-2 text-sm font-bold text-fg"><Type className="h-4 w-4" />System fonts</h3>
+      <p className="mt-1 text-xs text-subtle">
+        The typeface everyone sees, in both languages. Changes apply on each person&apos;s next app
+        open — no redeploy. Leave a box on &ldquo;Built-in&rdquo; to keep what the app ships with.
+      </p>
+
+      <div className="mt-5 space-y-6">
+        <FontSlotEditor
+          which="body"
+          heading="Body text"
+          blurb="Everything on every screen: tables, forms, buttons, labels."
+          slot={config.body}
+          onChange={(patch) => patchSlot("body", patch)}
+        />
+        <div className="h-px bg-line/[0.08]" />
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted">Headings &amp; figures</h4>
+              <p className="mt-0.5 text-[11px] text-subtle">Banner titles, the big numbers on tiles, hub labels.</p>
+            </div>
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => setConfig((c) => ({ ...c, heading: { ...c.body } }))}
+            >
+              Use the body font here too
+            </Button>
+          </div>
+          <div className="mt-3">
+            <FontSlotEditor
+              which="heading"
+              slot={config.heading}
+              onChange={(patch) => patchSlot("heading", patch)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-6 text-[11px] text-subtle">
+        Receipts, printed sheets and PDFs keep their own fixed fonts. Those are separate documents
+        built for a printer, not app screens, and a web font is not guaranteed to have loaded by the
+        time one is drawn.
+      </p>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button loading={saving} onClick={save} icon={Type}>Save fonts</Button>
+        <Button variant="ghost" onClick={reset} disabled={saving}>Reset to built-in</Button>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * One slot: an English face, a Bangla face, and optionally a custom file for either.
+ *
+ * The preview is not decoration. Two faces sharing one line will not share a baseline or an
+ * x-height, and the sample below is deliberately the worst case in this app — a ৳ figure,
+ * where the symbol comes from the Bangla face and the digits beside it from the Latin one.
+ * Seeing that before saving is the whole point.
+ */
+function FontSlotEditor({
+  which, heading, blurb, slot, onChange,
+}: {
+  which: "body" | "heading";
+  heading?: string;
+  blurb?: string;
+  slot: FontSlotView;
+  onChange: (patch: Partial<FontSlotView>) => void;
+}) {
+  const stack = buildStack(slot, which);
+
+  return (
+    <div className="space-y-4">
+      {heading && (
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-muted">{heading}</h4>
+          {blurb && <p className="mt-0.5 text-[11px] text-subtle">{blurb}</p>}
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="English face" hint="Used for Latin letters, numbers and punctuation.">
+          <Select
+            value={slot.latinId}
+            onChange={(e) => onChange({ latinId: e.target.value })}
+          >
+            <option value="">Built-in (system default)</option>
+            {LATIN_FONTS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}{f.hasBlack ? "" : " — no 900 weight"}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Bangla face" hint="Also draws ৳ on every amount, in both languages.">
+          <Select
+            value={slot.banglaId}
+            onChange={(e) => onChange({ banglaId: e.target.value })}
+          >
+            <option value="">Built-in (the device&apos;s own Bangla font)</option>
+            {BANGLA_FONTS.map((f) => (
+              // Disabled, not hidden: "Shadhinata 2.0 — font file not installed" tells whoever
+              // asked for it where it went. Silently omitting it would read as a missing feature.
+              <option key={f.id} value={f.id} disabled={f.unavailable}>
+                {f.name}
+                {f.unavailable ? " — font file not installed" : f.hasBlack ? "" : " — no 900 weight"}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+
+      <div className="rounded-xl border border-line/[0.1] bg-surface-2 px-4 py-3">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-faint">Preview</p>
+        <p className="mt-1.5 text-lg font-bold text-heading" style={{ fontFamily: stack || undefined }}>
+          Bari360 · ভাড়া মাস্টার · ৳12,500
+        </p>
+        <p className="mt-0.5 text-sm text-fg" style={{ fontFamily: stack || undefined }}>
+          Rent due today · আজ ভাড়া দেওয়ার শেষ দিন
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <CustomFontPicker
+          label="Custom English font"
+          value={slot.customLatin}
+          onChange={(customLatin) => onChange({ customLatin })}
+        />
+        <CustomFontPicker
+          label="Custom Bangla font"
+          value={slot.customBangla}
+          onChange={(customBangla) => onChange({ customBangla })}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Upload a font file, or paste a link to one. Either way it ends up as a URL.
+ *
+ * THE TEST BUTTON IS NOT OPTIONAL, and it is the reason this is a component rather than two
+ * text inputs. A cross-origin font whose host sends no Access-Control-Allow-Origin fails
+ * SILENTLY: the browser simply moves to the next family in the stack, and the admin sees the
+ * old font with no error anywhere. No server-side check can find this — a fetch from our
+ * server does not enforce CORS, only a browser does. So the browser has to be the one to try
+ * it, here, before it can be saved. FontFace.load() rejects on CORS, on a 404, and on a file
+ * that is not a font.
+ */
+function CustomFontPicker({
+  label, value, onChange,
+}: {
+  label: string;
+  value: CustomFontView | null;
+  onChange: (v: CustomFontView | null) => void;
+}) {
+  const [url, setUrl] = useState(value?.url ?? "");
+  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState<"idle" | "ok" | "bad">(value ? "ok" : "idle");
+
+  // A URL that has not been proven to load must not be saveable, so editing resets the proof.
+  function edit(next: string) {
+    setUrl(next);
+    setState("idle");
+    if (value) onChange(null);
+  }
+
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    try {
+      setBusy(true);
+      // Our own bucket, so CORS is already right — but it still goes through the same test
+      // below rather than being trusted, because a truncated upload looks fine until it renders.
+      const uploaded = await uploadFile(file, { role: "owner", folder: "fonts" });
+      setUrl(uploaded);
+      setState("idle");
+      await verify(uploaded, file.name);
+    } catch (err: any) { toast.error(err.message); }
+    finally { setBusy(false); }
+  }
+
+  async function verify(candidate: string, originalName?: string) {
+    const trimmed = candidate.trim();
+    if (!isSafeFontUrl(trimmed)) {
+      setState("bad");
+      toast.error("That must be an https link ending in .woff2, .woff, .ttf or .otf, with no spaces or quotes.");
+      return;
+    }
+    const format = fontFormatFor(trimmed);
+    if (!format) { setState("bad"); return; }
+
+    try {
+      setBusy(true);
+      // Loaded under a throwaway family name so a failed test cannot leave anything behind.
+      const probe = new FontFace("Bari360 Font Probe", `url("${trimmed}")`);
+      await probe.load();
+      setState("ok");
+      onChange({ url: trimmed, format, originalName: originalName ?? value?.originalName ?? "" });
+      toast.success("Font loads correctly.");
+    } catch {
+      setState("bad");
+      onChange(null);
+      toast.error("That font would not load. The file may be missing, not a font, or its host may not allow other sites to use it.");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Field
+      label={label}
+      hint={
+        state === "ok" ? "Tested and working — it overrides the picker above."
+          : state === "bad" ? "Not usable. Fix the link, or test again."
+          : "Optional. Upload a file or paste a link, then test it."
+      }
+    >
+      <div className="space-y-2">
+        <TextInput
+          value={url}
+          placeholder="https://example.com/my-font.woff2"
+          onChange={(e) => edit(e.target.value)}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <label className={cn(
+            "inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line/[0.12] bg-overlay/[0.06] px-3 py-1.5 text-xs font-semibold text-fg hover:bg-overlay/[0.1]",
+            busy && "pointer-events-none opacity-50",
+          )}>
+            {busy ? <Spinner className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
+            Upload file
+            <input type="file" className="hidden" accept=".woff2,.woff,.ttf,.otf" onChange={onPickFile} />
+          </label>
+          <Button variant="ghost" size="sm" disabled={busy || !url.trim()} onClick={() => verify(url)}>
+            Test this font
+          </Button>
+          {state === "ok" && <Check className="h-4 w-4 text-success" />}
+          {state === "bad" && <X className="h-4 w-4 text-danger" />}
+          {value && (
+            <Button variant="ghost" size="sm" onClick={() => { setUrl(""); setState("idle"); onChange(null); }}>
+              Remove
+            </Button>
+          )}
+        </div>
+      </div>
+    </Field>
   );
 }
 

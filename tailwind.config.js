@@ -10,14 +10,28 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
+        // --font-body and --font-heading are set at runtime, on <html>, when a super-admin has
+        // chosen a typeface (components/font-gate.tsx + FONT_INIT in app/layout.tsx). Both are
+        // written with a var() FALLBACK rather than being defined in globals.css, so with
+        // nothing configured these resolve to exactly what the app shipped with — no script,
+        // no fetch and no localStorage has to run for the default to be right.
         sans: [
-          "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI",
+          "var(--font-body, ui-sans-serif)", "system-ui", "-apple-system", "Segoe UI",
           "Roboto", "Helvetica Neue", "Arial", "sans-serif",
         ],
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
         // Baloo Da 2, loaded by next/font in app/layout.tsx. Opt-in per element (banner
         // titles, metric values, hub-tile labels) — never on body copy.
-        display: ["var(--font-display)", "ui-sans-serif", "system-ui", "sans-serif"],
+        //
+        // --font-display belongs to next/font and is NOT touched at runtime; --font-heading is
+        // the admin override that sits in front of it. Baloo is repeated after it on purpose:
+        // it is the only face in this stack with Bengali coverage, so a Latin-only admin choice
+        // still renders Bangla headings — and the ৳ sign — in Baloo rather than dropping to
+        // whatever Bengali font the device happens to have.
+        display: [
+          "var(--font-heading, var(--font-display))",
+          "var(--font-display)", "ui-sans-serif", "system-ui", "sans-serif",
+        ],
       },
       colors: {
         // Semantic theme tokens — resolve to CSS vars in globals.css (light default / dark override).

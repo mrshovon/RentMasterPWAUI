@@ -7,6 +7,26 @@
 @tailwind utilities;
 
 /* =====================================================================================
+   SELF-HOSTED BANGLA FACE
+   The one option in the admin font picker that is not on Google Fonts, so it is the one we
+   ship. Declared unconditionally and used only when a super-admin selects it — an unused
+   @font-face downloads nothing and costs nothing.
+
+   The unicode-range is load-bearing: without it this face is a candidate for Latin glyphs
+   too, and the browser would fetch it even when only the English slot was changed.
+
+   See public/fonts/README.md for where the file comes from and its licence.
+   ===================================================================================== */
+@font-face {
+  font-family: "Shadhinata 2.0";
+  src: url("/fonts/shadhinata-2.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0980-09FF, U+200C-200D, U+25CC;
+}
+
+/* =====================================================================================
    THEME TOKENS
    Semantic colours as space-separated RGB triples so Tailwind's <alpha-value> opacity
    modifiers still work (e.g. bg-overlay/[0.04]). Light is the default on :root; dark

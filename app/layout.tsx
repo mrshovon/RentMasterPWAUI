@@ -10,10 +10,17 @@ import { AnnouncementGate } from "../components/announcement-gate";
 import { NotificationSoundGate } from "../components/notification-sound-gate";
 import { DeepLinkGate } from "../components/deep-link-gate";
 import { LoginPopupGate } from "../components/login-popup-gate";
+import { FontGate } from "../components/font-gate";
 import { LanguageProvider } from "../lib/i18n";
 
-// The display face — banner titles, metric values and hub-tile labels. Body copy deliberately
-// stays on the system stack (font-sans); this is opt-in per element.
+// The DEFAULT display face — banner titles, metric values and hub-tile labels. Body copy
+// deliberately stays on the system stack (font-sans); this is opt-in per element.
+//
+// Since the admin font picker exists it is also the permanent Bengali fallback at the end of
+// the `font-display` stack (see tailwind.config.js), so a Latin-only admin choice still has
+// something with Bengali glyphs behind it. Leave the --font-display variable to next/font:
+// nothing at runtime writes to it, because doing so would discard the size-adjust fallback
+// face next/font generates alongside it.
 //
 // Chosen for its BENGALI coverage as much as its Latin. The app ships a full bn.ts, and most
 // rounded display faces carry no Bengali glyphs — a Bangla heading would silently fall back to
@@ -61,6 +68,39 @@ export const viewport: Viewport = {
 // Runs before paint so the saved theme is applied with no flash of the wrong palette.
 const THEME_INIT = `(function(){try{var t=localStorage.getItem('rentmaster-theme');document.documentElement.dataset.theme=(t==='dark')?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}})();`;
 
+// The same trick for the admin-chosen typeface: replay the cache components/font-gate.tsx
+// wrote, before first paint, so a configured font does not flash the default one on every
+// load. The gate then refetches and corrects this if the admin has changed something.
+//
+// EVERY VALUE IS RE-CHECKED HERE. localStorage is the least trustworthy input in the app —
+// anything running in this origin can write it — and these values go straight into CSS. The
+// family names are matched against the four fixed constants from lib/font-validate.ts, so
+// this script cannot introduce a family name of its own; the URL check denies exactly the
+// characters that could close the url(), the declaration or the rule. If any check fails we
+// set nothing, and the var() fallbacks in tailwind.config.js render the app as it shipped.
+//
+// `?nofont=1` is the way back in if an admin ever saves something unreadable.
+const FONT_INIT = `(function(){try{
+if(location.search.indexOf('nofont=1')>-1)return;
+var c=JSON.parse(localStorage.getItem('rentmaster-fonts')||'null');if(!c||c.v!==1)return;
+var FAM=/^"[A-Za-z0-9 .-]{1,60}"(, *"[A-Za-z0-9 .-]{1,60}")*$/;
+var G=/^https:\\/\\/fonts\\.googleapis\\.com\\/css2\\?[A-Za-z0-9=&:;,.+@%_-]{1,700}$/;
+var U=/^https:\\/\\/[^"'()\\\\;{}<>\\s]{1,480}$/;
+var N=/^Bari360 Custom (Latin|Bangla)( Heading)?$/;
+var d=document.documentElement;
+if(c.b&&FAM.test(c.b))d.style.setProperty('--font-body',c.b);
+if(c.h&&FAM.test(c.h))d.style.setProperty('--font-heading',c.h);
+var css='',i,x,f=c.f||[];
+for(i=0;i<f.length;i++){x=f[i];
+if(x&&N.test(x.n)&&U.test(x.u)&&/^(woff2|woff|truetype|opentype)$/.test(x.t)){
+css+='@font-face{font-family:"'+x.n+'";src:url("'+x.u+'") format("'+x.t+'");font-display:swap;font-weight:100 900;font-style:normal;}';}}
+if(css){var s=document.createElement('style');s.id='bari360-font-faces';s.textContent=css;document.head.appendChild(s);}
+if(c.g&&G.test(c.g)){
+var p=document.createElement('link');p.rel='preconnect';p.href='https://fonts.gstatic.com';p.crossOrigin='';document.head.appendChild(p);
+var l=document.createElement('link');l.id='bari360-gfonts';l.rel='stylesheet';l.href=c.g;
+l.media='print';l.onload=function(){this.media='all';};document.head.appendChild(l);}
+}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: {
@@ -70,6 +110,7 @@ export default function RootLayout({
     <html lang="en" className={display.variable}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+        <script dangerouslySetInnerHTML={{ __html: FONT_INIT }} />
       </head>
       <body className="min-h-screen bg-bg text-fg antialiased font-sans selection:bg-primary/30 selection:text-heading">
         <LanguageProvider>
@@ -89,6 +130,10 @@ export default function RootLayout({
           <MaintenanceGate />
           {/* Renders nothing — loads GA/GTM if the admin has configured and enabled it. */}
           <AnalyticsGate />
+          {/* Renders nothing — applies the typeface the admin chose in the admin panel. Most
+              loads are already correct by the time this mounts; FONT_INIT above replayed it
+              before first paint. */}
+          <FontGate />
           {/* Renders nothing — plays the Bari360 tone for pushes that land while a page is open. */}
           <NotificationSoundGate />
         </LanguageProvider>
