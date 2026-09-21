@@ -577,6 +577,22 @@ for (const file of files) {
     }
   }
 
+  // --- CONFIG: AdminDataTable renders labels VERBATIM, so it must never reach a user ---
+  //
+  // components/data-table.tsx exports two tables: DataTable translates, AdminDataTable does not.
+  // The verbatim one exists because the super-admin console is English by standing decision yet
+  // sits inside the LanguageProvider with a language toggle in its header — translating its
+  // headings would half-translate it, and this checker cannot see that because that file is on
+  // EXCLUDE. The flip side is the danger this rule guards: a customer-facing screen that imports
+  // AdminDataTable ships English with nothing to show for it. Every file reaching this point is
+  // by definition NOT excluded, so any hit here is a mistake.
+  if (/\bAdminDataTable\b/.test(src) && file !== "components/data-table.tsx") {
+    report({
+      file, line: lineOf(src.indexOf("AdminDataTable")), rule: "config", cls: "CONFIG",
+      text: `${file} imports AdminDataTable, which renders every label verbatim. Only the super-admin console may use it — use DataTable here.`,
+    });
+  }
+
   for (const s of reaching) {
     if (isProse(s) && !bnKeys.has(s)) {
       if (!dictGaps.has(s)) dictGaps.set(s, new Set());

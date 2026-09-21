@@ -45,6 +45,7 @@ import { useT, useLang } from "../../lib/i18n";
 import { translateNoticeText } from "../../lib/notice-i18n";
 import { useUnreadNotices } from "../../lib/notices-seen";
 import { OwnerProfileCard } from "../../components/profile-card";
+import { DataTable } from "../../components/data-table";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
   PageHeader, EmptyState, Alert, FullScreenLoader, SearchInput, Spinner, PasswordInput,
@@ -1936,121 +1937,60 @@ function TenantsTab({
           {filtered.length === 0 ? (
             <EmptyState icon={Users} title="No matches" hint={`No tenants match "${query}".`} />
           ) : (
-          <>
-          {/* Desktop table */}
-          <Card className="hidden overflow-hidden md:block">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-                  <tr>
-                    <th className="p-4">{t("Resident")}</th>
-                    <th className="p-4">{t("Property")}</th>
-                    <th className="p-4">{t("Rent")}</th>
-                    <th className="p-4">{t("Due day")}</th>
-                    <th className="p-4">{t("Passcode")}</th>
-                    <th className="p-4 text-right">{t("Actions")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line/[0.04]">
-                  {filtered.map((t) => {
-                    const disabled = isDisabled(t.id);
-                    return (
-                    <tr key={t.id} className={`hover:bg-overlay/[0.02] ${disabled ? "opacity-60" : ""}`}>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2 font-semibold text-heading">
-                          {t.name}{disabled && <Badge tone="rose">Disabled</Badge>}
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-subtle">
-                          <Phone className="h-3 w-3" /> {t.phone}
-                        </div>
-                      </td>
-                      <td className="p-4 text-fg">
-                        {t.properties?.name ?? propName(t.property_id) ?? (
-                          // No property = no portal access by default. Offer the override here,
-                          // where the owner can see *why* it applies.
-                          <div className="space-y-1.5">
-                            <Badge tone="amber">Unassigned</Badge>
-                            <LoginAccessToggle tenant={t} onToggle={onToggleLogin} />
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-4 font-semibold text-success">{formatCurrency(t.monthly_rent)}</td>
-                      <td className="p-4 text-fg">{ordinalDay(t.due_date)}</td>
-                      <td className="p-4">
-                        <ResetPasscodeButton
-                          tenant={t}
-                          onReset={onResetPasscode}
-                          pending={isPending(`passcode:${t.id}`)}
-                        />
-                      </td>
-                      <td className="p-4">
-                        <div className="flex justify-end gap-2">
-                          {disabled ? (
-                            <Button size="sm" variant="secondary" icon={ArrowUpCircle} onClick={onUpgrade}>Upgrade</Button>
-                          ) : (
-                            <>
-                              <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(t)}>Edit</Button>
-                              <Button size="sm" variant="secondary" icon={FileText} onClick={() => onDocs(t)}>Docs</Button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-
-          {/* Mobile cards */}
-          <div className="space-y-3 md:hidden">
-            {filtered.map((tn) => {
-              const disabled = isDisabled(tn.id);
-              return (
-              <Card key={tn.id} className={`p-4 ${disabled ? "opacity-60" : ""}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 font-semibold text-heading">
-                    {tn.name}{disabled && <Badge tone="rose">Disabled</Badge>}
-                  </div>
+          <DataTable
+            rows={filtered}
+            rowKey={(tn) => tn.id}
+            rowClassName={(tn) => (isDisabled(tn.id) ? "opacity-60" : undefined)}
+            columns={[
+              { key: "resident", label: "Resident", slot: "title",
+                cell: (tn) => (
+                  <>
+                    <span className="flex items-center gap-2 font-semibold text-heading">
+                      {tn.name}{isDisabled(tn.id) && <Badge tone="rose">Disabled</Badge>}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs font-normal text-subtle">
+                      <Phone className="h-3 w-3" /> {tn.phone}
+                    </span>
+                  </>
+                ) },
+              { key: "rent", label: "Rent", slot: "meta",
+                cell: (tn) => (
+                  <span className="font-semibold text-success">{formatCurrency(tn.monthly_rent)}</span>
+                ) },
+              // No slot: the cell can contain LoginAccessToggle, and nothing interactive may sit
+              // inside the card's header button.
+              { key: "property", label: "Property", className: "text-fg",
+                cell: (tn) =>
+                  tn.properties?.name ?? propName(tn.property_id) ?? (
+                    // No property = no portal access by default. Offer the override here, where
+                    // the owner can see *why* it applies.
+                    <span className="inline-flex flex-col items-end gap-1.5 md:items-start">
+                      <Badge tone="amber">Unassigned</Badge>
+                      <LoginAccessToggle tenant={tn} onToggle={onToggleLogin} />
+                    </span>
+                  ) },
+              { key: "due", label: "Due day", className: "text-fg",
+                cell: (tn) => ordinalDay(tn.due_date) },
+              { key: "passcode", label: "Passcode",
+                cell: (tn) => (
                   <ResetPasscodeButton
                     tenant={tn}
                     onReset={onResetPasscode}
                     pending={isPending(`passcode:${tn.id}`)}
-                    label="Reset passcode"
                   />
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted">
-                  <span>
-                    {tn.properties?.name ?? propName(tn.property_id) ?? (
-                      <Badge tone="amber">Unassigned</Badge>
-                    )}
-                  </span>
-                  <span className="text-right font-semibold text-success">{formatCurrency(tn.monthly_rent)}</span>
-                  <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{tn.phone}</span>
-                  <span className="text-right">{t("Due {0}").replace("{0}", ordinalDay(tn.due_date))}</span>
-                </div>
-                {/* Its own row, not squeezed into the grid cell beside the rent — it needs a real tap target. */}
-                {!tn.property_id && (
-                  <div className="mt-3">
-                    <LoginAccessToggle tenant={tn} onToggle={onToggleLogin} />
-                  </div>
-                )}
-                <div className="mt-3 flex justify-end gap-2">
-                  {disabled ? (
-                    <Button size="sm" variant="secondary" icon={ArrowUpCircle} onClick={onUpgrade}>Upgrade to re-enable</Button>
-                  ) : (
-                    <>
-                      <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(tn)}>Edit</Button>
-                      <Button size="sm" variant="secondary" icon={FileText} onClick={() => onDocs(tn)}>Docs</Button>
-                    </>
-                  )}
-                </div>
-              </Card>
-              );
-            })}
-          </div>
-          </>
+                ) },
+            ]}
+            actions={{
+              label: "Actions",
+              items: (tn) =>
+                isDisabled(tn.id)
+                  ? [{ label: "Upgrade", icon: ArrowUpCircle, tone: "neutral", onClick: onUpgrade }]
+                  : [
+                      { label: "Edit", icon: Pencil, tone: "neutral", onClick: () => onEdit(tn) },
+                      { label: "Docs", icon: FileText, tone: "neutral", onClick: () => onDocs(tn) },
+                    ],
+            }}
+          />
           )}
         </>
       )}
@@ -2116,97 +2056,92 @@ function BillingTab({
         {filtered.length === 0 ? (
           <EmptyState icon={ReceiptText} title="No matches" hint={`No invoices match "${query}".`} />
         ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-                <tr>
-                  <th className="p-4">{t("Tenant / Month")}</th>
-                  <th className="p-4">{t("Rent")}</th>
-                  <th className="p-4">{t("Extras")}</th>
-                  <th className="p-4">{t("Total")}</th>
-                  <th className="p-4">{t("Status")}</th>
-                  <th className="p-4 text-right">{t("Mark as")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line/[0.04]">
-                {filtered.map((l) => {
-                  // Settled = frozen. The status is a record of money the owner has confirmed,
-                  // so from here neither side may move it; only the history (read-only) and the
-                  // receipts stay live. Mirrored server-side — see SETTLED_INVOICE_ERROR.
-                  const locked = l.payment_status === "paid";
-                  return (
-                  <tr key={l.id} className="hover:bg-overlay/[0.02]">
-                    <td className="p-4">
-                      <div className="font-semibold text-heading">{l.tenants?.name ?? "Tenant"}</div>
-                      <div className="text-xs text-subtle">{formatMonth(l.billing_month)}</div>
-                    </td>
-                    <td className="p-4 text-fg">{formatCurrency(l.rent_amount)}</td>
-                    <td className="p-4 text-fg">
-                      {formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}
-                      {Number(l.discount) > 0 && (
-                        <span className="ml-1 text-xs text-success">−{formatCurrency(l.discount)}</span>
-                      )}
-                    </td>
-                    <td className="p-4 font-bold text-heading">{formatCurrency(l.total_payable)}</td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-1.5">
-                        <Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge>
-                        {/* Says why the buttons on this row are dead, so a locked invoice reads
-                            as deliberate rather than broken. */}
-                        {locked && (
-                          <span title={t("Settled — this invoice is locked")} className="text-subtle">
-                            <Lock className="h-3.5 w-3.5" />
-                          </span>
-                        )}
-                      </div>
-                      {l.payment_status === "paid" && l.paid_at && (
-                        <div className="mt-1 text-xs text-subtle">on {formatDate(l.paid_at)}</div>
-                      )}
-                      {l.payment_status === "partial" && (
-                        <div className="mt-1 text-xs text-subtle">
-                          {formatCurrency(l.amount_paid)} of {formatCurrency(l.total_payable)}
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-end gap-1">
-                        <button title={t("Receipt & share")} onClick={() => onReceipt(l)}
-                          className="rounded-lg p-1.5 text-primary transition hover:bg-primary/10">
-                          <Receipt className="h-4 w-4" />
-                        </button>
-                        {/* The tenant's own copy, sendable over WhatsApp. Only once the money is
-                            confirmed — before that there is nothing to give a receipt for. */}
-                        {locked && (
-                          <button title={t("Share tenant copy")} onClick={() => onTenantCopy(l)}
-                            className="rounded-lg p-1.5 text-success transition hover:bg-success/10">
-                            <Share2 className="h-4 w-4" />
-                          </button>
-                        )}
-                        {paymentCount(l.id) > 0 && (
-                          <button title={`Payments (${paymentCount(l.id)})`} onClick={() => onHistory(l)}
-                            className="rounded-lg p-1.5 text-muted transition hover:bg-overlay/[0.06] hover:text-heading">
-                            <History className="h-4 w-4" />
-                          </button>
-                        )}
-                        <StatusButton active={l.payment_status === "unpaid"} tone="rose" icon={Circle}
-                          onClick={() => onUnpaid(l)} title="Unpaid" disabled={locked} />
-                        <StatusButton active={l.payment_status === "sent"} tone="amber" icon={Send}
-                          onClick={() => onSent(l.id, "sent")} title="Sent" disabled={locked} />
-                        {/* Asks for the amount and date, so rent paid in parts can be recorded
-                            part by part — until the invoice settles, after which it is frozen
-                            (no late top-ups, no corrections). */}
-                        <StatusButton active={l.payment_status === "paid"} tone="emerald" icon={CheckCircle2}
-                          onClick={() => onPaid(l)} title="Payment received" disabled={locked} />
-                      </div>
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <DataTable
+          rows={filtered}
+          rowKey={(l) => l.id}
+          minWidth="min-w-[640px]"
+          columns={[
+            { key: "tenant", label: "Tenant / Month", slot: "title",
+              cell: (l) => (
+                <>
+                  <span className="block font-semibold text-heading">{l.tenants?.name ?? "Tenant"}</span>
+                  <span className="block text-xs font-normal text-subtle">{formatMonth(l.billing_month)}</span>
+                </>
+              ) },
+            { key: "rent", label: "Rent", className: "text-fg",
+              cell: (l) => formatCurrency(l.rent_amount) },
+            { key: "extras", label: "Extras", className: "text-fg",
+              cell: (l) => (
+                <>
+                  {formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}
+                  {Number(l.discount) > 0 && (
+                    <span className="ml-1 text-xs text-success">−{formatCurrency(l.discount)}</span>
+                  )}
+                </>
+              ) },
+            { key: "total", label: "Total", slot: "meta",
+              className: "font-bold text-heading",
+              cell: (l) => <span className="font-bold text-heading">{formatCurrency(l.total_payable)}</span> },
+            { key: "status", label: "Status", slot: "badge",
+              cell: (l) => (
+                <>
+                  <span className="flex items-center gap-1.5">
+                    <Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge>
+                    {/* Says why the buttons on this row are dead, so a locked invoice reads as
+                        deliberate rather than broken. On a phone the same thing is said in words,
+                        under the buttons — see the `hint` on the three status actions. */}
+                    {l.payment_status === "paid" && (
+                      <span title={t("Settled — this invoice is locked")} className="text-subtle">
+                        <Lock className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                  </span>
+                  {l.payment_status === "paid" && l.paid_at && (
+                    <span className="mt-1 block text-xs text-subtle">
+                      {t("on {0}").replace("{0}", formatDate(l.paid_at))}
+                    </span>
+                  )}
+                  {l.payment_status === "partial" && (
+                    <span className="mt-1 block text-xs text-subtle">
+                      {t("{0} of {1}")
+                        .replace("{0}", formatCurrency(l.amount_paid))
+                        .replace("{1}", formatCurrency(l.total_payable))}
+                    </span>
+                  )}
+                </>
+              ) },
+          ]}
+          actions={{
+            label: "Mark as",
+            items: (l) => {
+              // Settled = frozen. The status is a record of money the owner has confirmed, so from
+              // here neither side may move it; only the history (read-only) and the receipts stay
+              // live. Mirrored server-side — see SETTLED_INVOICE_ERROR.
+              const locked = l.payment_status === "paid";
+              const lockedHint = "Settled — this invoice is locked";
+              const n = paymentCount(l.id);
+              return [
+                { label: "Receipt & share", icon: Receipt, tone: "primary", onClick: () => onReceipt(l) },
+                // The tenant's own copy, sendable over WhatsApp. Only once the money is confirmed
+                // — before that there is nothing to give a receipt for.
+                locked && { label: "Share tenant copy", icon: Share2, tone: "success", onClick: () => onTenantCopy(l) },
+                n > 0 && { label: "Payments", icon: History, tone: "neutral", count: n, onClick: () => onHistory(l) },
+                { label: "Unpaid", icon: Circle, tone: "danger",
+                  active: l.payment_status === "unpaid", disabled: locked, hint: lockedHint,
+                  onClick: () => onUnpaid(l) },
+                { label: "Sent", icon: Send, tone: "warning",
+                  active: l.payment_status === "sent", disabled: locked, hint: lockedHint,
+                  onClick: () => onSent(l.id, "sent") },
+                // Asks for the amount and date, so rent paid in parts can be recorded part by
+                // part — until the invoice settles, after which it is frozen (no late top-ups,
+                // no corrections).
+                { label: "Payment received", icon: CheckCircle2, tone: "success",
+                  active: l.payment_status === "paid", disabled: locked, hint: lockedHint,
+                  onClick: () => onPaid(l) },
+              ];
+            },
+          }}
+        />
         )}
         </>
       )}
@@ -2214,32 +2149,6 @@ function BillingTab({
   );
 }
 
-function StatusButton({
-  active, tone, icon: Icon, onClick, title, disabled = false,
-}: {
-  active: boolean; tone: "rose" | "amber" | "emerald";
-  icon: typeof Circle; onClick: () => void; title: string;
-  /** Set on a settled invoice, where the status may no longer be moved at all. */
-  disabled?: boolean;
-}) {
-  const t = useT();
-  const tones = {
-    rose: "text-danger hover:bg-danger/10",
-    amber: "text-warning hover:bg-warning/10",
-    emerald: "text-success hover:bg-success/10",
-  };
-  return (
-    <button
-      // Interpolated, so it can never be an exact dictionary key — only the reason is translated.
-      title={disabled ? `${title} — ${t("Settled — this invoice is locked")}` : title}
-      onClick={onClick}
-      disabled={disabled}
-      className={`rounded-lg p-1.5 transition ${tones[tone]} ${active ? "bg-overlay/[0.06] ring-1 ring-line/10" : "text-faint"} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`}
-    >
-      <Icon className="h-4 w-4" />
-    </button>
-  );
-}
 
 /* ============================================================ MAINTENANCE */
 function MaintenanceTab({ logs, onUpdate }: { logs: MaintenanceLog[]; onUpdate: (m: MaintenanceLog) => void }) {

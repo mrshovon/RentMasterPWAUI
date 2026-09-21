@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DataTable } from "./data-table";
 import {
   Plus, Pencil, Trash2, ReceiptText, Wallet, History, Sparkles, CircleDollarSign, Printer,
 } from "lucide-react";
@@ -343,72 +344,72 @@ export function BuildingInvoicesTab({
           }
         />
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
-            <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-              <tr>
-                <th className="p-4">{t("Owner")}</th>
-                <th className="p-4">{t("Payable")}</th>
-                <th className="p-4">{t("Paid")}</th>
-                <th className="p-4">{t("Status")}</th>
-                <th className="p-4 text-right">{t("Actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((inv) => {
+        <DataTable
+          rows={invoices}
+          rowKey={(inv) => inv.id}
+          minWidth="min-w-[900px]"
+          columns={[
+            // Flat first: with several invoices for one person in a month, the flat is what
+            // tells the rows apart.
+            { key: "owner", label: "Owner", slot: "title",
+              cell: (inv) => {
                 const owner = ownerById[inv.owner_id];
-                const settled = inv.payment_status === "paid";
                 return (
-                  <tr key={inv.id} className="border-b border-line/[0.04] last:border-0">
-                    <td className="p-4">
-                      {/* Flat first: with several invoices for one person in a month, the flat is
-                          what tells the rows apart. */}
-                      <div className="font-medium text-heading">
-                        {inv.flat_label || owner?.unit_label || "—"}
-                      </div>
-                      <div className="text-xs text-muted">{owner?.name || owner?.email || "—"}</div>
-                    </td>
-                    <td className="p-4 text-fg">
-                      {formatCurrency(Number(inv.total_payable || 0))}
-                      {Number(inv.extra_charge || 0) > 0 && (
-                        <div className="text-xs text-muted">
-                          {t("incl. extra {0}").replace("{0}", formatCurrency(Number(inv.extra_charge)))}
-                        </div>
-                      )}
-                      {Number(inv.discount || 0) > 0 && (
-                        <div className="text-xs text-muted">
-                          {t("less discount {0}").replace("{0}", formatCurrency(Number(inv.discount)))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-4 text-fg">{formatCurrency(Number(inv.amount_paid || 0))}</td>
-                    <td className="p-4">
-                      <Badge tone={statusTone(inv.payment_status)}>{inv.payment_status}</Badge>
-                      {inv.paid_at && <div className="mt-1 text-xs text-muted">{formatDate(inv.paid_at)}</div>}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        {!settled && <Button size="sm" icon={Wallet} onClick={() => setPaying(inv)}>Record</Button>}
-                        {/* Offered at every status: a receipt for a part-paid invoice is a
-                            legitimate document, and it prints its own Balance Due row. */}
-                        <Button size="sm" variant="ghost" icon={ReceiptText}
-                          loading={receiptBusy === inv.id}
-                          onClick={() => void openReceipt(inv)}>Receipt</Button>
-                        <Button size="sm" variant="ghost" icon={History} onClick={() => setHistory(inv)}>History</Button>
-                        {!settled && (
-                          <Button size="sm" variant="secondary" icon={Pencil} onClick={() => setEditing(inv)}>Edit</Button>
-                        )}
-                        {Number(inv.amount_paid || 0) === 0 && (
-                          <Button size="sm" variant="danger" icon={Trash2} onClick={() => remove(inv)}>Delete</Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <>
+                    <span className="block font-medium text-heading">
+                      {inv.flat_label || owner?.unit_label || "—"}
+                    </span>
+                    <span className="block text-xs font-normal text-muted">
+                      {owner?.name || owner?.email || "—"}
+                    </span>
+                  </>
                 );
-              })}
-            </tbody>
-          </table>
-        </Card>
+              } },
+            { key: "payable", label: "Payable", slot: "meta", className: "text-fg",
+              cell: (inv) => (
+                <>
+                  {formatCurrency(Number(inv.total_payable || 0))}
+                  {Number(inv.extra_charge || 0) > 0 && (
+                    <span className="block text-xs text-muted">
+                      {t("incl. extra {0}").replace("{0}", formatCurrency(Number(inv.extra_charge)))}
+                    </span>
+                  )}
+                  {Number(inv.discount || 0) > 0 && (
+                    <span className="block text-xs text-muted">
+                      {t("less discount {0}").replace("{0}", formatCurrency(Number(inv.discount)))}
+                    </span>
+                  )}
+                </>
+              ) },
+            { key: "paid", label: "Paid", className: "text-fg",
+              cell: (inv) => formatCurrency(Number(inv.amount_paid || 0)) },
+            { key: "status", label: "Status", slot: "badge",
+              cell: (inv) => (
+                <>
+                  <Badge tone={statusTone(inv.payment_status)}>{inv.payment_status}</Badge>
+                  {inv.paid_at && <span className="mt-1 block text-xs text-muted">{formatDate(inv.paid_at)}</span>}
+                </>
+              ) },
+          ]}
+          actions={{
+            label: "Actions",
+            items: (inv) => {
+              const settled = inv.payment_status === "paid";
+              return [
+                !settled && { label: "Record", icon: Wallet, tone: "primary", onClick: () => setPaying(inv) },
+                // Offered at every status: a receipt for a part-paid invoice is a legitimate
+                // document, and it prints its own Balance Due row.
+                { label: "Receipt", icon: ReceiptText, tone: "neutral",
+                  loading: receiptBusy === inv.id, onClick: () => void openReceipt(inv) },
+                { label: "History", icon: History, tone: "neutral", onClick: () => setHistory(inv) },
+                !settled && { label: "Edit", icon: Pencil, tone: "neutral", onClick: () => setEditing(inv) },
+                Number(inv.amount_paid || 0) === 0 && {
+                  label: "Delete", icon: Trash2, tone: "danger", onClick: () => remove(inv),
+                },
+              ];
+            },
+          }}
+        />
       )}
 
       <IssueInvoiceModal

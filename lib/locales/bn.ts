@@ -459,6 +459,12 @@ export const bn: Record<string, string> = {
   Unpaid: "বকেয়া",
   Paid: "পরিশোধিত",
   "Partly paid": "আংশিক পরিশোধিত",
+  // The "X of Y" line under a partly-paid invoice, on the tenant ledger.
+  "{0} paid": "{0} পরিশোধিত",
+  // Under a settled invoice on the owner billing list: "on <date>".
+  "on {0}": "{0} তারিখে",
+  // Under a partly-paid one: "<paid> of <total>".
+  "{0} of {1}": "{1} এর মধ্যে {0}",
   View: "দেখুন",
   Sent: "পাঠানো হয়েছে",
   Other: "অন্যান্য",

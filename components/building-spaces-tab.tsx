@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { DataTable } from "./data-table";
 import {
   Plus, Home, Users, ReceiptText, Wallet, KeyRound, DoorOpen, CircleDollarSign,
 } from "lucide-react";
@@ -279,51 +280,43 @@ export function BuildingSpacesTab({
 
       {/* ---------------- rent invoices ---------------- */}
       {ledgers.length > 0 && (
-        <Card className="overflow-x-auto">
-          <div className="border-b border-line/[0.06] px-5 py-4">
-            <h3 className="text-sm font-semibold text-heading">{t("Rent invoices")}</h3>
-          </div>
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-              <tr>
-                <th className="p-4">{t("Tenant")}</th>
-                <th className="p-4">{t("Month")}</th>
-                <th className="p-4">{t("Payable")}</th>
-                <th className="p-4">{t("Paid")}</th>
-                <th className="p-4">{t("Status")}</th>
-                <th className="p-4 text-right">{t("Actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ledgers.map((l) => (
-                <tr key={l.id} className="border-b border-line/[0.04] last:border-0">
-                  <td className="p-4 font-medium text-heading">{l.tenants?.name || "—"}</td>
-                  <td className="p-4 text-fg">{formatMonth(l.billing_month)}</td>
-                  <td className="p-4 text-fg">{formatCurrency(Number(l.total_payable || 0))}</td>
-                  <td className="p-4 text-fg">{formatCurrency(Number(l.amount_paid || 0))}</td>
-                  <td className="p-4">
-                    <Badge tone={l.payment_status === "paid" ? "emerald" : l.payment_status === "partial" ? "amber" : "slate"}>
-                      {l.payment_status}
-                    </Badge>
-                    {l.paid_at && <div className="mt-1 text-xs text-muted">{formatDate(l.paid_at)}</div>}
-                  </td>
-                  <td className="p-4">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {l.payment_status !== "paid" && (
-                        <Button size="sm" icon={Wallet} onClick={() => setPayFor(l)}>Record</Button>
-                      )}
-                      {/* Offered at every status, like the owner dashboard: a receipt for a
-                          part-paid invoice is a legitimate document, and it prints its balance. */}
-                      <Button size="sm" variant="ghost" icon={ReceiptText} onClick={() => openReceipt(l)}>
-                        Receipt
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <DataTable
+          rows={ledgers}
+          rowKey={(l) => l.id}
+          title="Rent invoices"
+          minWidth="min-w-[760px]"
+          columns={[
+            { key: "tenant", label: "Tenant", slot: "title",
+              className: "font-medium text-heading",
+              cell: (l) => l.tenants?.name || "—" },
+            { key: "month", label: "Month", slot: "meta", className: "text-fg",
+              cell: (l) => formatMonth(l.billing_month) },
+            { key: "payable", label: "Payable", slot: "meta", className: "text-fg",
+              cell: (l) => formatCurrency(Number(l.total_payable || 0)) },
+            { key: "paid", label: "Paid", className: "text-fg",
+              cell: (l) => formatCurrency(Number(l.amount_paid || 0)) },
+            { key: "status", label: "Status", slot: "badge",
+              cell: (l) => (
+                <>
+                  <Badge tone={l.payment_status === "paid" ? "emerald" : l.payment_status === "partial" ? "amber" : "slate"}>
+                    {l.payment_status}
+                  </Badge>
+                  {l.paid_at && <span className="mt-1 block text-xs text-muted">{formatDate(l.paid_at)}</span>}
+                </>
+              ) },
+          ]}
+          actions={{
+            label: "Actions",
+            items: (l) => [
+              l.payment_status !== "paid" && {
+                label: "Record", icon: Wallet, tone: "primary", onClick: () => setPayFor(l),
+              },
+              // Offered at every status, like the owner dashboard: a receipt for a part-paid
+              // invoice is a legitimate document, and it prints its balance.
+              { label: "Receipt", icon: ReceiptText, tone: "neutral", onClick: () => openReceipt(l) },
+            ],
+          }}
+        />
       )}
 
       <AddSpaceModal open={spaceOpen} onClose={() => setSpaceOpen(false)} onSaved={reload} />

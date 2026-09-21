@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ReceiptText, Wallet, CircleDollarSign, Building2, FileText } from "lucide-react";
+import { DataTable } from "./data-table";
+import { ReceiptText, Wallet, CircleDollarSign, Building2, FileText, Eye } from "lucide-react";
 import { rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
 import { useT } from "../lib/i18n";
@@ -214,47 +215,43 @@ export function ServiceChargeTab() {
           hint="Your building administrator has not issued one to you."
         />
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-              <tr>
-                <th className="p-4">{t("Month")}</th>
-                <th className="p-4">{t("Payable")}</th>
-                <th className="p-4">{t("Received")}</th>
-                <th className="p-4">{t("Status")}</th>
-                <th className="p-4 text-right">{t("Details")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv.id} className="border-b border-line/[0.04] last:border-0">
-                  <td className="p-4 font-medium text-heading">
-                    {formatMonth(inv.billing_month)}
-                    {/* Only when it tells rows apart: an owner with one flat does not need to be
-                        told which one every month. */}
-                    {multiFlat && inv.flat_label && (
-                      <div className="text-xs font-normal text-muted">{inv.flat_label}</div>
-                    )}
-                  </td>
-                  <td className="p-4 text-fg">{formatCurrency(Number(inv.total_payable || 0))}</td>
-                  <td className="p-4 text-fg">{formatCurrency(Number(inv.amount_paid || 0))}</td>
-                  <td className="p-4">
-                    <Badge tone={statusTone(inv.payment_status)}>{t(statusLabel(inv.payment_status))}</Badge>
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => setOpen(inv)}>{t("View")}</Button>
-                      {/* Offered at every status, exactly as the building admin's copy is: an
-                          unpaid invoice still prints a receipt showing what is owed, and that is
-                          the document an owner takes to their building office. */}
-                      <Button size="sm" icon={ReceiptText} onClick={() => openReceipt(inv)}>Receipt</Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <DataTable
+          rows={invoices}
+          rowKey={(inv) => inv.id}
+          minWidth="min-w-[640px]"
+          columns={[
+            { key: "month", label: "Month", slot: "title",
+              className: "font-medium text-heading",
+              cell: (inv) => (
+                <>
+                  {formatMonth(inv.billing_month)}
+                  {/* Only when it tells rows apart: an owner with one flat does not need to be
+                      told which one every month. */}
+                  {multiFlat && inv.flat_label && (
+                    <span className="block text-xs font-normal text-muted">{inv.flat_label}</span>
+                  )}
+                </>
+              ) },
+            { key: "payable", label: "Payable", slot: "meta", className: "text-fg",
+              cell: (inv) => formatCurrency(Number(inv.total_payable || 0)) },
+            { key: "received", label: "Received", className: "text-fg",
+              cell: (inv) => formatCurrency(Number(inv.amount_paid || 0)) },
+            { key: "status", label: "Status", slot: "badge",
+              cell: (inv) => (
+                <Badge tone={statusTone(inv.payment_status)}>{t(statusLabel(inv.payment_status))}</Badge>
+              ) },
+          ]}
+          actions={{
+            label: "Details",
+            items: (inv) => [
+              { label: "View", icon: Eye, tone: "neutral", onClick: () => setOpen(inv) },
+              // Offered at every status, exactly as the building admin's copy is: an unpaid
+              // invoice still prints a receipt showing what is owed, and that is the document an
+              // owner takes to their building office.
+              { label: "Receipt", icon: ReceiptText, tone: "primary", onClick: () => openReceipt(inv) },
+            ],
+          }}
+        />
       )}
 
       <InvoiceDetailModal invoice={open} onClose={() => setOpen(null)} />

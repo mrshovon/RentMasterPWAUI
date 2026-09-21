@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { DataTable } from "../../components/data-table";
 import {
   LayoutDashboard, Users, Settings, Plus, Pencil, KeyRound, Ban, ShieldCheck,
   Unlink, Building2, CircleDollarSign, ReceiptText, Home, HardHat, Wallet, Wrench,
@@ -588,90 +589,61 @@ function OwnersTab({
           action={owners.length ? undefined : <Button icon={Plus} onClick={onAdd}>Add owner</Button>}
         />
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-left text-sm">
-            <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-              <tr>
-                <th className="p-4">{t("Owner")}</th>
-                <th className="p-4">{t("Flat")}</th>
-                <th className="p-4">{t("Service charge")}</th>
-                <th className="p-4">{t("Joined")}</th>
-                <th className="p-4">{t("Status")}</th>
-                <th className="p-4 text-right">{t("Actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((o) => (
-                <tr key={o.owner_id} className="border-b border-line/[0.04] last:border-0">
-                  <td className="p-4">
-                    <div className="font-medium text-heading">{o.name || "—"}</div>
-                    <div className="text-xs text-muted">{o.email || "—"}</div>
-                    {o.phone && <div className="text-xs text-subtle">{o.phone}</div>}
-                  </td>
-                  <td className="p-4 text-fg">
-                    {(o.flats?.filter((f) => f.is_active).map((f) => f.unit_label).filter(Boolean).join(", "))
-                      || o.unit_label || "—"}
-                  </td>
-                  <td className="p-4 text-fg">
-                    {/* The sum across their flats — one number per person is what the column meant
-                        before an owner could hold several. */}
-                    {formatCurrency(
-                      o.flats?.length
-                        ? o.flats.filter((f) => f.is_active).reduce((sum, f) => sum + Number(f.default_service_charge || 0), 0)
-                        : Number(o.default_service_charge || 0),
-                    )}
-                  </td>
-                  <td className="p-4 text-muted">{formatDate(o.joined_at)}</td>
-                  <td className="p-4">
-                    {o.suspended ? (
-                      <Badge tone="rose">Suspended</Badge>
-                    ) : o.is_active ? (
-                      <Badge tone="emerald">Active</Badge>
-                    ) : (
-                      <Badge tone="slate">Inactive</Badge>
-                    )}
-                  </td>
-                  <td className="p-4">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(o)}>Edit</Button>
-                      <Button
-                        size="sm" variant="ghost" icon={KeyRound}
-                        loading={busy === o.owner_id}
-                        onClick={() => setResetting(o)}
-                      >
-                        Password
-                      </Button>
-                      {o.suspended ? (
-                        <Button
-                          size="sm" variant="ghost" icon={ShieldCheck}
-                          loading={busy === o.owner_id}
-                          onClick={() => act(o.owner_id, { action: "reactivate" }, "Login reactivated.")}
-                        >
-                          Reactivate
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm" variant="ghost" icon={Ban}
-                          loading={busy === o.owner_id}
-                          onClick={() => act(o.owner_id, { action: "suspend" }, "Login suspended.")}
-                        >
-                          Suspend
-                        </Button>
-                      )}
-                      <Button
-                        size="sm" variant="danger" icon={Unlink}
-                        loading={busy === o.owner_id}
-                        onClick={() => detach(o)}
-                      >
-                        Detach
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <DataTable
+          rows={filtered}
+          rowKey={(o) => o.owner_id}
+          minWidth="min-w-[860px]"
+          columns={[
+            { key: "owner", label: "Owner", slot: "title",
+              cell: (o) => (
+                <>
+                  <span className="block font-medium text-heading">{o.name || "—"}</span>
+                  <span className="block text-xs font-normal text-muted">{o.email || "—"}</span>
+                  {o.phone && <span className="block text-xs font-normal text-subtle">{o.phone}</span>}
+                </>
+              ) },
+            { key: "flat", label: "Flat", slot: "meta", className: "text-fg",
+              cell: (o) =>
+                (o.flats?.filter((f) => f.is_active).map((f) => f.unit_label).filter(Boolean).join(", "))
+                || o.unit_label || "—" },
+            // The sum across their flats — one number per person is what the column meant before
+            // an owner could hold several.
+            { key: "charge", label: "Service charge", slot: "meta", className: "text-fg",
+              cell: (o) => formatCurrency(
+                o.flats?.length
+                  ? o.flats.filter((f) => f.is_active).reduce((sum, f) => sum + Number(f.default_service_charge || 0), 0)
+                  : Number(o.default_service_charge || 0),
+              ) },
+            { key: "joined", label: "Joined", className: "text-muted",
+              cell: (o) => formatDate(o.joined_at) },
+            { key: "status", label: "Status", slot: "badge",
+              cell: (o) =>
+                o.suspended ? (
+                  <Badge tone="rose">Suspended</Badge>
+                ) : o.is_active ? (
+                  <Badge tone="emerald">Active</Badge>
+                ) : (
+                  <Badge tone="slate">Inactive</Badge>
+                ) },
+          ]}
+          actions={{
+            label: "Actions",
+            items: (o) => [
+              { label: "Edit", icon: Pencil, tone: "neutral", onClick: () => onEdit(o) },
+              { label: "Password", icon: KeyRound, tone: "neutral",
+                loading: busy === o.owner_id, onClick: () => setResetting(o) },
+              o.suspended
+                ? { label: "Reactivate", icon: ShieldCheck, tone: "success",
+                    loading: busy === o.owner_id,
+                    onClick: () => act(o.owner_id, { action: "reactivate" }, "Login reactivated.") }
+                : { label: "Suspend", icon: Ban, tone: "warning",
+                    loading: busy === o.owner_id,
+                    onClick: () => act(o.owner_id, { action: "suspend" }, "Login suspended.") },
+              { label: "Detach", icon: Unlink, tone: "danger",
+                loading: busy === o.owner_id, onClick: () => detach(o) },
+            ],
+          }}
+        />
       )}
 
       <ResetPasswordModal

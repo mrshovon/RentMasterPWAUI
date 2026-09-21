@@ -22,6 +22,7 @@ import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
 import { AppSettingsCard } from "../../components/app-settings-card";
 import { TenantProfileCard } from "../../components/profile-card";
+import { DataTable } from "../../components/data-table";
 import { useT, useLang } from "../../lib/i18n";
 import { translateNoticeText } from "../../lib/notice-i18n";
 import { useUnreadNotices } from "../../lib/notices-seen";
@@ -268,89 +269,52 @@ export default function TenantDashboard() {
           {ledgers.length === 0 ? (
             <EmptyState icon={ReceiptText} title="No invoices yet" hint="Your rent invoices will appear here once your owner generates them." />
           ) : (
-            <>
-              <Card className="hidden overflow-hidden md:block">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[560px] text-left text-sm">
-                    <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-                      <tr>
-                        <th className="p-4">{t("Month")}</th><th className="p-4">{t("Rent")}</th>
-                        <th className="p-4">{t("Service + Extra")}</th><th className="p-4">{t("Total")}</th><th className="p-4">{t("Status")}</th>
-                        <th className="p-4 text-right">{t("Payment")}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line/[0.04]">
-                      {ledgers.map((l) => (
-                        <tr key={l.id} className="hover:bg-overlay/[0.02]">
-                          <td className="p-4 font-semibold text-heading">{formatMonth(l.billing_month, lang)}</td>
-                          <td className="p-4 text-fg">{formatCurrency(l.rent_amount)}</td>
-                          <td className="p-4 text-fg">{formatCurrency(Number(l.service_charge) + Number(l.extra_charge))}</td>
-                          <td className="p-4 font-bold text-success">
-                            <button type="button" onClick={() => setBreakdown(l)}
-                              className="inline-flex items-center gap-1.5 transition hover:text-success" title={t("View charge breakdown")}>
-                              {formatCurrency(l.total_payable)}
-                              <Info className="h-3.5 w-3.5 text-subtle" />
-                            </button>
-                          </td>
-                          <td className="p-4">
-                            <Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge>
-                            {l.payment_status === "partial" && (
-                              <div className="mt-1 text-xs text-subtle">
-                                {formatCurrency(l.amount_paid)} paid
-                              </div>
-                            )}
-                          </td>
-                          <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              {/* Any recorded payment is worth a receipt — it's the tenant's proof
-                                  of what they've handed over so far, settled or not. */}
-                              {Number(l.amount_paid) > 0 && (
-                                <button title={t("Download receipt")} onClick={() => openTenantReceipt(l)}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-surface-2/80 px-2.5 py-1.5 text-xs font-semibold text-heading transition hover:bg-surface-2/80">
-                                  <Receipt className="h-3.5 w-3.5" /> Receipt
-                                </button>
-                              )}
-                              <BillPaymentAction ledger={l} onSend={markRentAsSent} />
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-              <div className="space-y-3 md:hidden">
-                {ledgers.map((l) => (
-                  <Card key={l.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-heading">{formatMonth(l.billing_month, lang)}</span>
+            <DataTable
+              rows={ledgers}
+              rowKey={(l) => l.id}
+              minWidth="min-w-[560px]"
+              columns={[
+                { key: "month", label: "Month", slot: "title",
+                  className: "font-semibold text-heading",
+                  cell: (l) => formatMonth(l.billing_month, lang) },
+                { key: "rent", label: "Rent", className: "text-fg",
+                  cell: (l) => formatCurrency(l.rent_amount) },
+                { key: "extra", label: "Service + Extra", className: "text-fg",
+                  cell: (l) => formatCurrency(Number(l.service_charge) + Number(l.extra_charge)) },
+                // The figure only. It used to be a button with an Info icon, but a slotted cell
+                // renders inside the card's header button and nothing interactive may live there —
+                // so the breakdown became a proper action below, which is a bigger tap target than
+                // a 14px icon ever was.
+                { key: "total", label: "Total", slot: "meta",
+                  className: "font-bold text-success",
+                  cell: (l) => <span className="font-bold text-success">{formatCurrency(l.total_payable)}</span> },
+                { key: "status", label: "Status", slot: "badge",
+                  cell: (l) => (
+                    <>
                       <Badge tone={statusTone[l.payment_status]}>{l.payment_status}</Badge>
-                    </div>
-                    <div className="mt-2 flex items-end justify-between">
-                      <span className="text-xs text-muted">
-                        {t("Rent {0} + {1}")
-                          .replace("{0}", formatCurrency(l.rent_amount))
-                          .replace("{1}", formatCurrency(Number(l.service_charge) + Number(l.extra_charge)))}
-                      </span>
-                      <button type="button" onClick={() => setBreakdown(l)}
-                        className="inline-flex items-center gap-1 text-lg font-black text-success" title={t("View charge breakdown")}>
-                        {formatCurrency(l.total_payable)}
-                        <Info className="h-3.5 w-3.5 text-subtle" />
-                      </button>
-                    </div>
-                    <div className="mt-3 flex items-center justify-end gap-2">
-                      {Number(l.amount_paid) > 0 && (
-                        <button title={t("Download receipt")} onClick={() => openTenantReceipt(l)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-surface-2/80 px-2.5 py-1.5 text-xs font-semibold text-heading">
-                          <Receipt className="h-3.5 w-3.5" /> Receipt
-                        </button>
+                      {l.payment_status === "partial" && (
+                        <span className="mt-1 block text-xs text-subtle">
+                          {t("{0} paid").replace("{0}", formatCurrency(l.amount_paid))}
+                        </span>
                       )}
-                      <BillPaymentAction ledger={l} onSend={markRentAsSent} />
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </>
+                    </>
+                  ) },
+              ]}
+              actions={{
+                label: "Payment",
+                items: (l) => [
+                  { label: "View charge breakdown", icon: Info, tone: "neutral",
+                    onClick: () => setBreakdown(l) },
+                  // Any recorded payment is worth a receipt — it's the tenant's proof of what
+                  // they've handed over so far, settled or not.
+                  Number(l.amount_paid) > 0 && {
+                    label: "Download receipt", icon: Receipt, tone: "primary",
+                    onClick: () => openTenantReceipt(l),
+                  },
+                ],
+                render: (l) => <BillPaymentAction ledger={l} onSend={markRentAsSent} />,
+              }}
+            />
           )}
         </div>
       )}

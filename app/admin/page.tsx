@@ -1,13 +1,13 @@
 "use client";
 
-import { Fragment, ReactNode, useCallback, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useState } from "react";
 import {
   LayoutDashboard, Users, CreditCard, Megaphone, Plus, Ban, KeyRound,
   Trash2, Mail, CheckCircle2, ShieldOff, ShieldCheck, Inbox, Building2, Eye,
   RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User, Copy,
   Wallet, Upload, Image as ImageIcon, X, Check, HardHat, Settings, Wrench,
   BarChart3, Radio, Smartphone, Globe, TrendingUp, TrendingDown, Minus, EyeOff,
-  ScrollText, ChevronDown, ChevronRight, RefreshCw, Archive, LogIn, Type,
+  ScrollText, ChevronDown, RefreshCw, Archive, LogIn, Type,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
@@ -47,6 +47,11 @@ import {
 } from "../../components/ui";
 import { validateEmail, validatePhone, buildingAdminLoginId, isSystemLogin } from "../../lib/validate";
 import { PLAN_ADDONS, AddonKey, addonsOnTier, FREE_TIER_ID } from "../../lib/addons";
+// The VERBATIM table. This console is English by standing decision (see lib/locales/bn.ts)
+// but renders DashboardShell, which puts a language toggle in its header — so a translating
+// table would leave it half-Bangla. check-i18n has a guard that fails the build if any other
+// file imports this.
+import { AdminDataTable } from "../../components/data-table";
 import {
   LATIN_FONTS, BANGLA_FONTS, buildStack, EMPTY_FONT_CONFIG,
   type FontConfigView, type FontSlotView, type CustomFontView,
@@ -1014,57 +1019,54 @@ function OwnersTab({
         {filtered.length === 0 ? (
           <EmptyState icon={Users} title="No matches" hint={`No owners match "${query}".`} />
         ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-                <tr>
-                  <th className="p-4">Owner</th>
-                  <th className="p-4">Role</th>
-                  <th className="p-4">Presence</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Plan</th>
-                  <th className="p-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line/[0.04]">
-                {filtered.map((o) => (
-                  <tr key={o.id} className="hover:bg-overlay/[0.02]">
-                    <td className="p-4">
-                      <div className="font-semibold text-heading">{o.name || "—"}</div>
-                      <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {o.email}</div>
-                    </td>
-                    <td className="p-4"><Badge tone={o.role === "admin" ? "amber" : "slate"}>{o.role}</Badge></td>
-                    <td className="p-4"><PresenceCell online={o.online} lastSeenAt={o.last_seen_at} lastSignInAt={o.last_sign_in_at} /></td>
-                    <td className="p-4">
-                      <div className="flex flex-wrap gap-1">
-                        <Badge tone={o.suspended ? "rose" : "emerald"}>{o.suspended ? "Suspended" : "Active"}</Badge>
-                        {o.permissions_revoked && <Badge tone="amber">No perms</Badge>}
-                      </div>
-                    </td>
-                    <td className="p-4 text-fg">
-                      {o.subscription?.status === "active" ? (
-                        <Badge tone="indigo">{o.subscription.tier_id}</Badge>
-                      ) : <span className="text-xs text-subtle">—</span>}
-                    </td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-end gap-1">
-                        <IconBtn title="View / manage" tone="indigo" icon={Eye} onClick={() => onView(o.id)} />
-                        {/* Distinct pending keys per action — both used to be `owner:${id}`,
-                            so starting either one showed a spinner on both buttons. */}
-                        <IconBtn title={o.suspended ? "Reactivate" : "Suspend"} tone={o.suspended ? "emerald" : "amber"}
-                          icon={o.suspended ? RotateCcw : Ban} onClick={() => onToggleSuspend(o)}
-                          loading={isPending(`owner-suspend:${o.id}`)} />
-                        <IconBtn title="Delete" tone="rose" icon={Trash2} onClick={() => onDelete(o)}
-                          loading={isPending(`owner-delete:${o.id}`)} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <AdminDataTable
+          rows={filtered}
+          rowKey={(o) => o.id}
+          minWidth="min-w-[720px]"
+          columns={[
+            { key: "owner", label: "Owner", slot: "title",
+              cell: (o) => (
+                <>
+                  <span className="block font-semibold text-heading">{o.name || "—"}</span>
+                  <span className="flex items-center gap-1 text-xs font-normal text-subtle">
+                    <Mail className="h-3 w-3" /> {o.email}
+                  </span>
+                </>
+              ) },
+            { key: "role", label: "Role", slot: "badge",
+              cell: (o) => <Badge tone={o.role === "admin" ? "amber" : "slate"}>{o.role}</Badge> },
+            { key: "presence", label: "Presence", slot: "meta",
+              cell: (o) => <PresenceCell online={o.online} lastSeenAt={o.last_seen_at} lastSignInAt={o.last_sign_in_at} /> },
+            { key: "status", label: "Status", slot: "badge",
+              cell: (o) => (
+                <span className="flex flex-wrap gap-1">
+                  <Badge tone={o.suspended ? "rose" : "emerald"}>{o.suspended ? "Suspended" : "Active"}</Badge>
+                  {o.permissions_revoked && <Badge tone="amber">No perms</Badge>}
+                </span>
+              ) },
+            { key: "plan", label: "Plan", className: "text-fg",
+              cell: (o) =>
+                o.subscription?.status === "active" ? (
+                  <Badge tone="indigo">{o.subscription.tier_id}</Badge>
+                ) : <span className="text-xs text-subtle">—</span> },
+          ]}
+          actions={{
+            label: "Actions",
+            items: (o) => [
+              { label: "View / manage", icon: Eye, tone: "primary", onClick: () => onView(o.id) },
+              // Distinct pending keys per action — both used to be `owner:${id}`, so starting
+              // either one showed a spinner on both buttons.
+              { label: o.suspended ? "Reactivate" : "Suspend",
+                icon: o.suspended ? RotateCcw : Ban,
+                tone: o.suspended ? "success" : "warning",
+                loading: isPending(`owner-suspend:${o.id}`),
+                onClick: () => onToggleSuspend(o) },
+              { label: "Delete", icon: Trash2, tone: "danger",
+                loading: isPending(`owner-delete:${o.id}`),
+                onClick: () => onDelete(o) },
+            ],
+          }}
+        />
         )}
         </>
       )}
@@ -1161,47 +1163,40 @@ function TicketsTab({
           {filtered.length === 0 ? (
             <EmptyState icon={LifeBuoy} title="No matches" hint="No tickets match the current search or filter." />
           ) : (
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[860px] text-left text-sm">
-                  <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-                    <tr>
-                      <th className="p-4">#</th>
-                      <th className="p-4">Owner</th>
-                      <th className="p-4">Subject</th>
-                      <th className="p-4">Category</th>
-                      <th className="p-4">Priority</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4">Age</th>
-                      <th className="p-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line/[0.04]">
-                    {filtered.map((t) => (
-                      <tr key={t.id} className="hover:bg-overlay/[0.02]">
-                        <td className="p-4 font-mono text-xs text-subtle">#{t.ticket_no}</td>
-                        <td className="p-4">
-                          <div className="font-semibold text-heading">{t.owner?.name || "—"}</div>
-                          <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {t.owner?.email || "unknown"}</div>
-                        </td>
-                        <td className="p-4">
-                          <div className="max-w-[260px] truncate font-medium text-fg">{t.subject}</div>
-                        </td>
-                        <td className="p-4"><Badge tone="slate">{ticketCategoryLabel[t.category]}</Badge></td>
-                        <td className="p-4"><Badge tone={ticketPriorityTone[t.priority]}>{t.priority}</Badge></td>
-                        <td className="p-4"><Badge tone={ticketStatusTone[t.status]}>{ticketStatusLabel[t.status]}</Badge></td>
-                        <td className="p-4 text-xs text-subtle">{ticketAge(t.created_at)}</td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <IconBtn title="Open / update" tone="indigo" icon={Eye} onClick={() => onOpen(t)} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+            <AdminDataTable
+              rows={filtered}
+              rowKey={(t) => t.id}
+              minWidth="min-w-[860px]"
+              columns={[
+                { key: "no", label: "#", className: "font-mono text-xs text-subtle", desktopOnly: true,
+                  cell: (t) => `#${t.ticket_no}` },
+                { key: "subject", label: "Subject", slot: "title",
+                  cell: (t) => <span className="block max-w-[260px] truncate font-medium text-fg md:max-w-none">{t.subject}</span> },
+                { key: "owner", label: "Owner", slot: "meta",
+                  cell: (t) => (
+                    <>
+                      <span className="block font-semibold text-heading">{t.owner?.name || "—"}</span>
+                      <span className="flex items-center gap-1 text-xs font-normal text-subtle">
+                        <Mail className="h-3 w-3" /> {t.owner?.email || "unknown"}
+                      </span>
+                    </>
+                  ) },
+                { key: "category", label: "Category",
+                  cell: (t) => <Badge tone="slate">{ticketCategoryLabel[t.category]}</Badge> },
+                { key: "priority", label: "Priority", slot: "badge",
+                  cell: (t) => <Badge tone={ticketPriorityTone[t.priority]}>{t.priority}</Badge> },
+                { key: "status", label: "Status", slot: "badge",
+                  cell: (t) => <Badge tone={ticketStatusTone[t.status]}>{ticketStatusLabel[t.status]}</Badge> },
+                { key: "age", label: "Age", className: "text-xs text-subtle",
+                  cell: (t) => ticketAge(t.created_at) },
+              ]}
+              actions={{
+                label: "Actions",
+                items: (t) => [
+                  { label: "Open / update", icon: Eye, tone: "primary", onClick: () => onOpen(t) },
+                ],
+              }}
+            />
           )}
         </>
       )}
@@ -1355,41 +1350,36 @@ function MessagesTab({
           {filtered.length === 0 ? (
             <EmptyState icon={Mail} title="No matches" hint="No messages match the current search or filter." />
           ) : (
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[820px] text-left text-sm">
-                  <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-                    <tr>
-                      <th className="p-4">#</th>
-                      <th className="p-4">From</th>
-                      <th className="p-4">Message</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4">Received</th>
-                      <th className="p-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line/[0.04]">
-                    {filtered.map((m) => (
-                      <tr key={m.id} className="hover:bg-overlay/[0.02]">
-                        <td className="p-4 font-mono text-xs text-subtle">#{m.message_no}</td>
-                        <td className="p-4">
-                          <div className="font-semibold text-heading">{m.name || m.owner?.name || "—"}</div>
-                          <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {m.email || m.owner?.email || "unknown"}</div>
-                        </td>
-                        <td className="p-4"><div className="max-w-[280px] truncate text-fg">{m.message}</div></td>
-                        <td className="p-4"><Badge tone={CONTACT_STATUS_TONE[m.status]}>{CONTACT_STATUS_LABEL[m.status]}</Badge></td>
-                        <td className="p-4 text-xs text-subtle">{formatDate(m.created_at)}</td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <IconBtn title="Open / update" tone="indigo" icon={Eye} onClick={() => onOpen(m)} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+            <AdminDataTable
+              rows={filtered}
+              rowKey={(m) => m.id}
+              minWidth="min-w-[820px]"
+              columns={[
+                { key: "no", label: "#", className: "font-mono text-xs text-subtle", desktopOnly: true,
+                  cell: (m) => `#${m.message_no}` },
+                { key: "from", label: "From", slot: "title",
+                  cell: (m) => (
+                    <>
+                      <span className="block font-semibold text-heading">{m.name || m.owner?.name || "—"}</span>
+                      <span className="flex items-center gap-1 text-xs font-normal text-subtle">
+                        <Mail className="h-3 w-3" /> {m.email || m.owner?.email || "unknown"}
+                      </span>
+                    </>
+                  ) },
+                { key: "message", label: "Message",
+                  cell: (m) => <span className="block max-w-[280px] truncate text-fg md:max-w-none">{m.message}</span> },
+                { key: "status", label: "Status", slot: "badge",
+                  cell: (m) => <Badge tone={CONTACT_STATUS_TONE[m.status]}>{CONTACT_STATUS_LABEL[m.status]}</Badge> },
+                { key: "received", label: "Received", slot: "meta", className: "text-xs text-subtle",
+                  cell: (m) => formatDate(m.created_at) },
+              ]}
+              actions={{
+                label: "Actions",
+                items: (m) => [
+                  { label: "Open / update", icon: Eye, tone: "primary", onClick: () => onOpen(m) },
+                ],
+              }}
+            />
           )}
         </>
       )}
@@ -1536,52 +1526,49 @@ function PaymentsTab({
           {filtered.length === 0 ? (
             <EmptyState icon={CircleDollarSign} title="No matches" hint="No payments match the current search or filter." />
           ) : (
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-left text-sm">
-                  <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-                    <tr>
-                      <th className="p-4">#</th>
-                      <th className="p-4">Owner</th>
-                      <th className="p-4">Plan</th>
-                      <th className="p-4">Amount</th>
-                      <th className="p-4">Sender / Txn</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4">Submitted</th>
-                      <th className="p-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line/[0.04]">
-                    {filtered.map((p) => (
-                      <tr key={p.id} className="hover:bg-overlay/[0.02]">
-                        <td className="p-4 font-mono text-xs text-subtle">#{p.payment_no}</td>
-                        <td className="p-4">
-                          {/* The payment outlives the account — it is kept for audit — so a row
-                              with no live owner is expected, not a data fault. */}
-                          <div className="font-semibold text-heading">
-                            {p.owner?.name || (p.owner?.deleted ? "Account deleted" : "—")}
-                          </div>
-                          <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {p.owner?.email || p.owner_email || "unknown"}</div>
-                        </td>
-                        <td className="p-4"><div className="max-w-[180px] truncate font-medium text-fg">{p.tier_name || p.tier_id}</div></td>
-                        <td className="p-4 font-semibold text-heading">{formatCurrency(Number(p.amount || 0))}</td>
-                        <td className="p-4">
-                          <div className="text-fg">{p.sender_msisdn || "—"}</div>
-                          <div className="font-mono text-xs text-subtle">{p.txn_id || "—"}</div>
-                        </td>
-                        <td className="p-4"><Badge tone={PAYMENT_STATUS_TONE[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</Badge></td>
-                        <td className="p-4 text-xs text-subtle">{formatDate(p.created_at)}</td>
-                        <td className="p-4">
-                          <div className="flex items-center justify-end gap-1">
-                            <IconBtn title="Review" tone="indigo" icon={Eye} onClick={() => onOpen(p)} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+            <AdminDataTable
+              rows={filtered}
+              rowKey={(p) => p.id}
+              minWidth="min-w-[900px]"
+              columns={[
+                { key: "no", label: "#", className: "font-mono text-xs text-subtle", desktopOnly: true,
+                  cell: (p) => `#${p.payment_no}` },
+                // The payment outlives the account — it is kept for audit — so a row with no live
+                // owner is expected, not a data fault.
+                { key: "owner", label: "Owner", slot: "title",
+                  cell: (p) => (
+                    <>
+                      <span className="block font-semibold text-heading">
+                        {p.owner?.name || (p.owner?.deleted ? "Account deleted" : "—")}
+                      </span>
+                      <span className="flex items-center gap-1 text-xs font-normal text-subtle">
+                        <Mail className="h-3 w-3" /> {p.owner?.email || p.owner_email || "unknown"}
+                      </span>
+                    </>
+                  ) },
+                { key: "amount", label: "Amount", slot: "meta", className: "font-semibold text-heading",
+                  cell: (p) => <span className="font-semibold text-heading">{formatCurrency(Number(p.amount || 0))}</span> },
+                { key: "plan", label: "Plan", slot: "meta",
+                  cell: (p) => <span className="block max-w-[180px] truncate font-medium text-fg md:max-w-none">{p.tier_name || p.tier_id}</span> },
+                { key: "sender", label: "Sender / Txn",
+                  cell: (p) => (
+                    <>
+                      <span className="block text-fg">{p.sender_msisdn || "—"}</span>
+                      <span className="block font-mono text-xs text-subtle">{p.txn_id || "—"}</span>
+                    </>
+                  ) },
+                { key: "status", label: "Status", slot: "badge",
+                  cell: (p) => <Badge tone={PAYMENT_STATUS_TONE[p.status]}>{PAYMENT_STATUS_LABEL[p.status]}</Badge> },
+                { key: "submitted", label: "Submitted", className: "text-xs text-subtle",
+                  cell: (p) => formatDate(p.created_at) },
+              ]}
+              actions={{
+                label: "Actions",
+                items: (p) => [
+                  { label: "Review", icon: Eye, tone: "primary", onClick: () => onOpen(p) },
+                ],
+              }}
+            />
           )}
         </>
       )}
@@ -1841,58 +1828,50 @@ function BuildingsTab({
           hint={filter === "attention" ? "Every building is paid up and nobody is waiting on us." : "No buildings match."}
         />
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
-              <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-                <tr>
-                  <th className="p-4">#</th>
-                  <th className="p-4">Building</th>
-                  <th className="p-4">Admin login</th>
-                  <th className="p-4">Owners</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Expires</th>
-                  <th className="p-4">Owed</th>
-                  <th className="p-4">Requests</th>
-                  <th className="p-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line/[0.04]">
-                {rows.map((b) => {
-                  const badge = buildingStatusBadge(b);
-                  return (
-                    <tr key={b.id} className="hover:bg-overlay/[0.02]">
-                      <td className="p-4 text-xs text-muted">#{b.building_no}</td>
-                      <td className="p-4">
-                        <div className="font-semibold text-heading">{b.name}</div>
-                        <div className="text-xs text-muted">
-                          {[b.house_no, b.city].filter(Boolean).join(" · ") || "—"}
-                        </div>
-                      </td>
-                      <td className="p-4 font-mono text-xs text-fg">{b.admin_login || "—"}</td>
-                      <td className="p-4 text-xs">{b.owner_count}</td>
-                      <td className="p-4"><Badge tone={badge.tone}>{badge.label}</Badge></td>
-                      <td className="p-4 text-xs">
-                        {b.state?.expiryDate ? formatDate(b.state.expiryDate) : "—"}
-                      </td>
-                      <td className="p-4 text-xs font-bold">
-                        {b.amount_owed > 0 ? formatCurrency(b.amount_owed) : "—"}
-                      </td>
-                      <td className="p-4">
-                        {b.open_requests > 0
-                          ? <Badge tone="amber">{String(b.open_requests)}</Badge>
-                          : <span className="text-xs text-muted">—</span>}
-                      </td>
-                      <td className="p-4">
-                        <IconBtn title="Manage" tone="indigo" icon={Eye} onClick={() => onOpen(b.id)} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        <AdminDataTable
+          rows={rows}
+          rowKey={(b) => b.id}
+          minWidth="min-w-[900px]"
+          columns={[
+            { key: "no", label: "#", className: "text-xs text-muted", desktopOnly: true,
+              cell: (b) => `#${b.building_no}` },
+            { key: "building", label: "Building", slot: "title",
+              cell: (b) => (
+                <>
+                  <span className="block font-semibold text-heading">{b.name}</span>
+                  <span className="block text-xs font-normal text-muted">
+                    {[b.house_no, b.city].filter(Boolean).join(" · ") || "—"}
+                  </span>
+                </>
+              ) },
+            { key: "login", label: "Admin login", className: "font-mono text-xs text-fg",
+              cell: (b) => b.admin_login || "—" },
+            { key: "owners", label: "Owners", slot: "meta", className: "text-xs",
+              cell: (b) => String(b.owner_count) },
+            { key: "status", label: "Status", slot: "badge",
+              cell: (b) => {
+                const badge = buildingStatusBadge(b);
+                return <Badge tone={badge.tone}>{badge.label}</Badge>;
+              } },
+            { key: "expires", label: "Expires", className: "text-xs",
+              cell: (b) => (b.state?.expiryDate ? formatDate(b.state.expiryDate) : "—") },
+            { key: "owed", label: "Owed", slot: "meta", className: "text-xs font-bold",
+              cell: (b) => (
+                <span className="font-bold">{b.amount_owed > 0 ? formatCurrency(b.amount_owed) : "—"}</span>
+              ) },
+            { key: "requests", label: "Requests", slot: "badge",
+              cell: (b) =>
+                b.open_requests > 0
+                  ? <Badge tone="amber">{String(b.open_requests)}</Badge>
+                  : <span className="text-xs text-muted">—</span> },
+          ]}
+          actions={{
+            label: "Actions",
+            items: (b) => [
+              { label: "Manage", icon: Eye, tone: "primary", onClick: () => onOpen(b.id) },
+            ],
+          }}
+        />
       )}
 
       <ArchivedBuildings />
@@ -2955,39 +2934,37 @@ function ResetLogTab({ resets }: { resets: PasswordResetRecord[] }) {
           {filtered.length === 0 ? (
             <EmptyState icon={KeyRound} title="No matches" hint={`No resets match "${query}".`} />
           ) : (
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-                    <tr>
-                      <th className="p-4">#</th>
-                      <th className="p-4">Owner</th>
-                      <th className="p-4">Method</th>
-                      <th className="p-4">Performed by</th>
-                      <th className="p-4">When</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line/[0.04]">
-                    {filtered.map((r) => (
-                      <tr key={r.id} className="hover:bg-overlay/[0.02]">
-                        <td className="p-4 font-mono text-xs text-subtle">#{r.reset_no}</td>
-                        <td className="p-4">
-                          <div className="font-semibold text-heading">{r.owner?.name || "—"}</div>
-                          <div className="flex items-center gap-1 text-xs text-subtle"><Mail className="h-3 w-3" /> {r.owner?.email || r.owner_email || "unknown"}</div>
-                        </td>
-                        <td className="p-4"><Badge tone={RESET_METHOD_TONE[r.reset_method]}>{RESET_METHOD_LABEL[r.reset_method]}</Badge></td>
-                        <td className="p-4">
-                          {r.reset_method === "admin_reset"
-                            ? <span className="flex items-center gap-1 text-fg"><ShieldCheck className="h-3.5 w-3.5 text-warning" />{r.actor?.name || r.actor?.email || "Admin"}</span>
-                            : <span className="flex items-center gap-1 text-muted"><User className="h-3.5 w-3.5" />Owner (self-service)</span>}
-                        </td>
-                        <td className="p-4 text-xs text-subtle">{formatDate(r.created_at)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+            <AdminDataTable
+              rows={filtered}
+              rowKey={(r) => r.id}
+              minWidth="min-w-[760px]"
+              columns={[
+                { key: "no", label: "#", className: "font-mono text-xs text-subtle", desktopOnly: true,
+                  cell: (r) => `#${r.reset_no}` },
+                { key: "owner", label: "Owner", slot: "title",
+                  cell: (r) => (
+                    <>
+                      <span className="block font-semibold text-heading">{r.owner?.name || "—"}</span>
+                      <span className="flex items-center gap-1 text-xs font-normal text-subtle">
+                        <Mail className="h-3 w-3" /> {r.owner?.email || r.owner_email || "unknown"}
+                      </span>
+                    </>
+                  ) },
+                { key: "method", label: "Method", slot: "badge",
+                  cell: (r) => <Badge tone={RESET_METHOD_TONE[r.reset_method]}>{RESET_METHOD_LABEL[r.reset_method]}</Badge> },
+                { key: "actor", label: "Performed by",
+                  cell: (r) =>
+                    r.reset_method === "admin_reset" ? (
+                      <span className="flex items-center gap-1 text-fg">
+                        <ShieldCheck className="h-3.5 w-3.5 text-warning" />{r.actor?.name || r.actor?.email || "Admin"}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-muted"><User className="h-3.5 w-3.5" />Owner (self-service)</span>
+                    ) },
+                { key: "when", label: "When", slot: "meta", className: "text-xs text-subtle",
+                  cell: (r) => formatDate(r.created_at) },
+              ]}
+            />
           )}
         </>
       )}
@@ -3040,7 +3017,6 @@ function LogsTab() {
   const [applied, setApplied] = useState("");
   const [nextBefore, setNextBefore] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
 
   async function load(cursor: string | null = null) {
     const params = new URLSearchParams();
@@ -3135,80 +3111,60 @@ function LogsTab() {
         />
       ) : (
         <>
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="border-b border-line/[0.06] bg-overlay/[0.02] text-[11px] uppercase tracking-wider text-muted">
-                  <tr>
-                    <th className="p-4 w-8"></th>
-                    <th className="p-4">#</th>
-                    <th className="p-4">Level</th>
-                    <th className="p-4">Source</th>
-                    <th className="p-4">What happened</th>
-                    <th className="p-4">Who</th>
-                    <th className="p-4">When</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line/[0.04]">
-                  {rows.map((r) => (
-                    <Fragment key={r.id}>
-                      <tr
-                        className="cursor-pointer hover:bg-overlay/[0.02]"
-                        onClick={() => setExpanded(expanded === r.id ? null : r.id)}
-                      >
-                        <td className="p-4 text-muted">
-                          {expanded === r.id
-                            ? <ChevronDown className="h-4 w-4" />
-                            : <ChevronRight className="h-4 w-4" />}
-                        </td>
-                        <td className="p-4 font-mono text-xs text-subtle">#{r.log_no}</td>
-                        <td className="p-4"><Badge tone={LOG_LEVEL_TONE[r.level]}>{r.level}</Badge></td>
-                        <td className="p-4 text-xs text-subtle">{LOG_SOURCE_LABEL[r.source] ?? r.source}</td>
-                        <td className="p-4">
-                          <div className="max-w-[420px] truncate font-medium text-heading">{r.message}</div>
-                          <div className="flex items-center gap-2 text-xs text-subtle">
-                            {r.method && <span className="font-mono">{r.method}</span>}
-                            {r.route && <span className="truncate font-mono">{r.route}</span>}
-                            {r.status != null && <span>· {r.status}</span>}
-                            {r.request_id && <span className="font-mono">· {r.request_id}</span>}
-                          </div>
-                        </td>
-                        <td className="p-4 text-xs text-subtle">
-                          {r.user_email || r.user_id || "—"}
-                          {r.user_role && <div className="text-faint">{r.user_role}</div>}
-                        </td>
-                        <td className="p-4 whitespace-nowrap text-xs text-subtle">{formatDateTime(r.created_at)}</td>
-                      </tr>
-
-                      {expanded === r.id && (
-                        <tr className="bg-overlay/[0.02]">
-                          <td colSpan={7} className="p-4">
-                            <div className="space-y-3">
-                              <div className="text-xs text-subtle">
-                                {r.ip && <span className="mr-4">IP {r.ip}</span>}
-                                {r.code && <span className="mr-4">Code {r.code}</span>}
-                                {r.user_agent && <span className="break-all">{r.user_agent}</span>}
-                              </div>
-                              {r.detail && (
-                                <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl bg-bg p-4 font-mono text-[11px] leading-relaxed text-subtle">
-                                  {r.detail}
-                                </pre>
-                              )}
-                              {r.context && Object.keys(r.context).length > 0 && (
-                                <pre className="overflow-auto rounded-xl bg-bg p-4 font-mono text-[11px] text-subtle">
-                                  {JSON.stringify(r.context, null, 2)}
-                                </pre>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+          <AdminDataTable
+            rows={rows}
+            rowKey={(r) => r.id}
+            minWidth="min-w-[900px]"
+            columns={[
+              { key: "no", label: "#", className: "font-mono text-xs text-subtle", desktopOnly: true,
+                cell: (r) => `#${r.log_no}` },
+              { key: "message", label: "What happened", slot: "title",
+                cell: (r) => (
+                  <>
+                    <span className="block max-w-[420px] truncate font-medium text-heading md:max-w-none">{r.message}</span>
+                    <span className="flex flex-wrap items-center gap-2 text-xs font-normal text-subtle">
+                      {r.method && <span className="font-mono">{r.method}</span>}
+                      {r.route && <span className="truncate font-mono">{r.route}</span>}
+                      {r.status != null && <span>{r.status}</span>}
+                      {r.request_id && <span className="font-mono">{r.request_id}</span>}
+                    </span>
+                  </>
+                ) },
+              { key: "level", label: "Level", slot: "badge",
+                cell: (r) => <Badge tone={LOG_LEVEL_TONE[r.level]}>{r.level}</Badge> },
+              { key: "source", label: "Source", slot: "meta", className: "text-xs text-subtle",
+                cell: (r) => LOG_SOURCE_LABEL[r.source] ?? r.source },
+              { key: "who", label: "Who", className: "text-xs text-subtle",
+                cell: (r) => (
+                  <>
+                    {r.user_email || r.user_id || "—"}
+                    {r.user_role && <span className="block text-faint">{r.user_role}</span>}
+                  </>
+                ) },
+              { key: "when", label: "When", slot: "meta",
+                className: "whitespace-nowrap text-xs text-subtle",
+                cell: (r) => formatDateTime(r.created_at) },
+            ]}
+            detail={(r) => (
+              <div className="space-y-3">
+                <div className="text-xs text-subtle">
+                  {r.ip && <span className="mr-4">IP {r.ip}</span>}
+                  {r.code && <span className="mr-4">Code {r.code}</span>}
+                  {r.user_agent && <span className="break-all">{r.user_agent}</span>}
+                </div>
+                {r.detail && (
+                  <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl bg-bg p-4 font-mono text-[11px] leading-relaxed text-subtle">
+                    {r.detail}
+                  </pre>
+                )}
+                {r.context && Object.keys(r.context).length > 0 && (
+                  <pre className="overflow-auto rounded-xl bg-bg p-4 font-mono text-[11px] text-subtle">
+                    {JSON.stringify(r.context, null, 2)}
+                  </pre>
+                )}
+              </div>
+            )}
+          />
 
           {hasMore && (
             <div className="flex justify-center">

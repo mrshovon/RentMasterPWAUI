@@ -1,3 +1,7 @@
+- Lists no longer slide sideways on a phone. Every list — tenants, rent, service charge, invoices — is now a card you can read without dragging, and you tap one to open the rest of its details and its buttons.
+- The buttons inside those lists now carry their names instead of being bare icons, so it is clear what each one does before you tap it.
+- When an invoice is settled and its buttons are switched off, the reason is now written underneath instead of hidden in a tooltip you cannot see on a phone.
+- On a computer the lists still look exactly as they did.
 - The lettering used across the app can now be changed from the admin panel, separately for English and for Bangla, and it applies to everyone.
 - Bangla now gets a proper font of its own instead of borrowing whichever one your phone happens to have, so Bangla and English finally look like they belong together.
 - Your own font can be added too, either by uploading the file or by giving a link to it.
