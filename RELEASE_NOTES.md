@@ -29,3 +29,5 @@
 - Building admins get the same screen: service charge per month and what is outstanding at the top, a collection line with an All and Unpaid switch, and a card for every tab.
 - The building service charge total now counts every flat. Owners who hold more than one flat were being under-counted before.
 - The flat number on the sidebar card now shows in Bangla when the app is set to Bangla.
+- Announcements and sign-in banners have a new look: the picture fills a rounded card in the middle of the screen, the app stays softly visible behind it, and a round close button sits on its corner.
+- When more than one is showing, swipe the card or tap the dots underneath it to move between them.
