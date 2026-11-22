@@ -49,6 +49,17 @@ const TEMPLATES: { re: RegExp; en: string }[] = [
     re: /^Your (.+) plan has ended and you are now on the free plan — (\d+) propert(?:y|ies) and (\d+) tenants?\. Nothing has been deleted; anything beyond those limits is view-only until you choose a plan\.$/,
     en: "Your {0} plan has ended and you are now on the free plan — {1} properties and {2} tenants. Nothing has been deleted; anything beyond those limits is view-only until you choose a plan.",
   },
+  // ---- sign-in email change (rent-master-pwa/lib/email-change.ts) ----
+  // The title is a fixed string and resolves through the exact-match path; only the body
+  // interpolates the new address, so both variants need a template here.
+  {
+    re: /^An administrator changed your sign-in email to (.+)\. If this was not you, contact support\.$/,
+    en: "An administrator changed your sign-in email to {0}. If this was not you, contact support.",
+  },
+  {
+    re: /^Your sign-in email was changed to (.+)\. If this was not you, contact support\.$/,
+    en: "Your sign-in email was changed to {0}. If this was not you, contact support.",
+  },
 ];
 
 /**

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { UserRound, Mail, Phone, KeyRound } from "lucide-react";
-import { Card, Button, Field, TextInput, PhoneField } from "./ui";
-import { validatePhone, isSystemLogin } from "../lib/validate";
+import { Card, Button, Field, TextInput, PhoneField, EmailField } from "./ui";
+import { validateEmail, validatePhone, isSystemLogin } from "../lib/validate";
 import { toast } from "./toast";
 import { rentMasterFetch, getStoredSession, setStoredSession } from "../lib/api-service";
 import type { AccountProfile, TenantProfile } from "../types/api";
@@ -16,9 +16,10 @@ import { useT } from "../lib/i18n";
 // are Supabase auth users (name/phone in user_metadata, email on the auth user), while tenants
 // are rows in the `tenants` table with no email at all — their sign-in identity is their phone.
 //
-// Neither card can change the field a user signs in with. That is a deliberate limit, not an
-// oversight: changing a login address or number needs a verification/uniqueness flow that
-// doesn't exist, and getting it wrong locks someone out of their own account.
+// The tenant card cannot change the field its user signs in with (a phone number) — that is a
+// deliberate limit. An owner/admin CAN change their sign-in email, but only while a super admin
+// has left the one-shot opt-in on, and only after re-entering their current password. The
+// uniqueness/notification flow lives server-side in rent-master-pwa/lib/email-change.ts.
 // =============================================================================
 
 /** Keeps the cached session name in step with the server so the UI updates without a re-login. */
@@ -52,6 +53,9 @@ export function OwnerProfileCard() {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [changingEmail, setChangingEmail] = useState(false);
 
   const t = useT();
   const role = getStoredSession()?.role;
@@ -94,6 +98,28 @@ export function OwnerProfileCard() {
     finally { setSaving(false); }
   }
 
+  /** One-shot self-service email change. The server re-checks the opt-in and the password. */
+  async function submitEmail() {
+    const parsed = validateEmail(newEmail, { required: true });
+    if (!parsed.ok) { toast.error(parsed.error); return; }
+    if (!currentPassword) { toast.error("Enter your current password."); return; }
+    try {
+      setChangingEmail(true);
+      const res = await rentMasterFetch<{ data: { email: string; emailChangeAllowed: boolean } }>(
+        "/api/admin/owner/email",
+        {
+          method: "POST", role: apiRole,
+          body: JSON.stringify({ newEmail: parsed.value, currentPassword }),
+        },
+      );
+      setProfile((prev) => prev ? { ...prev, ...res.data } : prev);
+      setNewEmail("");
+      setCurrentPassword("");
+      toast.success("Sign-in email changed. Use the new address next time you sign in.");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setChangingEmail(false); }
+  }
+
   return (
     <Card className="p-6">
       <div className="mb-4 flex items-center gap-2">
@@ -120,6 +146,29 @@ export function OwnerProfileCard() {
               label="Login ID" icon={KeyRound} value={profile?.email ?? ""}
               hint="This is what you sign in with. Your building administrator can reset your password."
             />
+          ) : profile?.emailChangeAllowed ? (
+            <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/[0.04] p-3">
+              <div className="space-y-1.5">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-muted">
+                  {t("Sign-in email")}
+                </span>
+                <div className="flex items-center gap-2 rounded-xl border border-line/[0.08] bg-overlay/[0.03] px-3 py-2.5 text-sm text-fg">
+                  <Mail className="h-4 w-4 shrink-0 text-subtle" />
+                  <span className="truncate">{profile?.email || "—"}</span>
+                </div>
+                <span className="block text-[11px] text-subtle">
+                  {t("You can change this once. Your administrator enabled it.")}
+                </span>
+              </div>
+              <EmailField label="New email" value={newEmail} onChange={setNewEmail} required />
+              <Field label="Current password">
+                <TextInput type="password" autoComplete="current-password" value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)} />
+              </Field>
+              <Button type="button" size="sm" variant="secondary" loading={changingEmail} onClick={submitEmail}>
+                {t("Change email")}
+              </Button>
+            </div>
           ) : (
             <ReadOnlyField
               label="Email" icon={Mail} value={profile?.email ?? ""}

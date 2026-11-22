@@ -1683,6 +1683,20 @@ export const bn: Record<string, string> = {
   "About": "পরিচিতি",
   "About us": "আমাদের সম্পর্কে",
 
+  // ---------------------------------------------------------------- sign-in email change
+  // One-shot opt-in: a super admin allows it, the owner re-enters their password, and the
+  // permission switches itself off again. Notice bodies interpolate the new address, so they
+  // are templated in lib/notice-i18n.ts rather than being exact-match keys here.
+  "Sign-in email": "সাইন-ইন ইমেইল",
+  "Sign-in email changed": "সাইন-ইন ইমেইল পরিবর্তিত হয়েছে",
+  "You can change this once. Your administrator enabled it.": "আপনি এটি একবারই বদলাতে পারবেন। আপনার প্রশাসক এটি চালু করেছেন।",
+  "New email": "নতুন ইমেইল",
+  "Change email": "ইমেইল বদলান",
+  "Enter your current password.": "বর্তমান পাসওয়ার্ড দিন।",
+  "Sign-in email changed. Use the new address next time you sign in.": "সাইন-ইন ইমেইল বদলানো হয়েছে। পরের বার নতুন ঠিকানা ব্যবহার করুন।",
+  "An administrator changed your sign-in email to {0}. If this was not you, contact support.": "একজন প্রশাসক আপনার সাইন-ইন ইমেইল {0} এ বদলিয়েছেন। আপনি না করে থাকলে সহায়তা কেন্দ্রে জানান।",
+  "Your sign-in email was changed to {0}. If this was not you, contact support.": "আপনার সাইন-ইন ইমেইল {0} এ বদলানো হয়েছে। আপনি না করে থাকলে সহায়তা কেন্দ্রে জানান।",
+
   // ---------------------------------------------------------------- popup carousel
   // Several active announcements or login banners become ONE swipeable modal. Only this chrome is
   // translated — the admin writes their own Bangla and English editions of the content itself.

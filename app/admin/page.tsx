@@ -4969,7 +4969,7 @@ function OwnerDetailModal({
   const [detail, setDetail] = useState<AdminOwnerDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [edit, setEdit] = useState({ name: "", phone: "" });
+  const [edit, setEdit] = useState({ name: "", phone: "", email: "" });
   const [newPass, setNewPass] = useState("");
   const [tierId, setTierId] = useState("");
 
@@ -4979,7 +4979,7 @@ function OwnerDetailModal({
     try {
       const res = await rentMasterFetch(`/api/super-admin/owners/${ownerId}`, { role: "admin" });
       setDetail(res.data);
-      setEdit({ name: res.data?.name || "", phone: res.data?.phone || "" });
+      setEdit({ name: res.data?.name || "", phone: res.data?.phone || "", email: res.data?.email || "" });
     } catch (e: any) { toast.error(e.message); }
     finally { setLoading(false); }
   }
@@ -5096,6 +5096,33 @@ function OwnerDetailModal({
             }}>Save details</Button>
           </Section>
 
+          {/* Sign-in email. System-issued building logins are deliberately frozen: that string is
+              the login ID and isSystemLogin() silently changes mail/reset behaviour. */}
+          <Section title="Sign-in email">
+            {isSystemLogin(detail.email) ? (
+              <p className="text-xs text-subtle">
+                This account signs in with a system login ID. It cannot be changed here — contact support.
+              </p>
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  <EmailField label="New email" value={edit.email} required
+                    onChange={(v) => setEdit({ ...edit, email: v })} className="flex-1" />
+                  <Button size="sm" icon={Mail} variant="secondary" loading={busy}
+                    onClick={() => {
+                      const parsed = validateEmail(edit.email, { required: true });
+                      if (!parsed.ok) { toast.error(parsed.error); return; }
+                      patch({ email: parsed.value });
+                    }}>Change email</Button>
+                </div>
+                <p className="mt-2 text-xs text-subtle">
+                  The change takes effect immediately at sign-in. Both the old and the new mailbox
+                  get a security notice.
+                </p>
+              </>
+            )}
+          </Section>
+
           {/* Subscription */}
           <Section title="Subscription">
             {detail.subscription?.status === "active" ? (
@@ -5189,6 +5216,28 @@ function OwnerDetailModal({
                   </Button>
                 )}
               </div>
+
+              {/* One-shot opt-in, not a paid add-on — lives in owner_addons beside them, but the
+                  backend refuses it for system logins, so don't offer it here either. */}
+              {!isSystemLogin(detail.email) && (
+                <div className="flex flex-wrap items-center gap-3 border-t border-line/[0.06] pt-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-fg">
+                      <KeyRound className="h-4 w-4 text-subtle" /> Self-service email change
+                    </div>
+                    <div className="mt-0.5 text-xs text-subtle">
+                      {detail.email_change_allowed
+                        ? "On — this owner can change their own sign-in email once from Settings."
+                        : "Off — only an administrator can change their sign-in email."}
+                    </div>
+                  </div>
+                  <Button size="sm" variant={detail.email_change_allowed ? "secondary" : "success"}
+                    icon={detail.email_change_allowed ? ShieldOff : ShieldCheck} loading={busy}
+                    onClick={() => patch({ action: detail.email_change_allowed ? "disable_self_email_change" : "enable_self_email_change" })}>
+                    {detail.email_change_allowed ? "Turn off" : "Allow once"}
+                  </Button>
+                </div>
+              )}
             </div>
           </Section>
 

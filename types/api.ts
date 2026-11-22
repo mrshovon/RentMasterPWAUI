@@ -126,12 +126,14 @@ export interface Notice {
   created_at: string;
 }
 
-// ---- Signed-in owner/admin account (Supabase auth user; email is read-only) ----
+// ---- Signed-in owner/admin account (Supabase auth user) ----
 export interface AccountProfile {
   email: string | null;
   name: string | null;
   phone: string | null;
   role: string;
+  /** True only while a super admin has granted this ONE-SHOT opt-in. Changing the email clears it. */
+  emailChangeAllowed: boolean;
 }
 
 // ---- Platform maintenance window (admin-declared, app_settings.maintenance_mode) ----
@@ -788,6 +790,8 @@ export interface AdminOwnerDetail extends AdminOwner {
   accounts_addon: boolean;
   accounts_addon_granted_at: string | null;
   accounts_included_in_plan: boolean;
+  /** One-shot: when true, this account holder may change their own sign-in email once. */
+  email_change_allowed: boolean;
   /** Whole Building context. `admin` = they RUN this building and `ownerCount` is its roster
    *  size, which is what the delete flow has to ask about; `member` = they are a flat owner in
    *  someone else's building and `ownerCount` is 0. Null for an ordinary owner. The route has

@@ -1,3 +1,6 @@
+- Administrators can now change a user's sign-in email from the owner details screen, with the new address taking effect straight away.
+- An administrator can allow one user to change their own email once from Settings. After they use it, that permission switches itself off again.
+- Whenever a sign-in email changes, a security notice is sent to both the old and the new address, and a notice appears in the app.
 - Lists no longer slide sideways on a phone. Every list — tenants, rent, service charge, invoices — is now a card you can read without dragging, and you tap one to open the rest of its details and its buttons.
 - The buttons inside those lists now carry their names instead of being bare icons, so it is clear what each one does before you tap it.
 - When an invoice is settled and its buttons are switched off, the reason is now written underneath instead of hidden in a tooltip you cannot see on a phone.
