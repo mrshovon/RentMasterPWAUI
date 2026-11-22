@@ -16,7 +16,8 @@ import { useSessionGuard } from "../../lib/use-session";
 import { usePresenceHeartbeat } from "../../lib/presence";
 import { useTabState } from "../../lib/use-tab";
 import { useRevalidateOnFocus } from "../../lib/use-revalidate";
-import { BillingLedger, BillingPayment, MaintenanceLog, Notice, PaymentStatus, PriorityLevel, TenantProfile, Document, ServiceChargeBreakdown, RentRevision } from "../../types/api";
+import { BillingLedger, BillingPayment, MaintenanceLog, Notice, PaymentStatus, PriorityLevel, TenantProfile, Document, ServiceChargeBreakdown, RentRevision, PayToConfig } from "../../types/api";
+import { PayBillModal, claimMethodLabel } from "../../components/pay-bill-modal";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
@@ -72,6 +73,10 @@ export default function TenantDashboard() {
   const [breakdown, setBreakdown] = useState<BillingLedger | null>(null);
   // Read-only: the installments the owner has recorded against this tenant's invoices.
   const [payments, setPayments] = useState<BillingPayment[]>([]);
+  // The landlord's pay-to details, read only. Null until the first ledger fetch lands.
+  const [payTo, setPayTo] = useState<PayToConfig | null>(null);
+  // The invoice whose "how did you pay?" modal is open.
+  const [claimLedger, setClaimLedger] = useState<BillingLedger | null>(null);
   const [receipt, setReceipt] = useState<{ html: string; fileName: string } | null>(null);
 
   // `first` blanks the screen with a spinner; a background revalidation must not, or returning to
@@ -83,7 +88,7 @@ export default function TenantDashboard() {
         if (first) setLoading(true);
         setError(""); // a stale failure must not outlive the request that caused it
         const [b, m, n, p, bp] = await Promise.allSettled([
-          rentMasterFetch(`/api/admin/billing/tenant/${tenantId}`, { role: "tenant" }),
+          rentMasterFetch<{ data: BillingLedger[]; payTo?: PayToConfig }>(`/api/admin/billing/tenant/${tenantId}`, { role: "tenant" }),
           rentMasterFetch("/api/admin/maintenance", { role: "tenant" }),
           rentMasterFetch("/api/admin/notices", { role: "tenant" }),
           rentMasterFetch("/api/admin/tenants/me", { role: "tenant" }),
@@ -97,7 +102,10 @@ export default function TenantDashboard() {
           return;
         }
 
-        if (b.status === "fulfilled") setLedgers(b.value.data || []);
+        if (b.status === "fulfilled") {
+          setLedgers(b.value.data || []);
+          if (b.value.payTo) setPayTo(b.value.payTo);
+        }
         if (bp.status === "fulfilled") setPayments(bp.value.data || []);
         if (m.status === "fulfilled") setLogs(m.value.data || []);
         if (n.status === "fulfilled") setNotices(n.value.data || []);
@@ -183,21 +191,11 @@ export default function TenantDashboard() {
 
   const propertyId = ledgers[0]?.property_id;
 
-  // Tenant flags a bill as paid ("sent") — optimistic, backend notifies the owner.
-  async function markRentAsSent(id: string) {
-    const prev = ledgers;
-    setLedgers((ls) => ls.map((l) => (l.id === id ? { ...l, payment_status: "sent" } : l)));
-    try {
-      await rentMasterFetch(`/api/admin/billing/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ paymentStatus: "sent" }),
-        role: "tenant",
-      });
-      toast.success("Rent marked as sent — your owner has been notified.");
-    } catch (e: any) {
-      setLedgers(prev); // rollback
-      toast.error(`Could not update payment status: ${e.message}`);
-    }
+  // Opens the shared payment modal instead of writing a bare "sent" flag. The modal collects HOW
+  // the tenant paid (and optional txn id / remarks), then POSTs a claim; the backend flips the
+  // ledger to sent and tells the landlord. The claim itself never records money.
+  function markRentAsSent(id: string) {
+    setClaimLedger(ledgers.find((l) => l.id === id) || null);
   }
 
   // Build a "Tenant Copy" receipt for a paid invoice and open the preview.
@@ -444,6 +442,17 @@ export default function TenantDashboard() {
       />
       <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)}
         html={receipt?.html || ""} fileName={receipt?.fileName} />
+      <PayBillModal
+        open={!!claimLedger}
+        onClose={() => setClaimLedger(null)}
+        payTo={payTo}
+        source="rent"
+        refId={claimLedger?.id || ""}
+        amountLabel={claimLedger
+          ? `${formatMonth(claimLedger.billing_month)} · ${formatCurrency(Math.max(0, Number(claimLedger.total_payable || 0) - Number(claimLedger.amount_paid || 0)))}`
+          : ""}
+        onSubmitted={() => loadAll()}
+      />
     </DashboardShell>
   );
 }
@@ -985,7 +994,17 @@ function BillPaymentAction({
     );
   }
   if (ledger.payment_status === "sent") {
-    return <span className="text-xs text-warning">{t("Awaiting owner confirmation")}</span>;
+    return (
+      <div className="space-y-0.5">
+        <span className="text-xs text-warning">{t("Awaiting owner confirmation")}</span>
+        {ledger.claim && (
+          <div className="text-[11px] text-subtle">
+            {claimMethodLabel(t, ledger.claim.method)}
+            {ledger.claim.reference ? ` · #${ledger.claim.reference}` : ""}
+          </div>
+        )}
+      </div>
+    );
   }
   // Partly paid: the owner has confirmed some of it, so "I've sent it" would be misleading —
   // what the tenant needs to see is what's left.

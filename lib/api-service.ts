@@ -14,7 +14,7 @@
 
 import { reportClientError } from "./client-log";
 import { LEGAL_VERSION } from "../content/legal/generated";
-import type { PublicPlan } from "../types/api";
+import type { PublicPlan, ClaimSource, ClaimMethod, PaymentClaim } from "../types/api";
 
 export const BACKEND_API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
@@ -389,6 +389,21 @@ export async function apiResetComplete(accessToken: string): Promise<void> {
   } catch {
     /* non-fatal: the password change already succeeded on Supabase */
   }
+}
+
+// A payer telling the payee how they paid. This is a claim, never a payment: the payee still
+// records the real money through the normal billing routes.
+export async function apiSubmitPaymentClaim(input: {
+  source: ClaimSource;
+  refId: string;
+  method: ClaimMethod;
+  reference?: string;
+  note?: string;
+}): Promise<{ success: boolean; message?: string; data: PaymentClaim }> {
+  return rentMasterFetch("/api/admin/payment-claims", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 // Multipart file upload — cannot go through rentMasterFetch (which forces a JSON

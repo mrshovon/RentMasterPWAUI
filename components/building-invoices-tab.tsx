@@ -18,6 +18,9 @@ import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, Select, PageHeader, EmptyState,
 } from "./ui";
 import { useT } from "../lib/i18n";
+import { PaymentClaimsPanel } from "./payment-claims-panel";
+import { claimMethodLabel } from "./pay-bill-modal";
+import type { ClaimMethod, PaymentClaim } from "../types/api";
 
 // =====================================================================================
 // 🏢 BUILDING ADMIN — SERVICE CHARGE
@@ -56,6 +59,11 @@ export function BuildingInvoicesTab({
   const [generating, setGenerating] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const [paying, setPaying] = useState<BuildingServiceInvoice | null>(null);
+  /** When opened from a claim, its method/reference/remarks are carried into the money form so
+   *  the admin does not have to retype what the payer already told them. */
+  const [claimPrefill, setClaimPrefill] = useState<{
+    method: ClaimMethod; reference: string | null; note: string | null;
+  } | null>(null);
   const [history, setHistory] = useState<BuildingServiceInvoice | null>(null);
   const [editing, setEditing] = useState<BuildingServiceInvoice | null>(null);
   const [receipt, setReceipt] = useState<
@@ -310,6 +318,17 @@ export function BuildingInvoicesTab({
         }
       />
 
+      <PaymentClaimsPanel
+        source="service_charge"
+        onServiceChargeConfirm={(c: PaymentClaim) => {
+          const inv = invoices.find((i) => i.id === c.ref_id);
+          if (!inv) { toast.error(t("Refresh the invoice list and try again.")); return; }
+          setClaimPrefill({ method: c.method, reference: c.reference, note: c.note });
+          setPaying(inv);
+        }}
+        onChanged={load}
+      />
+
       <Card className="p-4">
         <Field label="Billing month" hint="Invoices are listed and generated for this month.">
           <TextInput
@@ -423,7 +442,8 @@ export function BuildingInvoicesTab({
       <RecordPaymentModal
         invoice={paying}
         ownerName={paying ? ownerById[paying.owner_id]?.name || null : null}
-        onClose={() => setPaying(null)}
+        onClose={() => { setPaying(null); setClaimPrefill(null); }}
+        prefill={claimPrefill}
         onRecorded={load}
         onReceipt={setPendingReceiptId}
       />
@@ -692,12 +712,14 @@ function TotalRow({ total }: { total: number }) {
 /* ---------------------------------------------------------------- money */
 
 function RecordPaymentModal({
-  invoice, ownerName, onClose, onRecorded, onReceipt,
+  invoice, ownerName, onClose, onRecorded, onReceipt, prefill,
 }: {
   invoice: BuildingServiceInvoice | null;
   ownerName: string | null;
   onClose: () => void;
   onRecorded: () => Promise<void>;
+  /** Details from the payer's claim, carried into the note for cross-checking. */
+  prefill?: { method: ClaimMethod; reference: string | null; note: string | null } | null;
   /** Hands the parent the INVOICE ID once the reload has landed, so the receipt is built from the
    *  refreshed row rather than this modal's pre-payment copy of it. */
   onReceipt: (invoiceId: string) => void;
@@ -715,7 +737,13 @@ function RecordPaymentModal({
       amount: String(outstanding || ""),
       method: "cash",
       paidOn: new Date().toISOString().slice(0, 10),
-      note: "",
+      note: prefill
+        ? [
+            claimMethodLabel(t, prefill.method),
+            prefill.reference ? `#${prefill.reference}` : "",
+            prefill.note || "",
+          ].filter(Boolean).join(" · ").slice(0, 500)
+        : "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoice]);

@@ -12,15 +12,17 @@ import { buildReceiptHtml } from "../lib/receipt";
 import { buildOwnerStatementHtml, BuildingHeader } from "../lib/building-print";
 import { ReceiptModal } from "./receipt-modal";
 import { PrintModal } from "./print-modal";
+import { PayBillModal, claimMethodLabel } from "./pay-bill-modal";
 import { Card, StatCard, Badge, Button, Modal, PageHeader, EmptyState } from "./ui";
 
 // =====================================================================================
 // 🧾 FLAT OWNER — MY SERVICE CHARGE
 //
 // The read-only other side of the building admin's invoices. An owner never records money
-// against their own service charge — their building admin does — so there is nothing to submit
-// here, only to read. The tab is mounted by app/owner/page.tsx and only when the owner's plan
-// says they are in a building.
+// against their own service charge — their building admin does. But they CAN tell the admin HOW
+// they paid (cash, someone else, bank/MFS, Bangla QR) with an optional reference and remarks; the
+// open claim is what this screen shows as "sent — awaiting confirmation". No money moves here.
+// The tab is mounted by app/owner/page.tsx and only when the owner's plan says they are in a building.
 //
 // Unlike components/building-invoices-tab.tsx (an operator screen, English), this is end-user
 // facing and every string goes through t(). See lib/locales/bn.ts.
@@ -36,11 +38,11 @@ import { Card, StatCard, Badge, Button, Modal, PageHeader, EmptyState } from "./
 // bill, so there is no counterparty to send it to. Hence hideWhatsapp on ReceiptModal.
 // =====================================================================================
 
-const statusTone = (s: string): "emerald" | "amber" | "rose" =>
-  s === "paid" ? "emerald" : s === "partial" ? "amber" : "rose";
+const statusTone = (s: string, claimed?: boolean): "emerald" | "amber" | "rose" =>
+  s === "paid" ? "emerald" : (claimed || s === "partial") ? "amber" : "rose";
 
-const statusLabel = (s: string): string =>
-  s === "paid" ? "Paid" : s === "partial" ? "Partly paid" : "Unpaid";
+const statusLabel = (s: string, claimed?: boolean): string =>
+  s === "paid" ? "Paid" : s === "partial" ? "Partly paid" : claimed ? "Sent — awaiting confirmation" : "Unpaid";
 
 export function ServiceChargeTab() {
   const t = useT();
@@ -49,6 +51,7 @@ export function ServiceChargeTab() {
   const [open, setOpen] = useState<BuildingServiceInvoice | null>(null);
   const [receipt, setReceipt] = useState<{ html: string; fileName: string; month: string } | null>(null);
   const [statement, setStatement] = useState<string | null>(null);
+  const [payClaimInv, setPayClaimInv] = useState<BuildingServiceInvoice | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -195,7 +198,7 @@ export function ServiceChargeTab() {
                 </p>
               )}
               <p className="mt-2 text-sm text-muted">
-                {t("Your building administrator issues these invoices and records the payments.")}
+                {t("Your building administrator issues these invoices and records the payments. You can tell them how you paid.")}
               </p>
             </div>
           </div>
@@ -238,12 +241,26 @@ export function ServiceChargeTab() {
               cell: (inv) => formatCurrency(Number(inv.amount_paid || 0)) },
             { key: "status", label: "Status", slot: "badge",
               cell: (inv) => (
-                <Badge tone={statusTone(inv.payment_status)}>{t(statusLabel(inv.payment_status))}</Badge>
+                <div className="space-y-0.5">
+                  <Badge tone={statusTone(inv.payment_status, !!inv.claim)}>
+                    {t(statusLabel(inv.payment_status, !!inv.claim))}
+                  </Badge>
+                  {inv.claim && (
+                    <div className="text-[11px] text-subtle">
+                      {claimMethodLabel(t, inv.claim.method)}
+                      {inv.claim.reference ? ` · #${inv.claim.reference}` : ""}
+                    </div>
+                  )}
+                </div>
               ) },
           ]}
           actions={{
             label: "Details",
             items: (inv) => [
+              ...(inv.payment_status !== "paid" && !inv.claim ? [
+                { label: "Pay / mark sent", icon: Wallet, tone: "primary" as const,
+                  onClick: () => setPayClaimInv(inv) },
+              ] : []),
               { label: "View", icon: Eye, tone: "neutral", onClick: () => setOpen(inv) },
               // Offered at every status, exactly as the building admin's copy is: an unpaid
               // invoice still prints a receipt showing what is owed, and that is the document an
@@ -272,6 +289,17 @@ export function ServiceChargeTab() {
         title="Service charge statement"
         subtitle="Every month you have been billed, and the balance after each."
         fileName={`service-charge-statement-${new Date().toISOString().slice(0, 10)}`}
+      />
+      <PayBillModal
+        open={!!payClaimInv}
+        onClose={() => setPayClaimInv(null)}
+        payTo={res?.building?.serviceChargePayTo}
+        source="service_charge"
+        refId={payClaimInv?.id || ""}
+        amountLabel={payClaimInv
+          ? `${formatMonth(payClaimInv.billing_month)} · ${formatCurrency(Math.max(0, Number(payClaimInv.total_payable || 0) - Number(payClaimInv.amount_paid || 0)))}`
+          : ""}
+        onSubmitted={load}
       />
     </div>
   );
@@ -317,6 +345,17 @@ function InvoiceDetailModal({
 
       {invoice.note && (
         <p className="mt-4 rounded-xl bg-surface-2 px-4 py-3 text-sm text-muted">{invoice.note}</p>
+      )}
+
+      {invoice.claim && (
+        <div className="mt-4 rounded-xl bg-surface-2 px-4 py-3">
+          <div className="text-xs font-semibold text-heading">{t("Sent — awaiting confirmation")}</div>
+          <div className="mt-1 text-xs text-muted">
+            {claimMethodLabel(t, invoice.claim.method)}
+            {invoice.claim.reference ? ` · #${invoice.claim.reference}` : ""}
+            {invoice.claim.note ? ` · ${invoice.claim.note}` : ""}
+          </div>
+        </div>
       )}
 
       <h4 className="mt-6 text-sm font-semibold text-heading">{t("Payments")}</h4>

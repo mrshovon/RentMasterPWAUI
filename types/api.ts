@@ -81,6 +81,8 @@ export interface BillingLedger {
   // Relational joins
   properties?: { name: string } | null;
   tenants?: { name: string; phone: string } | null;
+  /** Open claim submitted by the tenant for this invoice, when there is one. */
+  claim?: PaymentClaim | null;
 }
 
 /** One installment against an invoice. Rent is often paid in parts, so an invoice has a list. */
@@ -134,6 +136,37 @@ export interface AccountProfile {
   role: string;
   /** True only while a super admin has granted this ONE-SHOT opt-in. Changing the email clears it. */
   emailChangeAllowed: boolean;
+}
+
+// ---- Payer-submitted payment claims (a message, never money) ----
+export type ClaimSource = "rent" | "service_charge";
+export type ClaimMethod = "cash" | "proxy" | "bank" | "p2p_qr";
+
+export interface PaymentClaim {
+  id: string;
+  source: ClaimSource;
+  ref_id: string;
+  payer_id: string;
+  payee_id: string;
+  method: ClaimMethod;
+  reference: string | null;
+  note: string | null;
+  status: "pending" | "confirmed" | "dismissed";
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  /** Added by the read routes so the queue can name the invoice without another fetch. */
+  refLabel?: string | null;
+  amount?: number | null;
+}
+
+/** Where a payer sends money. `defaultMethod` is preselected but always changeable. */
+export interface PayToConfig {
+  account: string | null;
+  qrUrl: string | null;
+  instructions: string | null;
+  methods: ClaimMethod[];
+  defaultMethod: ClaimMethod;
 }
 
 // ---- Platform maintenance window (admin-declared, app_settings.maintenance_mode) ----
@@ -381,6 +414,8 @@ export interface Building {
   updated_at: string;
   /** Only on GET /api/admin/building — how many owners are on the roster. */
   owner_count?: number;
+  /** Service-charge pay-to details, added by ADD_PAYMENT_CLAIMS.sql. */
+  serviceChargePayTo?: PayToConfig;
 }
 
 export type BuildingNoticeAudience = "all_owners" | "all_tenants" | "individual_owner";
@@ -517,6 +552,8 @@ export interface BuildingServiceInvoice {
   updated_at: string;
   /** Present on the single-invoice GET and on the owner's statement, not on the list. */
   payments?: BuildingServicePayment[];
+  /** Open claim from this flat owner — what the UI shows as awaiting confirmation. */
+  claim?: PaymentClaim | null;
 }
 
 /** GET /api/admin/building/statement — the flat owner's read of their own service charges.
@@ -538,6 +575,8 @@ export interface BuildingStatementResponse {
     signatoryName: string | null;
     signatoryTitle: string | null;
     signatureUrl: string | null;
+    /** Where flat owners should send their service charge. */
+    serviceChargePayTo?: PayToConfig;
   } | null;
   /** The caller's own name, for the party row on their receipt. */
   owner?: { name: string | null };

@@ -45,6 +45,8 @@ import { useT, useLang } from "../../lib/i18n";
 import { translateNoticeText } from "../../lib/notice-i18n";
 import { useUnreadNotices } from "../../lib/notices-seen";
 import { OwnerProfileCard } from "../../components/profile-card";
+import { PaymentClaimsPanel } from "../../components/payment-claims-panel";
+import { PayToSettingsCard } from "../../components/pay-to-settings-card";
 import { DataTable } from "../../components/data-table";
 import {
   Card, StatCard, Badge, Button, Modal, Field, TextInput, TextArea, Select,
@@ -2037,6 +2039,8 @@ function BillingTab({
           </div>
         }
       />
+      <PaymentClaimsPanel source="rent" />
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <StatCard label="Invoices" value={ledgers.length} accent="indigo" />
         <StatCard label="Outstanding" value={formatCurrency(outstanding)} accent="rose" />
@@ -3680,6 +3684,9 @@ function SettingsTab({
 
       {/* Who you are */}
       <OwnerProfileCard />
+
+      {/* Where tenants send rent, and which "I paid" options they may pick */}
+      <PayToSettingsCard kind="owner" />
 
       {/* WhatsApp receipt message */}
       <Card className="p-6">

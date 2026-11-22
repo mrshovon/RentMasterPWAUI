@@ -1,3 +1,8 @@
+- You can now tell your landlord or building administrator how you paid a bill — in person, through someone else, by bank transfer, or by scanning a Bangla QR code.
+- The payment method is preset to the one your landlord chose, but you can pick a different one any time.
+- Transaction number and remarks are optional for bank and QR payments, so the payee can cross-check them if they want.
+- Landlords and building administrators can add their account details and QR code in Settings, choose which payment methods they accept, and set the one shown first.
+- After you send the payment details, the bill shows as sent and awaiting confirmation until the payee records the money.
 - Administrators can now change a user's sign-in email from the owner details screen, with the new address taking effect straight away.
 - An administrator can allow one user to change their own email once from Settings. After they use it, that permission switches itself off again.
 - Whenever a sign-in email changes, a security notice is sent to both the old and the new address, and a notice appears in the app.

@@ -24,6 +24,7 @@ import { DashboardShell, NavItem } from "../../components/shell";
 import { useT } from "../../lib/i18n";
 import { AppSettingsCard } from "../../components/app-settings-card";
 import { SignatureCard } from "../../components/signature-card";
+import { PayToSettingsCard } from "../../components/pay-to-settings-card";
 import { BuildingInvoicesTab } from "../../components/building-invoices-tab";
 import { BuildingSpacesTab } from "../../components/building-spaces-tab";
 import { BuildingSetupTab } from "../../components/building-setup-tab";
@@ -1268,6 +1269,8 @@ function SettingsTab({
       {/* Its own card, not a field inside the form above: the upload is a separate API call and
           does not belong behind "Save building". It sits next to the TYPED signatory fields it
           complements. */}
+      <PayToSettingsCard kind="building" building={building} onSaved={onSaved} />
+
       <SignatureCard
         signatureUrl={signatureUrl}
         onSaved={onSignatureSaved}

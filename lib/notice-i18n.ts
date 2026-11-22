@@ -60,6 +60,12 @@ const TEMPLATES: { re: RegExp; en: string }[] = [
     re: /^Your sign-in email was changed to (.+)\. If this was not you, contact support\.$/,
     en: "Your sign-in email was changed to {0}. If this was not you, contact support.",
   },
+  // ---- service-charge claim (rent-master-pwa/lib/payment-claims.ts) ----
+  {
+    // "Karim says they have paid the service charge for 2026-08 (৳3,500). Please verify…"
+    re: /^(.+) says they have paid the service charge for (.+) \(৳(.+)\)\. Please verify the payment and confirm receipt\.$/,
+    en: "{0} says they have paid the service charge for {1} (৳{2}). Please verify the payment and confirm receipt.",
+  },
 ];
 
 /**
