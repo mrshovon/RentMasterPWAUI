@@ -412,6 +412,17 @@ export async function uploadFile(
   file: File,
   opts: { role?: "owner" | "tenant"; folder?: string } = {}
 ): Promise<string> {
+  return (await uploadFileMeta(file, opts)).url;
+}
+
+/**
+ * Same upload, but keeps the STORAGE PATH as well. Needed when the backend must fetch the file
+ * itself (email attachments): paths are ours to read, arbitrary URLs are not safe to accept.
+ */
+export async function uploadFileMeta(
+  file: File,
+  opts: { role?: "owner" | "tenant"; folder?: string } = {}
+): Promise<{ url: string; path: string }> {
   // `role` is accepted for call-site symmetry with rentMasterFetch but no longer read: the
   // backend derives identity from the bearer token, never from a caller-supplied role.
   const { folder } = opts;
@@ -451,7 +462,7 @@ export async function uploadFile(
   if (!response.ok || !json.success) {
     throw new Error(json.error || `Upload failed (${response.status}).`);
   }
-  return json.url as string;
+  return { url: json.url as string, path: json.path as string };
 }
 
 export async function rentMasterFetch<T = any>(

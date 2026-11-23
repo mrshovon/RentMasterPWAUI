@@ -1,4 +1,5 @@
 - Administrators can now send welcome and follow-up emails to a chosen user, a group of users, or a list of email addresses.
+- Emails from the admin panel can now include image or PDF attachments.
 - Some notices can now be tapped to take you straight to the section they are about, and they show a tap sign so you know.
 - Administrators can choose which menu a notice opens, or leave it as a plain message.
 - You can now tell your landlord or building administrator how you paid a bill — in person, through someone else, by bank transfer, or by scanning a Bangla QR code.

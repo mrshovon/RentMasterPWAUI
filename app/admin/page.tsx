@@ -10,7 +10,7 @@ import {
   ScrollText, ChevronDown, RefreshCw, Archive, LogIn, Type, Send,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { rentMasterFetch, uploadFile } from "../../lib/api-service";
+import { rentMasterFetch, uploadFile, uploadFileMeta } from "../../lib/api-service";
 import { toast } from "../../components/toast";
 import { confirmDialog, confirmChoice } from "../../components/confirm";
 import { useSessionGuard } from "../../lib/use-session";
@@ -4918,6 +4918,8 @@ function EmailsTab({ owners }: { owners: AdminOwner[] }) {
   const [preview, setPreview] = useState<EmailPreview | null>(null);
   const [checking, setChecking] = useState(false);
   const [sending, setSending] = useState(false);
+  const [attachments, setAttachments] = useState<{ name: string; path: string; size: number }[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   const ids = selected.join(",");
   const selectable = owners.filter((o) => o.email && !isSystemLogin(o.email));
@@ -4948,6 +4950,30 @@ function EmailsTab({ owners }: { owners: AdminOwner[] }) {
     setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   }
 
+  async function onFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ""; // allow picking the same file again after removing it
+    if (!files.length) return;
+    try {
+      setUploadingFile(true);
+      const next = [...attachments];
+      for (const f of files) {
+        if (next.length >= 3) { toast.error("You can attach at most 3 files."); break; }
+        if (!/^image\/(png|jpeg|jpg|webp|gif)$/.test(f.type) && f.type !== "application/pdf") {
+          toast.error("Only images and PDFs can be attached."); continue;
+        }
+        if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name} is over the 5MB limit.`); continue; }
+        if (next.reduce((s, a) => s + a.size, 0) + f.size > 8 * 1024 * 1024) {
+          toast.error("Attachments exceed 8MB in total."); break;
+        }
+        const meta = await uploadFileMeta(f, { folder: "email-attachments" });
+        next.push({ name: f.name, path: meta.path, size: f.size });
+      }
+      setAttachments(next);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setUploadingFile(false); }
+  }
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (!subjectEn.trim() || !bodyEn.trim()) {
@@ -4973,6 +4999,7 @@ function EmailsTab({ owners }: { owners: AdminOwner[] }) {
           subjectEn, bodyEn,
           subjectBn: showBn ? subjectBn : null,
           bodyBn: showBn ? bodyBn : null,
+          attachments: attachments.map(({ name, path }) => ({ name, path })),
         }),
       });
       toast.success(res.message);
@@ -5087,8 +5114,34 @@ function EmailsTab({ owners }: { owners: AdminOwner[] }) {
             </div>
           )}
 
+          <div className="space-y-2">
+            <span className="block text-sm font-semibold text-fg">Attachments</span>
+            <p className="text-xs text-muted">
+              Images or PDFs, up to 3 files and 8MB in total. Each file is also emailed as a copy.
+            </p>
+            <label className="inline-flex cursor-pointer items-center rounded-lg border border-line/[0.08] bg-overlay/[0.03] px-3 py-2 text-xs font-semibold text-fg hover:border-primary/40">
+              {uploadingFile ? "Uploading…" : "Add image or PDF"}
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+                multiple className="hidden" disabled={uploadingFile} onChange={onFiles} />
+            </label>
+            {attachments.length > 0 && (
+              <div className="space-y-1">
+                {attachments.map((a) => (
+                  <div key={a.path} className="flex items-center gap-2 rounded-lg bg-overlay/[0.03] px-3 py-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate text-fg">{a.name}</span>
+                    <span className="text-xs text-subtle">{(a.size / 1024 / 1024).toFixed(1)} MB</span>
+                    <Button type="button" size="sm" variant="secondary"
+                      onClick={() => setAttachments((list) => list.filter((x) => x.path !== a.path))}>
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <Button type="submit" loading={sending} icon={Send} className="w-full"
-            disabled={checking || !preview?.willSend || !!preview && !preview.ready}>
+            disabled={checking || uploadingFile || !preview?.willSend || !!preview && !preview.ready}>
             Send emails
           </Button>
         </form>
