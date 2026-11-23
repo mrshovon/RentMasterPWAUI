@@ -1683,6 +1683,21 @@ export const bn: Record<string, string> = {
   "About": "পরিচিতি",
   "About us": "আমাদের সম্পর্কে",
 
+  // ---------------------------------------------------------------- clickable notices
+  "Tap to open": "খুলতে টাপ করুন",
+  // Labels for the admin's notice-destination picker (admin console itself stays English).
+  "Overview (home)": "ওভারভিউ (হোম)",
+  "App home": "অ্যাপের হোম",
+  "Analytics": "বিশ্লেষণ",
+  "Buildings": "বিল্ডিং",
+  "Circulate": "প্রচার",
+  "Logs": "লগ",
+  "Messages": "বার্তা",
+  "Payment setup": "পেমেন্ট সেটআপ",
+  "Plans": "প্ল্যান",
+  "Reset log": "রিসেট লগ",
+  "Tickets": "টিকিট",
+
   // ---------------------------------------------------------------- payment claims / pay-to
   // A claim is a message, not money. The payer picks HOW they paid; the payee confirms later.
   "Tell us how you paid": "আপনি কীভাবে বিনিময় করেছেন তা জানান",

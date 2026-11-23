@@ -18,6 +18,7 @@ import { useTabState } from "../../lib/use-tab";
 import { useRevalidateOnFocus } from "../../lib/use-revalidate";
 import { BillingLedger, BillingPayment, MaintenanceLog, Notice, PaymentStatus, PriorityLevel, TenantProfile, Document, ServiceChargeBreakdown, RentRevision, PayToConfig } from "../../types/api";
 import { PayBillModal, claimMethodLabel } from "../../components/pay-bill-modal";
+import { openNoticeTarget } from "../../lib/notice-nav";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
@@ -367,15 +368,31 @@ export default function TenantDashboard() {
             <EmptyState icon={Bell} title="Inbox empty" hint="You'll see building updates and reminders here." />
           ) : (
             <div className="space-y-4">
-              {notices.map((n) => (
-                <Card key={n.id} className="space-y-2 p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="font-bold text-primary">{translateNoticeText(n.title, t)}</h3>
-                    <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at, lang)}</span>
-                  </div>
-                  <p className="text-sm leading-relaxed text-fg">{translateNoticeText(n.content, t)}</p>
-                </Card>
-              ))}
+              {notices.map((n) => {
+                const clickable = !!n.is_clickable && !!n.action_url;
+                const body = (
+                  <>
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="font-bold text-primary">{translateNoticeText(n.title, t)}</h3>
+                      <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at, lang)}</span>
+                    </div>
+                    <p className="text-sm leading-relaxed text-fg">{translateNoticeText(n.content, t)}</p>
+                    {clickable && (
+                      <p className="pt-1 text-xs font-semibold text-primary">{t("Tap to open")} →</p>
+                    )}
+                  </>
+                );
+                return (
+                  <Card key={n.id} className="space-y-2 p-5">
+                    {clickable ? (
+                      <button type="button" className="w-full text-left"
+                        onClick={() => openNoticeTarget(n.action_url!)}>
+                        {body}
+                      </button>
+                    ) : body}
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>

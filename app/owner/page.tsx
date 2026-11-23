@@ -46,6 +46,7 @@ import { translateNoticeText } from "../../lib/notice-i18n";
 import { useUnreadNotices } from "../../lib/notices-seen";
 import { OwnerProfileCard } from "../../components/profile-card";
 import { PaymentClaimsPanel } from "../../components/payment-claims-panel";
+import { openNoticeTarget } from "../../lib/notice-nav";
 import { PayToSettingsCard } from "../../components/pay-to-settings-card";
 import { DataTable } from "../../components/data-table";
 import {
@@ -2398,19 +2399,33 @@ function NoticesTab({ notices, onCreate }: { notices: Notice[]; onCreate: () => 
           action={<Button icon={Plus} onClick={onCreate}>{t("New notice")}</Button>} />
       ) : (
         <div className="space-y-4">
-          {notices.map((n) => (
-            <Card key={n.id} className="space-y-2 p-5">
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="font-bold text-primary">{translateNoticeText(n.title, t)}</h3>
-                <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at, lang)}</span>
-              </div>
-              <p className="text-sm leading-relaxed text-fg">{translateNoticeText(n.content, t)}</p>
-              <div className="flex items-center gap-2 pt-1">
-                <Badge tone="indigo">{t(scopeLabel(n))}</Badge>
-                <Badge tone="slate">{t(senderLabel(n))}</Badge>
-              </div>
-            </Card>
-          ))}
+          {notices.map((n) => {
+            const clickable = !!n.is_clickable && !!n.action_url;
+            const body = (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-bold text-primary">{translateNoticeText(n.title, t)}</h3>
+                  <span className="shrink-0 font-mono text-[10px] text-subtle">{formatDate(n.created_at, lang)}</span>
+                </div>
+                <p className="text-sm leading-relaxed text-fg">{translateNoticeText(n.content, t)}</p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Badge tone="indigo">{t(scopeLabel(n))}</Badge>
+                  <Badge tone="slate">{t(senderLabel(n))}</Badge>
+                  {clickable && <Badge tone="cyan">{t("Tap to open")} →</Badge>}
+                </div>
+              </>
+            );
+            return (
+              <Card key={n.id} className="space-y-2 p-5">
+                {clickable ? (
+                  <button type="button" className="w-full text-left"
+                    onClick={() => openNoticeTarget(n.action_url!)}>
+                    {body}
+                  </button>
+                ) : body}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

@@ -1,3 +1,6 @@
+- Administrators can now send welcome and follow-up emails to a chosen user, a group of users, or a list of email addresses.
+- Some notices can now be tapped to take you straight to the section they are about, and they show a tap sign so you know.
+- Administrators can choose which menu a notice opens, or leave it as a plain message.
 - You can now tell your landlord or building administrator how you paid a bill — in person, through someone else, by bank transfer, or by scanning a Bangla QR code.
 - The payment method is preset to the one your landlord chose, but you can pick a different one any time.
 - Transaction number and remarks are optional for bank and QR payments, so the payee can cross-check them if they want.

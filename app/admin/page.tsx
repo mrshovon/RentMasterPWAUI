@@ -7,7 +7,7 @@ import {
   RotateCcw, CircleDollarSign, Pencil, Power, Percent, LifeBuoy, MessageSquare, User, Copy,
   Wallet, Upload, Image as ImageIcon, X, Check, HardHat, Settings, Wrench,
   BarChart3, Radio, Smartphone, Globe, TrendingUp, TrendingDown, Minus, EyeOff,
-  ScrollText, ChevronDown, RefreshCw, Archive, LogIn, Type,
+  ScrollText, ChevronDown, RefreshCw, Archive, LogIn, Type, Send,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { rentMasterFetch, uploadFile } from "../../lib/api-service";
@@ -46,6 +46,9 @@ import {
   EmailField, PhoneField,
 } from "../../components/ui";
 import { validateEmail, validatePhone, buildingAdminLoginId, isSystemLogin } from "../../lib/validate";
+import {
+  NOTICE_TARGET_OPTIONS, noticeAudienceForScope, noticeAudienceForWelcome, type NoticeAudience,
+} from "../../lib/notice-targets";
 import { PLAN_ADDONS, AddonKey, addonsOnTier, FREE_TIER_ID } from "../../lib/addons";
 // The VERBATIM table. This console is English by standing decision (see lib/locales/bn.ts)
 // but renders DashboardShell, which puts a language toggle in its header — so a translating
@@ -207,6 +210,7 @@ export default function AdminDashboard() {
     { key: "notices", label: "Circulate", icon: Megaphone },
     { key: "tickets", label: "Tickets", icon: LifeBuoy, badge: metrics.openTickets },
     { key: "messages", label: "Messages", icon: Mail, badge: metrics.newMessages },
+    { key: "emails", label: "Emails", icon: Send },
     { key: "reset-log", label: "Reset log", icon: KeyRound },
     { key: "logs", label: "Logs", icon: ScrollText },
     { key: "settings", label: "Settings", icon: Settings },
@@ -411,6 +415,8 @@ export default function AdminDashboard() {
       {tab === "tickets" && <TicketsTab tickets={tickets} onOpen={setActiveTicket} />}
 
       {tab === "messages" && <MessagesTab messages={messages} onOpen={setActiveMessage} />}
+
+      {tab === "emails" && <EmailsTab owners={owners} />}
 
       {tab === "reset-log" && <ResetLogTab resets={resets} />}
 
@@ -4612,6 +4618,41 @@ function CirculateModeSwitch({ mode, onChange }: { mode: CirculateMode; onChange
  * Send twice does not double-message anyone. The count is fetched as a dry run first, so the
  * blast radius is visible on the button before anything goes out.
  */
+/** Optional click-through controls, shared by the one-off notice form and the welcome form. */
+function NoticeActionFields({
+  audience, clickable, actionUrl, onChange,
+}: {
+  audience: NoticeAudience;
+  clickable: boolean;
+  actionUrl: string;
+  onChange: (clickable: boolean, actionUrl: string) => void;
+}) {
+  return (
+    <div className="space-y-3 rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+      <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-fg">
+        <input type="checkbox" checked={clickable}
+          onChange={(e) => onChange(e.target.checked, actionUrl)} />
+        Make this notice clickable
+      </label>
+      <p className="text-xs text-muted">
+        Readers will see a “Tap to open” sign on the notice. Turn this on only when you want them
+        taken straight to a menu.
+      </p>
+      {clickable && (
+        <Field label="Open which menu?" required
+          hint="Only destinations that exist for the audience you chose are offered.">
+          <Select value={actionUrl} onChange={(e) => onChange(true, e.target.value)}>
+            <option value="">Choose a menu…</option>
+            {NOTICE_TARGET_OPTIONS[audience].map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </Select>
+        </Field>
+      )}
+    </div>
+  );
+}
+
 function WelcomePanel() {
   const AUDIENCES = [
     { key: "both", label: "New owners and tenants" },
@@ -4628,6 +4669,8 @@ function WelcomePanel() {
   const [days, setDays] = useState("7");
   const [title, setTitle] = useState("Welcome to Bari360 👋");
   const [content, setContent] = useState("");
+  const [clickable, setClickable] = useState(false);
+  const [actionUrl, setActionUrl] = useState("");
   const [preview, setPreview] = useState<{ count: number; dedupeAvailable: boolean } | null>(null);
   const [checking, setChecking] = useState(true);
   const [sending, setSending] = useState(false);
@@ -4635,6 +4678,7 @@ function WelcomePanel() {
   // Dry run whenever the audience changes, so the button always states the real reach.
   useEffect(() => {
     let cancelled = false;
+    setActionUrl(""); // destinations differ by audience — never carry one across a switch
     (async () => {
       try {
         setChecking(true);
@@ -4652,6 +4696,10 @@ function WelcomePanel() {
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
+    if (clickable && !actionUrl) {
+      toast.error("Choose which menu the tapped notice should open.");
+      return;
+    }
     if (!(await confirmDialog({
       title: "Send welcome message?",
       message: `This sends an in-app notice and a push notification to ${preview?.count ?? 0} user${preview?.count === 1 ? "" : "s"}.`,
@@ -4661,7 +4709,9 @@ function WelcomePanel() {
       setSending(true);
       const res = await rentMasterFetch<{ message: string }>("/api/super-admin/welcome", {
         method: "POST", role: "admin",
-        body: JSON.stringify({ title, content, audience, days: Number(days) }),
+        body: JSON.stringify({
+          title, content, audience, days: Number(days), clickable, actionUrl: clickable ? actionUrl : null,
+        }),
       });
       toast.success(res.message);
       setContent("");
@@ -4702,6 +4752,12 @@ function WelcomePanel() {
             value={content} onChange={(e) => setContent(e.target.value)} />
         </Field>
 
+        <NoticeActionFields
+          audience={noticeAudienceForWelcome(audience)}
+          clickable={clickable} actionUrl={actionUrl}
+          onChange={(c, u) => { setClickable(c); setActionUrl(u); }}
+        />
+
         <Button type="submit" loading={sending} icon={Megaphone} className="w-full"
           disabled={checking || count === 0}>
           {checking ? "Checking who's new…"
@@ -4723,6 +4779,8 @@ function CirculateTab({ owners }: { owners: AdminOwner[] }) {
   }>({ scope: "everyone", targetOwnerId: "", title: "", content: "" });
   const [saving, setSaving] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [clickable, setClickable] = useState(false);
+  const [actionUrl, setActionUrl] = useState("");
 
   const audience = CIRCULATE_AUDIENCES.find((a) => a.scope === form.scope)!;
   const selectedOwner = owners.find((o) => o.id === form.targetOwnerId);
@@ -4737,6 +4795,10 @@ function CirculateTab({ owners }: { owners: AdminOwner[] }) {
       toast.error("Choose which owner should receive this notice.");
       return;
     }
+    if (clickable && !actionUrl) {
+      toast.error("Choose which menu the tapped notice should open.");
+      return;
+    }
     try {
       setSaving(true);
       const res = await rentMasterFetch("/api/admin/notices", {
@@ -4746,6 +4808,7 @@ function CirculateTab({ owners }: { owners: AdminOwner[] }) {
           targetScope: form.scope,
           targetOwnerId: form.scope === "individual_owner" ? form.targetOwnerId : null,
           title: form.title, content: form.content,
+          clickable, actionUrl: clickable ? actionUrl : null,
         }),
       });
       if (res.success) {
@@ -4781,7 +4844,10 @@ function CirculateTab({ owners }: { owners: AdminOwner[] }) {
         <form onSubmit={submit} className="space-y-4">
           <Field label="Send to" required>
             <Select value={form.scope}
-              onChange={(e) => setForm({ ...form, scope: e.target.value as NoticeScope, targetOwnerId: "" })}>
+              onChange={(e) => {
+                setForm({ ...form, scope: e.target.value as NoticeScope, targetOwnerId: "" });
+                setActionUrl(""); // destinations are audience-specific
+              }}>
               {CIRCULATE_AUDIENCES.map((a) => (
                 <option key={a.scope} value={a.scope}>{a.label}</option>
               ))}
@@ -4810,8 +4876,220 @@ function CirculateTab({ owners }: { owners: AdminOwner[] }) {
             <TextArea required rows={5} placeholder="Write your announcement…" value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })} />
           </Field>
+
+          <NoticeActionFields
+            audience={noticeAudienceForScope(form.scope)}
+            clickable={clickable} actionUrl={actionUrl}
+            onChange={(c, u) => { setClickable(c); setActionUrl(u); }}
+          />
+
           <Button type="submit" loading={saving} icon={Inbox} className="w-full">
             Circulate to {audienceLabel}
+          </Button>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================ EMAILS */
+type EmailPreview = {
+  success: boolean;
+  mode: string;
+  count: number;
+  willSend: number;
+  cap: number;
+  skippedSystem: number;
+  ready: boolean;
+  sample: { email: string; name: string | null }[];
+};
+
+function EmailsTab({ owners }: { owners: AdminOwner[] }) {
+  const [mode, setMode] = useState("specific");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+  const [custom, setCustom] = useState("");
+  const [days, setDays] = useState("30");
+  const [subjectEn, setSubjectEn] = useState("");
+  const [bodyEn, setBodyEn] = useState("");
+  const [subjectBn, setSubjectBn] = useState("");
+  const [bodyBn, setBodyBn] = useState("");
+  const [showBn, setShowBn] = useState(false);
+  const [preview, setPreview] = useState<EmailPreview | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const ids = selected.join(",");
+  const selectable = owners.filter((o) => o.email && !isSystemLogin(o.email));
+  const q = search.trim().toLowerCase();
+  const shown = q
+    ? selectable.filter((o) => [o.name, o.email, o.phone].some((v) => String(v || "").toLowerCase().includes(q)))
+    : selectable;
+
+  // Dry run whenever the recipient selection changes. Sending never happens without a preview.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setChecking(true);
+        const qs = new URLSearchParams({ mode, ids, emails: custom, inactiveDays: days });
+        const res = await rentMasterFetch<EmailPreview>(`/api/super-admin/emails?${qs}`, { role: "admin" });
+        if (!cancelled) setPreview(res);
+      } catch {
+        if (!cancelled) setPreview(null);
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mode, ids, custom, days]);
+
+  function toggle(id: string) {
+    setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+  }
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    if (!subjectEn.trim() || !bodyEn.trim()) {
+      toast.error("Write a subject and a message first."); return;
+    }
+    if (preview && !preview.ready) {
+      toast.error("Email delivery is not switched on. Configure Brevo in Settings first."); return;
+    }
+    if (!preview?.willSend) {
+      toast.error("There is nobody to send this to."); return;
+    }
+    if (!(await confirmDialog({
+      title: "Send this email?",
+      message: `This will email ${preview.willSend} recipient${preview.willSend === 1 ? "" : "s"}.{name} is replaced with each person's name.`,
+      confirmLabel: "Send emails",
+    }))) return;
+    try {
+      setSending(true);
+      const res = await rentMasterFetch<{ message: string }>("/api/super-admin/emails", {
+        method: "POST", role: "admin",
+        body: JSON.stringify({
+          mode, ids: selected, emails: custom, inactiveDays: Number(days),
+          subjectEn, bodyEn,
+          subjectBn: showBn ? subjectBn : null,
+          bodyBn: showBn ? bodyBn : null,
+        }),
+      });
+      toast.success(res.message);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSending(false); }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Emails" subtitle="Send a welcome or follow-up email to one person or a chosen group." />
+      <Card className="max-w-3xl p-6">
+        <form onSubmit={send} className="space-y-5">
+          <Field label="Send to" required
+            hint="Tenants sign in with a phone number and have no email address, so they are not listed.">
+            <Select value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="specific">Selected users</option>
+              <option value="all">All users</option>
+              <option value="inactive">Users who have not signed in lately</option>
+              <option value="custom">Custom email list</option>
+            </Select>
+          </Field>
+
+          {mode === "specific" && (
+            <div className="space-y-2">
+              <SearchInput value={search} onChange={setSearch} placeholder="Find a user by name or email" />
+              <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-line/[0.08] p-2">
+                {shown.length === 0 && <p className="p-2 text-sm text-muted">No users match that search.</p>}
+                {shown.map((o) => (
+                  <label key={o.id}
+                    className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-overlay/[0.03]">
+                    <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggle(o.id)} />
+                    <span className="min-w-0 flex-1 truncate text-fg">
+                      {o.name || o.email}{" "}
+                      <span className="text-xs text-subtle">{o.name ? `— ${o.email}` : ""}</span>
+                    </span>
+                    <Badge tone="slate">{o.role}</Badge>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-subtle">{selected.length} selected</p>
+            </div>
+          )}
+
+          {mode === "inactive" && (
+            <Field label="Days since last sign-in" required hint="People who never signed in are included.">
+              <TextInput type="number" min={1} max={3650} value={days}
+                onChange={(e) => setDays(e.target.value)} />
+            </Field>
+          )}
+
+          {mode === "custom" && (
+            <Field label="Email addresses" required
+              hint="Separate addresses with commas, spaces or new lines.">
+              <TextArea rows={4} value={custom} onChange={(e) => setCustom(e.target.value)}
+                placeholder={"one@example.com\ntwo@example.com"} />
+            </Field>
+          )}
+
+          <div className="rounded-xl border border-line/[0.08] bg-overlay/[0.02] p-4">
+            {checking ? (
+              <p className="text-sm text-muted">Checking recipients…</p>
+            ) : preview ? (
+              <div className="space-y-2 text-sm">
+                <p className="font-semibold text-heading">
+                  Will send to {preview.willSend} recipient{preview.willSend === 1 ? "" : "s"}
+                  {preview.count > preview.willSend ? ` (${preview.count - preview.willSend} over the limit)` : ""}.
+                </p>
+                {preview.skippedSystem > 0 && (
+                  <p className="text-xs text-warning">
+                    {preview.skippedSystem} building login ID{preview.skippedSystem === 1 ? "" : "s"}
+                    {" "}cannot receive email and will be skipped.
+                  </p>
+                )}
+                {preview.sample.length > 0 && (
+                  <p className="text-xs text-muted">
+                    For example: {preview.sample.map((r) => r.email).join(", ")}
+                  </p>
+                )}
+                {!preview.ready && (
+                  <Alert>
+                    Email delivery is switched off. Add a key and sender in Settings → Email before sending.
+                  </Alert>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted">Could not check recipients.</p>
+            )}
+          </div>
+
+          <Field label="Subject (English)" required>
+            <TextInput required value={subjectEn} onChange={(e) => setSubjectEn(e.target.value)}
+              placeholder="Welcome to Bari360" />
+          </Field>
+          <Field label="Message (English)" required
+            hint="Use {name} to greet each person by name. Blank lines make new paragraphs.">
+            <TextArea required rows={6} value={bodyEn} onChange={(e) => setBodyEn(e.target.value)}
+              placeholder={"Hi {name},\n\nWelcome to Bari360 — here is what you can do next.\n\n— The team"} />
+          </Field>
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-fg">
+            <input type="checkbox" checked={showBn} onChange={(e) => setShowBn(e.target.checked)} />
+            Add a Bangla version
+          </label>
+          {showBn && (
+            <div className="space-y-4">
+              <Field label="Subject (Bangla)">
+                <TextInput value={subjectBn} onChange={(e) => setSubjectBn(e.target.value)} />
+              </Field>
+              <Field label="Message (Bangla)" hint="Left blank, readers get the English text in both halves.">
+                <TextArea rows={6} value={bodyBn} onChange={(e) => setBodyBn(e.target.value)} />
+              </Field>
+            </div>
+          )}
+
+          <Button type="submit" loading={sending} icon={Send} className="w-full"
+            disabled={checking || !preview?.willSend || !!preview && !preview.ready}>
+            Send emails
           </Button>
         </form>
       </Card>

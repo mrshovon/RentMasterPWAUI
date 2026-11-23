@@ -126,6 +126,9 @@ export interface Notice {
   title: string;
   content: string;
   created_at: string;
+  /** Set when the notice can be tapped to open a dashboard section. */
+  is_clickable?: boolean;
+  action_url?: string | null;
 }
 
 // ---- Signed-in owner/admin account (Supabase auth user) ----
