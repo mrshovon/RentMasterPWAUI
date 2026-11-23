@@ -4918,7 +4918,8 @@ function EmailsTab({ owners }: { owners: AdminOwner[] }) {
   const [preview, setPreview] = useState<EmailPreview | null>(null);
   const [checking, setChecking] = useState(false);
   const [sending, setSending] = useState(false);
-  const [attachments, setAttachments] = useState<{ name: string; path: string; size: number }[]>([]);
+  const [attachments, setAttachments] = useState<{ name: string; path: string; size: number; isImage: boolean }[]>([]);
+  const [inline, setInline] = useState<number[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
 
   const ids = selected.join(",");
@@ -4967,7 +4968,7 @@ function EmailsTab({ owners }: { owners: AdminOwner[] }) {
           toast.error("Attachments exceed 8MB in total."); break;
         }
         const meta = await uploadFileMeta(f, { folder: "email-attachments" });
-        next.push({ name: f.name, path: meta.path, size: f.size });
+        next.push({ name: f.name, path: meta.path, size: f.size, isImage: f.type.startsWith("image/") });
       }
       setAttachments(next);
     } catch (e: any) { toast.error(e.message); }
@@ -5000,6 +5001,7 @@ function EmailsTab({ owners }: { owners: AdminOwner[] }) {
           subjectBn: showBn ? subjectBn : null,
           bodyBn: showBn ? bodyBn : null,
           attachments: attachments.map(({ name, path }) => ({ name, path })),
+          inlineIndices: inline,
         }),
       });
       toast.success(res.message);
@@ -5117,7 +5119,9 @@ function EmailsTab({ owners }: { owners: AdminOwner[] }) {
           <div className="space-y-2">
             <span className="block text-sm font-semibold text-fg">Attachments</span>
             <p className="text-xs text-muted">
-              Images or PDFs, up to 3 files and 8MB in total. Each file is also emailed as a copy.
+              Images or PDFs, up to 3 files and 8MB in total. Every file stays attached as a copy.
+              Tick “Show in message” to also display an image inside the email; put {"{{image:1}}"}
+              in your message to choose where it goes, otherwise it is added at the end.
             </p>
             <label className="inline-flex cursor-pointer items-center rounded-lg border border-line/[0.08] bg-overlay/[0.03] px-3 py-2 text-xs font-semibold text-fg hover:border-primary/40">
               {uploadingFile ? "Uploading…" : "Add image or PDF"}
@@ -5126,12 +5130,27 @@ function EmailsTab({ owners }: { owners: AdminOwner[] }) {
             </label>
             {attachments.length > 0 && (
               <div className="space-y-1">
-                {attachments.map((a) => (
-                  <div key={a.path} className="flex items-center gap-2 rounded-lg bg-overlay/[0.03] px-3 py-2 text-sm">
-                    <span className="min-w-0 flex-1 truncate text-fg">{a.name}</span>
+                {attachments.map((a, i) => (
+                  <div key={a.path} className="flex flex-wrap items-center gap-2 rounded-lg bg-overlay/[0.03] px-3 py-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate text-fg">
+                      {a.name} <span className="text-xs text-subtle">({i + 1})</span>
+                    </span>
+                    {a.isImage && (
+                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg">
+                        <input type="checkbox" checked={inline.includes(i + 1)}
+                          onChange={(e) => setInline((list) => e.target.checked
+                            ? [...list, i + 1]
+                            : list.filter((n) => n !== i + 1))} />
+                        Show in message
+                      </label>
+                    )}
                     <span className="text-xs text-subtle">{(a.size / 1024 / 1024).toFixed(1)} MB</span>
                     <Button type="button" size="sm" variant="secondary"
-                      onClick={() => setAttachments((list) => list.filter((x) => x.path !== a.path))}>
+                      onClick={() => {
+                        setAttachments((list) => list.filter((x) => x.path !== a.path));
+                        setInline((list) => list.filter((n) => n !== i + 1)
+                          .map((n) => n > i + 1 ? n - 1 : n));
+                      }}>
                       Remove
                     </Button>
                   </div>
