@@ -1683,6 +1683,13 @@ export const bn: Record<string, string> = {
   "About": "পরিচিতি",
   "About us": "আমাদের সম্পর্কে",
 
+  // ---------------------------------------------------------------- overview help card
+  "Need a hand?": "সাহায্য লাগছে?",
+  "Open help guides": "সাহায্য গাইড খুলুন",
+  "Short guides on adding properties, tenants, invoices and getting paid.": "সম্পত্তি, ভাড়াটিয়া, চালান ও বিনিময় নিয়ে ছোট গাইড।",
+  "Short guides on your rent, how to pay, and how to flag a payment.": "ভাড়া, বিনিময় ও পেমেন্ট জানানোর ছোট গাইড।",
+  "Short guides on flats, service charge, payment claims and reports.": "ফ্ল্যাট, সার্ভিস চার্জ, বিনিময় দাবি ও রিপোর্টের ছোট গাইড।",
+
   // ---------------------------------------------------------------- help page
   "Help": "সাহায্য",
   "Short guides for each role. Choose yours below.": "প্রতিটি ভূমিকার জন্য ছোট গাইড। নিচে আপনারটি বাছুন।",

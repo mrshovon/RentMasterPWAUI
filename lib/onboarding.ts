@@ -33,6 +33,27 @@ export function setOnboardingDismissed(role: OnboardingRole, dismissed = true): 
   }
 }
 
+const helpKeyFor = (role: OnboardingRole) => `rentmaster-help:${role}:dismissed`;
+
+export function isHelpCardDismissed(role: OnboardingRole): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(helpKeyFor(role)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function useHelpCardDismiss(role: OnboardingRole) {
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => { setDismissed(isHelpCardDismissed(role)); }, [role]);
+  function dismiss() {
+    try { window.localStorage.setItem(helpKeyFor(role), "1"); } catch { /* private mode */ }
+    setDismissed(true);
+  }
+  return { dismissed, dismiss };
+}
+
 export function useOnboardingDismiss(role: OnboardingRole) {
   const [dismissed, setDismissed] = useState(false);
   // Read in an effect, not during render: SSR HTML must match the first client paint.

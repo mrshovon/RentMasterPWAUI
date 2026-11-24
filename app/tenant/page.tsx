@@ -21,6 +21,7 @@ import { PayBillModal, claimMethodLabel } from "../../components/pay-bill-modal"
 import { openNoticeTarget } from "../../lib/notice-nav";
 import { OnboardingChecklist, type OnboardingStepView } from "../../components/onboarding-checklist";
 import { useOnboardingDismiss } from "../../lib/onboarding";
+import { HelpCard } from "../../components/help-card";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
@@ -682,6 +683,8 @@ function HomeTab({
           onDismiss={dismissOnboarding}
         />
       )}
+      <HelpCard role="tenant"
+        description={t("Short guides on your rent, how to pay, and how to flag a payment.")} />
 
       {/* ---- The section header, which is also its collapse control ---- */}
       <SectionBanner

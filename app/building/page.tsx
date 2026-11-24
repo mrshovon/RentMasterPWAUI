@@ -27,6 +27,7 @@ import { SignatureCard } from "../../components/signature-card";
 import { PayToSettingsCard } from "../../components/pay-to-settings-card";
 import { OnboardingChecklist, type OnboardingStepView } from "../../components/onboarding-checklist";
 import { useOnboardingDismiss } from "../../lib/onboarding";
+import { HelpCard } from "../../components/help-card";
 import { normalizeWhatsappPhone, openWhatsapp } from "../../lib/whatsapp";
 import { BuildingInvoicesTab } from "../../components/building-invoices-tab";
 import { BuildingSpacesTab } from "../../components/building-spaces-tab";
@@ -449,6 +450,8 @@ function OverviewTab({
           onDismiss={dismissOnboarding}
         />
       )}
+      <HelpCard role="building"
+        description={t("Short guides on flats, service charge, payment claims and reports.")} />
 
       {/* ---- The section header, which is also its collapse control ---- */}
       <SectionBanner

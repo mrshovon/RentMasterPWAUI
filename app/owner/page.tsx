@@ -49,6 +49,7 @@ import { PaymentClaimsPanel } from "../../components/payment-claims-panel";
 import { openNoticeTarget } from "../../lib/notice-nav";
 import { OnboardingChecklist, type OnboardingStepView } from "../../components/onboarding-checklist";
 import { useOnboardingDismiss } from "../../lib/onboarding";
+import { HelpCard } from "../../components/help-card";
 import { PayToSettingsCard } from "../../components/pay-to-settings-card";
 import { DataTable } from "../../components/data-table";
 import {
@@ -1774,6 +1775,8 @@ function OverviewTab({
           onDismiss={dismissOnboarding}
         />
       )}
+      <HelpCard role="owner"
+        description={t("Short guides on adding properties, tenants, invoices and getting paid.")} />
 
       {/* ---- The section header, which is also its collapse control ---- */}
       <SectionBanner
