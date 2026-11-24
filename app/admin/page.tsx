@@ -1047,6 +1047,7 @@ function OwnersTab({
               cell: (o) => (
                 <span className="flex flex-wrap gap-1">
                   <Badge tone={o.suspended ? "rose" : "emerald"}>{o.suspended ? "Suspended" : "Active"}</Badge>
+                  {!o.last_sign_in_at && <Badge tone="amber">Never signed in</Badge>}
                   {o.permissions_revoked && <Badge tone="amber">No perms</Badge>}
                 </span>
               ) },

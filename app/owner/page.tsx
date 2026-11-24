@@ -15,7 +15,7 @@ import { toast } from "../../components/toast";
 import { confirmDialog } from "../../components/confirm";
 import { buildReceiptHtml } from "../../lib/receipt";
 import { ReceiptModal } from "../../components/receipt-modal";
-import { resolveReceiptMessage } from "../../lib/whatsapp";
+import { resolveReceiptMessage, normalizeWhatsappPhone, openWhatsapp } from "../../lib/whatsapp";
 import { useSessionGuard } from "../../lib/use-session";
 import { usePresenceHeartbeat } from "../../lib/presence";
 import { PLAN_ADDONS, addonsOnTier } from "../../lib/addons";
@@ -47,6 +47,8 @@ import { useUnreadNotices } from "../../lib/notices-seen";
 import { OwnerProfileCard } from "../../components/profile-card";
 import { PaymentClaimsPanel } from "../../components/payment-claims-panel";
 import { openNoticeTarget } from "../../lib/notice-nav";
+import { OnboardingChecklist, type OnboardingStepView } from "../../components/onboarding-checklist";
+import { useOnboardingDismiss } from "../../lib/onboarding";
 import { PayToSettingsCard } from "../../components/pay-to-settings-card";
 import { DataTable } from "../../components/data-table";
 import {
@@ -117,6 +119,9 @@ export default function OwnerDashboard() {
   const [ownerSignature, setOwnerSignature] = useState<string | null>(null);
   const [sigOpen, setSigOpen] = useState(false);
   const [whatsappTemplate, setWhatsappTemplate] = useState<string>("");
+  // Whether the owner has put in account/QR/instructions for tenants to pay. Part of the
+  // first-use checklist; read from the same settings call that loads the message templates.
+  const [payToReady, setPayToReady] = useState(false);
   const [receipt, setReceipt] = useState<{ html: string; phone: string | null; message: string; fileName: string } | null>(null);
   const [revealPasscode, setRevealPasscode] = useState<{ name: string; code: string } | null>(null);
   // Invoice awaiting a "payment received" entry, and the one whose installments are being reviewed.
@@ -142,6 +147,42 @@ export default function OwnerDashboard() {
         });
         if (res.passcode) setRevealPasscode({ name: t.name, code: res.passcode });
         toast.success("Passcode reset.");
+      } catch (e: any) { toast.error(e.message); }
+    });
+  }
+
+  // The tenant never signed up — the owner created them. A WhatsApp invite carrying a FRESH
+  // passcode is the single biggest thing that gets a new tenant into the app, so it is one tap
+  // from the tenant row. Resetting here is deliberate: passcodes are hashed, not recoverable.
+  async function inviteTenant(tn: Tenant) {
+    if (!(await confirmDialog({
+      title: t("Invite tenant on WhatsApp?"),
+      message: t("This generates a fresh passcode for {0} and opens WhatsApp with their login details.")
+        .replace("{0}", tn.name || ""),
+      confirmLabel: t("Invite"),
+    }))) return;
+    await run(`invite:${tn.id}`, async () => {
+      try {
+        const res = await rentMasterFetch<{ passcode?: string }>(`/api/admin/tenants/${tn.id}`, {
+          method: "PATCH", role: "owner", body: JSON.stringify({ resetPasscode: true }),
+        });
+        if (!res.passcode) {
+          toast.error(t("Could not get a passcode. Use Reset passcode and try again."));
+          return;
+        }
+        const phone = normalizeWhatsappPhone(tn.phone);
+        if (!phone) {
+          setRevealPasscode({ name: tn.name, code: res.passcode });
+          toast.error(t("This phone number cannot receive WhatsApp. Showing the passcode here instead."));
+          return;
+        }
+        const text = t("Hello {tenant}, your Bari360 login is phone {phone} and passcode {code}. Open the app to see your rent: {url}")
+          .replace("{tenant}", tn.name || "")
+          .replace("{phone}", tn.phone || "")
+          .replace("{code}", res.passcode)
+          .replace("{url}", process.env.NEXT_PUBLIC_APP_URL || "https://www.bari360.space");
+        openWhatsapp(phone, text);
+        toast.success(t("Invite opened in WhatsApp."));
       } catch (e: any) { toast.error(e.message); }
     });
   }
@@ -359,10 +400,15 @@ export default function OwnerDashboard() {
   // Load the owner's message templates (WhatsApp receipt + rent reminder) from Settings/auth metadata.
   const loadWhatsappTemplate = async () => {
     try {
-      const res = await rentMasterFetch<{ whatsappMessageTemplate: string | null; reminderMessageTemplate: string | null }>(
-        "/api/admin/owner/settings", { role: "owner" });
+      const res = await rentMasterFetch<{
+        whatsappMessageTemplate: string | null;
+        reminderMessageTemplate: string | null;
+        rentPayTo?: { account?: string | null; qrUrl?: string | null; instructions?: string | null };
+      }>("/api/admin/owner/settings", { role: "owner" });
       setWhatsappTemplate(res.whatsappMessageTemplate || "");
       setReminderTemplate(res.reminderMessageTemplate || "");
+      const payTo = res.rentPayTo;
+      setPayToReady(!!(payTo?.account || payTo?.qrUrl || payTo?.instructions));
     } catch { /* non-fatal — Settings tab shows an empty field */ }
   };
   useEffect(() => { loadWhatsappTemplate(); }, []);
@@ -495,12 +541,16 @@ export default function OwnerDashboard() {
         <OverviewTab
           properties={properties}
           tenants={tenants}
+          ledgers={ledgers}
           metrics={metrics}
           plan={plan}
           nav={nav}
           onNavigate={setTab}
           sessionName={session?.name}
           onQuickInvoice={() => setInvoiceOpen(true)}
+          onAddProperty={() => guardedOpen("property", () => setPropOpen(true))}
+          onAddTenant={() => guardedOpen("tenant", () => setTenantOpen(true))}
+          payToReady={payToReady}
         />
       )}
 
@@ -528,6 +578,7 @@ export default function OwnerDashboard() {
           onEdit={setEditTenant}
           onDocs={setDocsTenant}
           onResetPasscode={resetTenantPasscode}
+          onInvite={inviteTenant}
           onToggleLogin={toggleTenantLogin}
           isPending={isPending}
         />
@@ -597,6 +648,7 @@ export default function OwnerDashboard() {
           onTemplateSaved={setWhatsappTemplate}
           reminderTemplate={reminderTemplate}
           onReminderTemplateSaved={setReminderTemplate}
+          onPayToSaved={loadWhatsappTemplate}
         />
       )}
 
@@ -1554,9 +1606,10 @@ const OVERVIEW_OPEN_KEY = "bari360-overview-open";
 type TileTone = "neutral" | "primary" | "success" | "warning" | "danger";
 
 function OverviewTab({
-  properties, tenants, metrics, plan, nav, onNavigate, onQuickInvoice, sessionName,
+  properties, tenants, ledgers, metrics, plan, nav, onNavigate, onQuickInvoice, sessionName,
+  onAddProperty, onAddTenant, payToReady,
 }: {
-  properties: Property[]; tenants: Tenant[];
+  properties: Property[]; tenants: Tenant[]; ledgers: BillingLedger[];
   metrics: {
     occupied: number; selfOccupied: number; vacant: number; lettable: number;
     monthlyRevenue: number; outstanding: number; unpaidCount: number; openTickets: number;
@@ -1567,9 +1620,13 @@ function OverviewTab({
   nav: NavItem[];
   onNavigate: (key: string) => void;
   onQuickInvoice: () => void;
+  onAddProperty: () => void;
+  onAddTenant: () => void;
+  payToReady: boolean;
   sessionName?: string;
 }) {
   const t = useT();
+  const { dismissed: onboardingDismissed, dismiss: dismissOnboarding } = useOnboardingDismiss("owner");
 
   // Collapse state. Initialised to `true` and corrected on mount rather than read from storage
   // during render: reading localStorage while rendering desynchronises the server-rendered HTML
@@ -1648,6 +1705,39 @@ function OverviewTab({
   // whose order already matches the design.
   const tiles = nav.filter((n) => n.key !== "overview");
 
+  // Completion is derived from real data, so the card can never claim a step is done when the
+  // account has nothing to show. A dismissed card stays hidden on this device only.
+  const onboardingSteps: OnboardingStepView[] = [
+    {
+      label: t("Add your first property"),
+      help: t("A property is a unit you rent out. Add one before tenants or bills."),
+      actionLabel: t("Add property"),
+      done: properties.length > 0,
+      onGo: onAddProperty,
+    },
+    {
+      label: t("Add a tenant"),
+      help: t("Tenants sign in with a phone number and passcode you give them."),
+      actionLabel: t("Add tenant"),
+      done: tenants.length > 0,
+      onGo: onAddTenant,
+    },
+    {
+      label: t("Create a rent invoice"),
+      help: t("Bills the tenant for this month's rent."),
+      actionLabel: t("Create invoice"),
+      done: ledgers.length > 0,
+      onGo: onQuickInvoice,
+    },
+    {
+      label: t("Set payment details"),
+      help: t("Add your account or QR so tenants know where to pay."),
+      actionLabel: t("Set payment details"),
+      done: payToReady,
+      onGo: () => onNavigate("settings"),
+    },
+  ];
+
   return (
     <div className="space-y-3">
       {/* ---- Who is signed in, what they own, and the one action worth a shortcut ---- */}
@@ -1675,6 +1765,15 @@ function OverviewTab({
         </div>
         <Button icon={Plus} onClick={onQuickInvoice} className="shrink-0 rounded-full">Invoice</Button>
       </Card>
+
+      {!onboardingDismissed && (
+        <OnboardingChecklist
+          title={t("Get started with Bari360")}
+          subtitle={t("Four quick steps to get your rent flowing. You can hide this at any time.")}
+          steps={onboardingSteps}
+          onDismiss={dismissOnboarding}
+        />
+      )}
 
       {/* ---- The section header, which is also its collapse control ---- */}
       <SectionBanner
@@ -1905,11 +2004,12 @@ function ResetPasscodeButton({
 }
 
 function TenantsTab({
-  tenants, properties, disabledIds, onUpgrade, onAdd, onEdit, onDocs, onResetPasscode, onToggleLogin,
+  tenants, properties, disabledIds, onUpgrade, onAdd, onEdit, onDocs, onResetPasscode, onInvite, onToggleLogin,
   isPending,
 }: {
   tenants: Tenant[]; properties: Property[]; disabledIds: string[]; onUpgrade: () => void; onAdd: () => void;
   onEdit: (t: Tenant) => void; onDocs: (t: Tenant) => void; onResetPasscode: (t: Tenant) => void;
+  onInvite: (t: Tenant) => void;
   onToggleLogin: (t: Tenant) => void;
   isPending: (key: string) => boolean;
 }) {
@@ -1989,6 +2089,7 @@ function TenantsTab({
                 isDisabled(tn.id)
                   ? [{ label: "Upgrade", icon: ArrowUpCircle, tone: "neutral", onClick: onUpgrade }]
                   : [
+                      { label: t("Invite on WhatsApp"), icon: Send, tone: "primary", onClick: () => onInvite(tn) },
                       { label: "Edit", icon: Pencil, tone: "neutral", onClick: () => onEdit(tn) },
                       { label: "Docs", icon: FileText, tone: "neutral", onClick: () => onDocs(tn) },
                     ],
@@ -3652,10 +3753,12 @@ function SignatureModal({
 const WA_PLACEHOLDERS = ["{tenant}", "{month}", "{amount}", "{status}", "{property}"];
 
 function SettingsTab({
-  template, onTemplateSaved, reminderTemplate, onReminderTemplateSaved,
+  template, onTemplateSaved, reminderTemplate, onReminderTemplateSaved, onPayToSaved,
 }: {
   template: string; onTemplateSaved: (t: string) => void;
   reminderTemplate: string; onReminderTemplateSaved: (t: string) => void;
+  /** Refresh the checklist's "payment details" step right after a save. */
+  onPayToSaved?: () => void | Promise<void>;
 }) {
   const t = useT();
   const [text, setText] = useState(template);
@@ -3701,7 +3804,7 @@ function SettingsTab({
       <OwnerProfileCard />
 
       {/* Where tenants send rent, and which "I paid" options they may pick */}
-      <PayToSettingsCard kind="owner" />
+      <PayToSettingsCard kind="owner" onSaved={onPayToSaved} />
 
       {/* WhatsApp receipt message */}
       <Card className="p-6">

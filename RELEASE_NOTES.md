@@ -1,3 +1,7 @@
+- Building administrators now get a short, hideable setup guide covering house number, flat owners, payment details and the first service charge invoice.
+- Tenants now get a short, hideable guide on their home screen that explains their rent, how to pay, and how to flag a payment and keep the receipt.
+- Landlords can invite a tenant on WhatsApp with their login and a fresh passcode in one tap.
+- New property owners now get a short, hideable checklist on their home screen that walks them through setting up their first property, tenant, invoice and payment details.
 - Administrators can now send welcome and follow-up emails to a chosen user, a group of users, or a list of email addresses.
 - Emails from the admin panel can now include image or PDF attachments.
 - Images attached to an email can also be shown inside the message, either where you place them or at the end.

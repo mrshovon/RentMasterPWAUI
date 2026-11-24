@@ -19,6 +19,8 @@ import { useRevalidateOnFocus } from "../../lib/use-revalidate";
 import { BillingLedger, BillingPayment, MaintenanceLog, Notice, PaymentStatus, PriorityLevel, TenantProfile, Document, ServiceChargeBreakdown, RentRevision, PayToConfig } from "../../types/api";
 import { PayBillModal, claimMethodLabel } from "../../components/pay-bill-modal";
 import { openNoticeTarget } from "../../lib/notice-nav";
+import { OnboardingChecklist, type OnboardingStepView } from "../../components/onboarding-checklist";
+import { useOnboardingDismiss } from "../../lib/onboarding";
 import { formatCurrency, formatMonth, formatDate, ordinalDay } from "../../lib/format";
 import { DashboardShell, NavItem } from "../../components/shell";
 import { AttachmentStrip } from "../../components/attachments";
@@ -78,6 +80,7 @@ export default function TenantDashboard() {
   const [payTo, setPayTo] = useState<PayToConfig | null>(null);
   // The invoice whose "how did you pay?" modal is open.
   const [claimLedger, setClaimLedger] = useState<BillingLedger | null>(null);
+  const [payToOpen, setPayToOpen] = useState(false);
   const [receipt, setReceipt] = useState<{ html: string; fileName: string } | null>(null);
 
   // `first` blanks the screen with a spinner; a background revalidation must not, or returning to
@@ -250,6 +253,10 @@ export default function TenantDashboard() {
           nav={nav}
           sessionName={session?.name}
           onNavigate={setTab}
+          ledgers={ledgers}
+          payTo={payTo}
+          onShowPayTo={() => setPayToOpen(true)}
+          onReceipt={openTenantReceipt}
           onNewRequest={() => setTicketOpen(true)}
           onPayRent={() => metrics.dueLedger && markRentAsSent(metrics.dueLedger.id)}
           onBreakdown={() => metrics.dueLedger && setBreakdown(metrics.dueLedger)}
@@ -459,6 +466,27 @@ export default function TenantDashboard() {
       />
       <ReceiptModal open={!!receipt} onClose={() => setReceipt(null)}
         html={receipt?.html || ""} fileName={receipt?.fileName} />
+      <Modal open={payToOpen} onClose={() => setPayToOpen(false)} title={t("How to pay")}>
+        <div className="space-y-3">
+          {payTo?.qrUrl && (
+            <img src={payTo.qrUrl} alt={t("Payment QR code")}
+              className="mx-auto h-44 w-44 rounded-xl bg-white object-contain p-2" />
+          )}
+          {payTo?.account && (
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-muted">{t("Account details")}</div>
+              <p className="mt-1 whitespace-pre-wrap text-sm font-semibold text-fg">{payTo.account}</p>
+            </div>
+          )}
+          {payTo?.instructions && <p className="text-sm text-muted">{payTo.instructions}</p>}
+          {!payTo?.account && !payTo?.qrUrl && !payTo?.instructions && (
+            <p className="text-sm text-muted">
+              {t("Your landlord hasn't added payment details yet. Ask them how they want to receive rent.")}
+            </p>
+          )}
+        </div>
+      </Modal>
+
       <PayBillModal
         open={!!claimLedger}
         onClose={() => setClaimLedger(null)}
@@ -489,7 +517,7 @@ const HOME_OPEN_KEY = "bari360-tenant-home-open";
 type TileTone = "neutral" | "primary" | "success" | "warning" | "danger";
 
 function HomeTab({
-  profile, notices, metrics, nav, sessionName,
+  profile, notices, metrics, nav, sessionName, ledgers, payTo, onShowPayTo, onReceipt,
   onNavigate, onNewRequest, onPayRent, onBreakdown, onServiceBreakdown, onRentHistory,
 }: {
   profile: TenantProfile | null;
@@ -498,6 +526,10 @@ function HomeTab({
     dueLedger?: BillingLedger; openTickets: number; totalPaid: number; amountDue: number;
     ledgerCount: number; unpaidCount: number;
   };
+  ledgers: BillingLedger[];
+  payTo: PayToConfig | null;
+  onShowPayTo: () => void;
+  onReceipt: (l: BillingLedger) => void;
   /** The shell's own nav array. The tile grid is built from it so the two can never disagree
    *  about what exists, what it is called, or what its badge says. */
   nav: NavItem[];
@@ -511,6 +543,7 @@ function HomeTab({
 }) {
   const t = useT();
   const lang = useLang();
+  const { dismissed: onboardingDismissed, dismiss: dismissOnboarding } = useOnboardingDismiss("tenant");
 
   // Initialised to `true` and corrected on mount rather than read from storage during render:
   // reading localStorage while rendering desynchronises the server-rendered HTML from the
@@ -568,6 +601,40 @@ function HomeTab({
   // Every tab except this one. Order, labels and badges all come from nav.
   const tiles = nav.filter((n) => n.key !== "overview");
 
+  const paidLedger = ledgers.find((l) => l.payment_status === "paid");
+  const sentLedger = ledgers.find((l) => l.payment_status === "sent" || l.payment_status === "paid");
+  const payToReady = !!(payTo?.account || payTo?.qrUrl || payTo?.instructions);
+  const onboardingSteps: OnboardingStepView[] = [
+    {
+      label: t("See this month's rent"),
+      help: t("Your landlord's bills appear on the Rent tab. Tap to take a look."),
+      actionLabel: t("Open Rent"),
+      done: ledgers.length > 0,
+      onGo: () => onNavigate("billing"),
+    },
+    {
+      label: t("See how to pay"),
+      help: t("Your landlord can add an account or QR code so you know where to send rent."),
+      actionLabel: t("Payment details"),
+      done: payToReady,
+      onGo: onShowPayTo,
+    },
+    {
+      label: t("Tell your landlord when you've paid"),
+      help: t("Choose how you paid, add a transaction reference if you have one, and they will confirm."),
+      actionLabel: t("Mark as sent"),
+      done: !!sentLedger,
+      onGo: () => metrics.dueLedger?.payment_status === "unpaid" ? onPayRent() : onNavigate("billing"),
+    },
+    ...(paidLedger ? [{
+      label: t("Save your receipt"),
+      help: t("Your confirmed payment has a receipt you can download or share."),
+      actionLabel: t("Open receipt"),
+      done: false,
+      onGo: () => onReceipt(paidLedger),
+    }] : []),
+  ];
+
   return (
     <div className="space-y-3">
       {/* ---- Who is signed in, where they live, and the actions worth a shortcut ---- */}
@@ -606,6 +673,15 @@ function HomeTab({
           </Button>
         </div>
       </Card>
+
+      {!onboardingDismissed && (
+        <OnboardingChecklist
+          title={t("New here? Start with these")}
+          subtitle={t("A short guide to your rent, payments and receipts. Hide it whenever you like.")}
+          steps={onboardingSteps}
+          onDismiss={dismissOnboarding}
+        />
+      )}
 
       {/* ---- The section header, which is also its collapse control ---- */}
       <SectionBanner

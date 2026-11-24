@@ -25,6 +25,8 @@ import { useT } from "../../lib/i18n";
 import { AppSettingsCard } from "../../components/app-settings-card";
 import { SignatureCard } from "../../components/signature-card";
 import { PayToSettingsCard } from "../../components/pay-to-settings-card";
+import { OnboardingChecklist, type OnboardingStepView } from "../../components/onboarding-checklist";
+import { useOnboardingDismiss } from "../../lib/onboarding";
 import { BuildingInvoicesTab } from "../../components/building-invoices-tab";
 import { BuildingSpacesTab } from "../../components/building-spaces-tab";
 import { BuildingSetupTab } from "../../components/building-setup-tab";
@@ -308,6 +310,7 @@ function OverviewTab({
   onAdd: () => void;
 }) {
   const t = useT();
+  const { dismissed: onboardingDismissed, dismiss: dismissOnboarding } = useOnboardingDismiss("building");
 
   // Initialised to `true` and corrected on mount rather than read from storage during render:
   // reading localStorage while rendering desynchronises the server-rendered HTML from the
@@ -375,6 +378,40 @@ function OverviewTab({
   // Every tab except this one. Order, labels, badges and the add-on crowns all come from nav.
   const tiles = nav.filter((n) => n.key !== "overview");
 
+  // Completion comes from the same data the Overview already loaded — no new reads. A generated
+  // login is useless until the house number, pay-to details and the first invoice are in place.
+  const payTo = building?.serviceChargePayTo;
+  const onboardingSteps: OnboardingStepView[] = [
+    {
+      label: t("Set your house number"),
+      help: t("New flat owners get a login built from it. Existing logins keep the one they have."),
+      actionLabel: t("Open Settings"),
+      done: !!building?.house_no,
+      onGo: () => onNavigate("settings"),
+    },
+    {
+      label: t("Add your first flat owner"),
+      help: t("Flat owners see their service charge and can tell you how they paid."),
+      actionLabel: t("Add owner"),
+      done: metrics.owners > 0,
+      onGo: onAdd,
+    },
+    {
+      label: t("Set payment details"),
+      help: t("Add an account or QR so flat owners know where to send service charge."),
+      actionLabel: t("Payment details"),
+      done: !!(payTo?.account || payTo?.qrUrl || payTo?.instructions),
+      onGo: () => onNavigate("settings"),
+    },
+    {
+      label: t("Generate this month's service charge"),
+      help: t("Issues one invoice to every active flat based on its default charge."),
+      actionLabel: t("Open Service charge"),
+      done: metrics.invoiceCount > 0,
+      onGo: () => onNavigate("invoices"),
+    },
+  ];
+
   return (
     <div className="space-y-3">
       {/* ---- Which building this is, how big it is, and the one creation action ---- */}
@@ -402,6 +439,15 @@ function OverviewTab({
         </div>
         <Button icon={Plus} onClick={onAdd} className="shrink-0 rounded-full">Add owner</Button>
       </Card>
+
+      {!onboardingDismissed && (
+        <OnboardingChecklist
+          title={t("Set up your building")}
+          subtitle={t("Four steps to get your building running in Bari360. Hide it at any time.")}
+          steps={onboardingSteps}
+          onDismiss={dismissOnboarding}
+        />
+      )}
 
       {/* ---- The section header, which is also its collapse control ---- */}
       <SectionBanner

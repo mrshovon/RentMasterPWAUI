@@ -1683,6 +1683,59 @@ export const bn: Record<string, string> = {
   "About": "পরিচিতি",
   "About us": "আমাদের সম্পর্কে",
 
+  // ---------------------------------------------------------------- building first-use
+  "Set up your building": "আপনার বিল্ডিং সেট করুন",
+  "Four steps to get your building running in Bari360. Hide it at any time.": "Bari360-এ বিল্ডিং চালু করতে চারটি ধাপ। চাইলে যেকোনো সময় লুকাতে পারেন।",
+  "Set your house number": "হাউস নম্বর দিন",
+  "New flat owners get a login built from it. Existing logins keep the one they have.": "নতুন ফ্ল্যাট মালিকদের লগইন এটি থেকে তৈরি হয়। পুরোনো লগইন আগের মতোই থাকে।",
+  "Open Settings": "সেটিংস খুলুন",
+  "Add your first flat owner": "প্রথম ফ্ল্যাট মালিক যোগ করুন",
+  "Flat owners see their service charge and can tell you how they paid.": "ফ্ল্যাট মালিকেরা সার্ভিস চার্জ দেখতে পারেন এবং কীভাবে বিনিময় করেছেন তা জানাতে পারেন।",
+  "Add an account or QR so flat owners know where to send service charge.": "ফ্ল্যাট মালিকেরা কোথায় সার্ভিস চার্জ পাঠাবেন তা জানতে অ্যাকাউন্ট বা QR যোগ করুন।",
+  "Generate this month's service charge": "এই মাসের সার্ভিস চার্জ তৈরি করুন",
+  "Issues one invoice to every active flat based on its default charge.": "প্রতি সক্রিয় ফ্ল্যাটে তার ডিফল্ট চার্জ অনুযায়ী একটি চালান তৈরি করে।",
+  "Open Service charge": "সার্ভিস চার্জ খুলুন",
+
+  // ---------------------------------------------------------------- tenant invite
+  "Invite tenant on WhatsApp?": "ভাড়াটিয়াকে WhatsApp-এ আমন্ত্রণ করবেন?",
+  "This generates a fresh passcode for {0} and opens WhatsApp with their login details.": "এটি {0} এর জন্য নতুন পাসকোড তৈরি করবে এবং লগইনের তথ্য নিয়ে WhatsApp খুলবে।",
+  "Invite": "আমন্ত্রণ",
+  "Could not get a passcode. Use Reset passcode and try again.": "পাসকোড পাওয়া যায়নি। Reset passcode ব্যবহার করে আবার চেষ্টা করুন।",
+  "This phone number cannot receive WhatsApp. Showing the passcode here instead.": "এই ফোন নম্বরে WhatsApp পাওয়া যাবে না। পাসকোড এখানেই দেখানো হচ্ছে।",
+  "Hello {tenant}, your Bari360 login is phone {phone} and passcode {code}. Open the app to see your rent: {url}": "নমস্কার {tenant}, আপনার Bari360 লগইন: ফোন {phone}, পাসকোড {code}। ভাড়া দেখতে অ্যাপ খুলুন: {url}",
+  "Invite opened in WhatsApp.": "WhatsApp-এ আমন্ত্রণ খোলা হয়েছে।",
+  "Invite on WhatsApp": "WhatsApp-এ আমন্ত্রণ",
+
+  // ---------------------------------------------------------------- tenant first-use
+  "New here? Start with these": "নতুন? এগুলো দিয়ে শুরু করুন",
+  "A short guide to your rent, payments and receipts. Hide it whenever you like.": "ভাড়া, বিনিময় ও রিসিটের ছোট গাইড। চাইলে যেকোনো সময় লুকাতে পারেন।",
+  "See this month's rent": "এই মাসের ভাড়া দেখুন",
+  "Your landlord's bills appear on the Rent tab. Tap to take a look.": "আপনার বাড়ির মালিকের চালান Rent ট্যাবে দেখা যাবে। দেখতে টাপ করুন।",
+  "Open Rent": "Rent খুলুন",
+  "See how to pay": "কীভাবে বিনিময় করবেন",
+  "Your landlord can add an account or QR code so you know where to send rent.": "আপনার বাড়ির মালিক অ্যাকাউন্ট বা QR যোগ করতে পারেন, যাতে আপনি জানেন কোথায় পাঠাতে হবে।",
+  "Payment details": "বিনিময়ের তথ্য",
+  "Tell your landlord when you've paid": "বিনিময় করলে বাড়ির মালিককে জানান",
+  "Choose how you paid, add a transaction reference if you have one, and they will confirm.": "কীভাবে বিনিময় করেছেন তা বাছুন, থাকলে ট্রানজেকশন নম্বর যোগ করুন, তিনি নিশ্চিত করবেন।",
+  "Mark as sent": "পাঠানো হিসেবে চিহ্নিত",
+  "Save your receipt": "রিসিট সংরক্ষণ করুন",
+  "Your confirmed payment has a receipt you can download or share.": "নিশ্চিত বিনিময়ের রিসিট আপনি ডাউনলোড বা শেয়ার করতে পারেন।",
+  "Open receipt": "রিসিট খুলুন",
+  "How to pay": "কীভাবে বিনিময় করবেন",
+  "Your landlord hasn't added payment details yet. Ask them how they want to receive rent.": "আপনার বাড়ির মালিক এখনো বিনিময়ের তথ্য যোগ করেননি। ভাড়া কীভাবে পাঠাবেন তা তাদের জিজ্ঞাসা করুন।",
+
+  // ---------------------------------------------------------------- first-use checklist
+  "Hide": "লুকান",
+  "Get started with Bari360": "Bari360 দিয়ে শুরু করুন",
+  "Four quick steps to get your rent flowing. You can hide this at any time.": "ভাড়ার কাজ চালু করতে চারটি সহজ ধাপ। আপনি চাইলে এটি যেকোনো সময় লুকাতে পারেন।",
+  "Add your first property": "আপনার প্রথম সম্পত্তি যোগ করুন",
+  "A property is a unit you rent out. Add one before tenants or bills.": "সম্পত্তি হলো আপনার ভাড়া দেওয়া একটি ইউনিট। ভাড়াটিয়া বা চালান তৈরির আগে একটি যোগ করুন।",
+  "Tenants sign in with a phone number and passcode you give them.": "ভাড়াটিয়ারা আপনার দেওয়া ফোন নম্বর ও পাসকোড দিয়ে সাইন ইন করেন।",
+  "Create a rent invoice": "ভাড়ার চালান তৈরি করুন",
+  "Bills the tenant for this month's rent.": "এই মাসের ভাড়া ভাড়াটিয়াকে চার্জ করে।",
+  "Set payment details": "বিনিময়ের তথ্য সেট করুন",
+  "Add your account or QR so tenants know where to pay.": "ভাড়াটিয়ারা কোথায় বিনিময় করবে তা জানতে অ্যাকাউন্ট বা QR যোগ করুন।",
+
   // ---------------------------------------------------------------- clickable notices
   "Tap to open": "খুলতে টাপ করুন",
   // Labels for the admin's notice-destination picker (admin console itself stays English).
