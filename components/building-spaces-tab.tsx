@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DataTable } from "./data-table";
 import {
-  Plus, Home, Users, ReceiptText, Wallet, KeyRound, DoorOpen, CircleDollarSign,
+  Plus, Home, Users, ReceiptText, Wallet, KeyRound, DoorOpen, CircleDollarSign, Send,
 } from "lucide-react";
 import { rentMasterFetch } from "../lib/api-service";
 import { toast } from "./toast";
@@ -11,7 +11,7 @@ import { confirmDialog } from "./confirm";
 import { formatCurrency, formatDate, formatMonth } from "../lib/format";
 import { Building, Property, Tenant, BillingLedger, BillingPayment } from "../types/api";
 import { buildReceiptHtml } from "../lib/receipt";
-import { resolveReceiptMessage } from "../lib/whatsapp";
+import { resolveReceiptMessage, normalizeWhatsappPhone, openWhatsapp } from "../lib/whatsapp";
 import { ReceiptModal } from "./receipt-modal";
 import { validatePhone } from "../lib/validate";
 import {
@@ -207,6 +207,37 @@ export function BuildingSpacesTab({
     }
   }
 
+  async function inviteTenant(tn: Tenant) {
+    const ok = await confirmDialog({
+      title: t("Invite tenant on WhatsApp?"),
+      message: t("This generates a fresh passcode for {0} and opens WhatsApp with their login details.")
+        .replace("{0}", tn.name || ""),
+      confirmLabel: t("Invite"),
+    });
+    if (!ok) return;
+    try {
+      const res = await rentMasterFetch<{ passcode?: string }>(`/api/admin/tenants/${tn.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ resetPasscode: true }),
+      });
+      if (!res.passcode) { toast.error(t("Could not get a passcode. Try Reset passcode again.")); return; }
+      const phone = normalizeWhatsappPhone(tn.phone);
+      if (!phone) {
+        setPasscode({ name: tn.name, code: res.passcode });
+        toast.error(t("No valid WhatsApp number — showing the passcode here instead."));
+        return;
+      }
+      const text = t("Hello {tenant}, your Bari360 login for {building} is phone {phone} and passcode {code}. Open the app to see your rent: {url}")
+        .replace("{tenant}", tn.name || "")
+        .replace("{building}", building?.name || "your building")
+        .replace("{phone}", String(tn.phone || ""))
+        .replace("{code}", res.passcode)
+        .replace("{url}", process.env.NEXT_PUBLIC_APP_URL || "https://www.bari360.space");
+      openWhatsapp(phone, text);
+      toast.success(t("Invite opened in WhatsApp."));
+    } catch (e: any) { toast.error(e.message); }
+  }
+
   if (loading) return <Card className="p-8 text-center text-sm text-muted">Loading…</Card>;
 
   return (
@@ -260,6 +291,9 @@ export function BuildingSpacesTab({
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Button size="sm" icon={ReceiptText} onClick={() => setInvoiceFor(tenant)}>Bill rent</Button>
+                      <Button size="sm" variant="secondary" icon={Send} onClick={() => inviteTenant(tenant)}>
+                        {t("Invite")}
+                      </Button>
                       <Button size="sm" variant="ghost" icon={KeyRound} onClick={() => resetPasscode(tenant)}>
                         Passcode
                       </Button>

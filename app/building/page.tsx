@@ -5,7 +5,7 @@ import { DataTable } from "../../components/data-table";
 import {
   LayoutDashboard, Users, Settings, Plus, Pencil, KeyRound, Ban, ShieldCheck,
   Unlink, Building2, CircleDollarSign, ReceiptText, Home, HardHat, Wallet, Wrench,
-  Megaphone, FileText, CreditCard, Trash2, TriangleAlert, CheckCircle2,
+  Megaphone, FileText, CreditCard, Trash2, TriangleAlert, CheckCircle2, Send,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { rentMasterFetch } from "../../lib/api-service";
@@ -27,6 +27,7 @@ import { SignatureCard } from "../../components/signature-card";
 import { PayToSettingsCard } from "../../components/pay-to-settings-card";
 import { OnboardingChecklist, type OnboardingStepView } from "../../components/onboarding-checklist";
 import { useOnboardingDismiss } from "../../lib/onboarding";
+import { normalizeWhatsappPhone, openWhatsapp } from "../../lib/whatsapp";
 import { BuildingInvoicesTab } from "../../components/building-invoices-tab";
 import { BuildingSpacesTab } from "../../components/building-spaces-tab";
 import { BuildingSetupTab } from "../../components/building-setup-tab";
@@ -613,6 +614,44 @@ function OwnersTab({
   // the password belongs to — and a prompt cannot mask what is being typed, cannot display the
   // ID beside it, and is blocked outright in the Android WebView on some versions.
   const [resetting, setResetting] = useState<BuildingOwner | null>(null);
+  const [inviteInfo, setInviteInfo] = useState<{
+    name: string; loginId: string; password: string;
+  } | null>(null);
+
+  // Same "relay once" model the owner dashboard uses for tenants: generate a fresh credential,
+  // open WhatsApp with it, and if the phone is not reachable show it on screen instead.
+  async function inviteOwner(o: BuildingOwner) {
+    if (!(await confirmDialog({
+      title: t("Invite flat owner on WhatsApp?"),
+      message: t("This generates a fresh password for {0} and opens WhatsApp with their login details. Their login ID stays the same.")
+        .replace("{0}", o.name || ""),
+      confirmLabel: t("Invite"),
+    }))) return;
+    try {
+      setBusy(o.owner_id);
+      const res = await rentMasterFetch<{
+        data: { loginId: string; password: string };
+      }>(`/api/admin/building/owners/${o.owner_id}/invite`, { method: "POST" });
+      const { loginId, password } = res.data;
+      const phone = normalizeWhatsappPhone(o.phone);
+      if (!phone) {
+        setInviteInfo({ name: o.name || "", loginId, password });
+        toast.error(t("No valid WhatsApp number — showing the credentials here instead."));
+        return;
+      }
+      const text = t("Hello {name}, your Bari360 building login is {login} and password {password}. Open the app to see your service charge: {url}")
+        .replace("{name}", o.name || "")
+        .replace("{login}", loginId)
+        .replace("{password}", password)
+        .replace("{url}", process.env.NEXT_PUBLIC_APP_URL || "https://www.bari360.space");
+      openWhatsapp(phone, text);
+      toast.success(t("Invite opened in WhatsApp."));
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -676,6 +715,8 @@ function OwnersTab({
           actions={{
             label: "Actions",
             items: (o) => [
+              { label: t("Invite on WhatsApp"), icon: Send, tone: "primary",
+                loading: busy === o.owner_id, onClick: () => inviteOwner(o) },
               { label: "Edit", icon: Pencil, tone: "neutral", onClick: () => onEdit(o) },
               { label: "Password", icon: KeyRound, tone: "neutral",
                 loading: busy === o.owner_id, onClick: () => setResetting(o) },
@@ -701,6 +742,26 @@ function OwnersTab({
           setResetting(null);
         }}
       />
+
+      <Modal open={!!inviteInfo} onClose={() => setInviteInfo(null)} title={t("Share these credentials")}>
+        {inviteInfo && (
+          <div className="space-y-3 text-sm">
+            <p className="text-muted">
+              {t("This phone cannot receive WhatsApp. Copy the details below and send them to {0} yourself.")
+                .replace("{0}", inviteInfo.name)}
+            </p>
+            <div className="rounded-xl bg-surface-2 px-4 py-3">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-muted">{t("Login ID")}</div>
+              <div className="break-all font-mono text-sm font-semibold text-fg">{inviteInfo.loginId}</div>
+            </div>
+            <div className="rounded-xl bg-surface-2 px-4 py-3">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-muted">{t("Password")}</div>
+              <div className="break-all font-mono text-sm font-semibold text-fg">{inviteInfo.password}</div>
+            </div>
+            <Button onClick={() => setInviteInfo(null)} className="w-full">{t("I have written them down")}</Button>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

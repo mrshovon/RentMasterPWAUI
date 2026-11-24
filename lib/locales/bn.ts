@@ -1688,6 +1688,18 @@ export const bn: Record<string, string> = {
   "Short guides for each role. Choose yours below.": "প্রতিটি ভূমিকার জন্য ছোট গাইড। নিচে আপনারটি বাছুন।",
   "Choose your role": "আপনার ভূমিকা বাছুন",
 
+  // ---------------------------------------------------------------- building credential invites
+  "Invite flat owner on WhatsApp?": "ফ্ল্যাট মালিককে WhatsApp-এ আমন্ত্রণ করবেন?",
+  "This generates a fresh password for {0} and opens WhatsApp with their login details. Their login ID stays the same.": "এটি {0} এর জন্য নতুন পাসওয়ার্ড তৈরি করবে এবং লগইনের তথ্য নিয়ে WhatsApp খুলবে। তাদের লগইন আইডি অপরিবর্তিত থাকবে।",
+  "No valid WhatsApp number — showing the credentials here instead.": "এই ফোন নম্বরে WhatsApp পাওয়া যাবে না। তথ্য এখানেই দেখানো হচ্ছে।",
+  "No valid WhatsApp number — showing the passcode here instead.": "এই ফোন নম্বরে WhatsApp পাওয়া যাবে না। পাসকোড এখানেই দেখানো হচ্ছে।",
+  "Hello {name}, your Bari360 building login is {login} and password {password}. Open the app to see your service charge: {url}": "নমস্কার {name}, আপনার Bari360 বিল্ডিং লগইন: {login}, পাসওয়ার্ড: {password}। সার্ভিস চার্জ দেখতে অ্যাপ খুলুন: {url}",
+  "Share these credentials": "এই তথ্যগুলো শেয়ার করুন",
+  "This phone cannot receive WhatsApp. Copy the details below and send them to {0} yourself.": "এই ফোনে WhatsApp পাওয়া যাবে না। নিচের তথ্যগুলো কপি করে {0} কে নিজে পাঠান।",
+  "I have written them down": "আমি লিখে নিয়েছি",
+  "Could not get a passcode. Try Reset passcode again.": "পাসকোড পাওয়া যায়নি। আবার Passcode চাপুন।",
+  "Hello {tenant}, your Bari360 login for {building} is phone {phone} and passcode {code}. Open the app to see your rent: {url}": "নমস্কার {tenant}, {building} এর জন্য আপনার Bari360 লগইন: ফোন {phone}, পাসকোড {code}। ভাড়া দেখতে অ্যাপ খুলুন: {url}",
+
   // ---------------------------------------------------------------- building first-use
   "Set up your building": "আপনার বিল্ডিং সেট করুন",
   "Four steps to get your building running in Bari360. Hide it at any time.": "Bari360-এ বিল্ডিং চালু করতে চারটি ধাপ। চাইলে যেকোনো সময় লুকাতে পারেন।",

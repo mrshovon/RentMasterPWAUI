@@ -1,3 +1,4 @@
+- Building administrators can now invite flat owners and their own tenants on WhatsApp with fresh login details in one tap.
 - A new bilingual Help page has short guides for owners, tenants and building administrators, linked from the login screen, settings and the sidebar.
 - Building administrators now get a short, hideable setup guide covering house number, flat owners, payment details and the first service charge invoice.
 - Tenants now get a short, hideable guide on their home screen that explains their rent, how to pay, and how to flag a payment and keep the receipt.
