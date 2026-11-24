@@ -98,6 +98,10 @@ export function LegalPage({
             {t("About us")}
           </Link>
           <span aria-hidden="true">·</span>
+          <Link href="/help" className="transition hover:text-primary">
+            {t("Help")}
+          </Link>
+          <span aria-hidden="true">·</span>
           <Link href="/" className="transition hover:text-primary">
             {t("Sign in")}
           </Link>

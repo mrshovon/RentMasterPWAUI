@@ -1,3 +1,4 @@
+- A new bilingual Help page has short guides for owners, tenants and building administrators, linked from the login screen, settings and the sidebar.
 - Building administrators now get a short, hideable setup guide covering house number, flat owners, payment details and the first service charge invoice.
 - Tenants now get a short, hideable guide on their home screen that explains their rent, how to pay, and how to flag a payment and keep the receipt.
 - Landlords can invite a tenant on WhatsApp with their login and a fresh passcode in one tap.

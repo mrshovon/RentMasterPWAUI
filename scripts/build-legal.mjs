@@ -48,6 +48,15 @@ const DOCS = [
   // to it and it is deliberately not part of LEGAL_VERSION, which is read from termsEn below.
   { key: 'aboutEn', file: 'ABOUT_US.en.md' },
   { key: 'aboutBn', file: 'ABOUT_US.bn.md' },
+  // Help guides are informational too — not consented to, and not part of LEGAL_VERSION. The
+  // engine that parses them is exactly the one used for the policies, so a heading or list in a
+  // guide renders identically to the same markup in Terms.
+  { key: 'helpOwnerEn', file: 'HELP_OWNER.en.md' },
+  { key: 'helpOwnerBn', file: 'HELP_OWNER.bn.md' },
+  { key: 'helpTenantEn', file: 'HELP_TENANT.en.md' },
+  { key: 'helpTenantBn', file: 'HELP_TENANT.bn.md' },
+  { key: 'helpBuildingEn', file: 'HELP_BUILDING.en.md' },
+  { key: 'helpBuildingBn', file: 'HELP_BUILDING.bn.md' },
 ];
 
 const missing = DOCS.filter((d) => !fs.existsSync(path.join(SRC, d.file)));
@@ -100,6 +109,9 @@ export const LEGAL_VERSION = ${JSON.stringify(version)};
 export const LEGAL_DOCS = ${JSON.stringify(parsed, null, 2)} as unknown as {
   privacyEn: LegalDoc; privacyBn: LegalDoc; termsEn: LegalDoc; termsBn: LegalDoc;
   aboutEn: LegalDoc; aboutBn: LegalDoc;
+  helpOwnerEn: LegalDoc; helpOwnerBn: LegalDoc;
+  helpTenantEn: LegalDoc; helpTenantBn: LegalDoc;
+  helpBuildingEn: LegalDoc; helpBuildingBn: LegalDoc;
 };
 `;
 
@@ -113,7 +125,9 @@ const srcBody = `${banner}
  * console saves an OVERRIDE on top of this, so these strings stay the built-in fallback.
  */
 export const LEGAL_SOURCE: Record<
-  "privacyEn" | "privacyBn" | "termsEn" | "termsBn" | "aboutEn" | "aboutBn",
+  | "privacyEn" | "privacyBn" | "termsEn" | "termsBn" | "aboutEn" | "aboutBn"
+  | "helpOwnerEn" | "helpOwnerBn" | "helpTenantEn" | "helpTenantBn"
+  | "helpBuildingEn" | "helpBuildingBn",
   string
 > =
   ${JSON.stringify(raw, null, 2)};

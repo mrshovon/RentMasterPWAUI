@@ -1683,6 +1683,11 @@ export const bn: Record<string, string> = {
   "About": "পরিচিতি",
   "About us": "আমাদের সম্পর্কে",
 
+  // ---------------------------------------------------------------- help page
+  "Help": "সাহায্য",
+  "Short guides for each role. Choose yours below.": "প্রতিটি ভূমিকার জন্য ছোট গাইড। নিচে আপনারটি বাছুন।",
+  "Choose your role": "আপনার ভূমিকা বাছুন",
+
   // ---------------------------------------------------------------- building first-use
   "Set up your building": "আপনার বিল্ডিং সেট করুন",
   "Four steps to get your building running in Bari360. Hide it at any time.": "Bari360-এ বিল্ডিং চালু করতে চারটি ধাপ। চাইলে যেকোনো সময় লুকাতে পারেন।",

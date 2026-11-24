@@ -12063,8 +12063,2219 @@ export const LEGAL_DOCS = {
         ]
       }
     ]
+  },
+  "helpOwnerEn": {
+    "title": "Bari360 — Help for owners",
+    "blocks": [
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "Who this is for:"
+          },
+          {
+            "t": "text",
+            "v": " landlords managing their own properties. Your Home screen has a short setup guide you can hide at any time; this page explains the same steps in more detail."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Getting started"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Add a property."
+            },
+            {
+              "t": "text",
+              "v": " A property is one unit you rent out. Go to "
+            },
+            {
+              "t": "bold",
+              "v": "Properties"
+            },
+            {
+              "t": "text",
+              "v": " and tap "
+            },
+            {
+              "t": "bold",
+              "v": "Add property"
+            },
+            {
+              "t": "text",
+              "v": ". You cannot add a tenant or an invoice until at least one property exists."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Add a tenant."
+            },
+            {
+              "t": "text",
+              "v": " Go to "
+            },
+            {
+              "t": "bold",
+              "v": "Tenants"
+            },
+            {
+              "t": "text",
+              "v": " and tap "
+            },
+            {
+              "t": "bold",
+              "v": "Onboard tenant"
+            },
+            {
+              "t": "text",
+              "v": ". Choose the property, the monthly rent and the due day. A passcode is generated from the last four digits of their phone number — you can change it with "
+            },
+            {
+              "t": "bold",
+              "v": "Passcode"
+            },
+            {
+              "t": "text",
+              "v": " on that row."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Create a rent invoice."
+            },
+            {
+              "t": "text",
+              "v": " Go to "
+            },
+            {
+              "t": "bold",
+              "v": "Billing"
+            },
+            {
+              "t": "text",
+              "v": " and tap "
+            },
+            {
+              "t": "bold",
+              "v": "Create invoice"
+            },
+            {
+              "t": "text",
+              "v": " for the month. The total is rent plus any service charge and extra charges, minus a discount."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Add payment details."
+            },
+            {
+              "t": "text",
+              "v": " Go to "
+            },
+            {
+              "t": "bold",
+              "v": "Settings → Payment details"
+            },
+            {
+              "t": "text",
+              "v": ". Add your account number and/or a QR image, pick which payment methods you accept, and choose the one tenants see first. This is optional, but tenants are much less confused when it is there."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Invite the tenant."
+            },
+            {
+              "t": "text",
+              "v": " On the tenant row, tap "
+            },
+            {
+              "t": "bold",
+              "v": "Invite on WhatsApp"
+            },
+            {
+              "t": "text",
+              "v": ". This generates a fresh passcode and opens a message with their login and the app link. If their number cannot receive WhatsApp, the passcode is shown on screen instead so you can share it yourself."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "The monthly rent cycle"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "The tenant flags an invoice as "
+            },
+            {
+              "t": "bold",
+              "v": "sent"
+            },
+            {
+              "t": "text",
+              "v": ". You will see a notice and a push, and the bill shows "
+            },
+            {
+              "t": "bold",
+              "v": "Awaiting owner confirmation"
+            },
+            {
+              "t": "text",
+              "v": "."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Open "
+            },
+            {
+              "t": "bold",
+              "v": "Billing"
+            },
+            {
+              "t": "text",
+              "v": " to see any "
+            },
+            {
+              "t": "bold",
+              "v": "Payments awaiting confirmation"
+            },
+            {
+              "t": "text",
+              "v": ". The card shows the method the tenant chose and, for bank or QR payments, an optional transaction ID and remarks."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Cross-check against your bank or MFS statement, then tap "
+            },
+            {
+              "t": "bold",
+              "v": "Payment received"
+            },
+            {
+              "t": "text",
+              "v": " to record the money. This is the only action that marks the invoice paid and books income in your Accounts tab, if you have that module."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "If the details do not match, tap "
+            },
+            {
+              "t": "bold",
+              "v": "Dismiss"
+            },
+            {
+              "t": "text",
+              "v": ". The bill goes back to unpaid and the tenant can submit a fresh claim."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "A settled invoice is frozen: it cannot be edited or re-opened, so please check the figures before you confirm."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Receipts and sharing"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Every invoice has a "
+          },
+          {
+            "t": "bold",
+            "v": "Receipt"
+          },
+          {
+            "t": "text",
+            "v": " action. It opens a printable receipt with your signature if you have added one in Billing. You can download it as an image, print it, or send a text summary to the tenant on WhatsApp. The tenant has their own copy on their Rent tab."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Requests, notices and reminders"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Requests"
+            },
+            {
+              "t": "text",
+              "v": " shows maintenance tickets raised by tenants. Open one to update its status."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Notices"
+            },
+            {
+              "t": "text",
+              "v": " is where you broadcast an announcement to your tenants. A notice can be made clickable so tapping it opens the right tab."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Reminders"
+            },
+            {
+              "t": "text",
+              "v": " lets you schedule rent reminders. Same-day reminders send immediately; future and monthly ones need the platform's daily cron to be running."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Plans and limits"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Your "
+          },
+          {
+            "t": "bold",
+            "v": "Plan"
+          },
+          {
+            "t": "text",
+            "v": " tab shows your current tier, what it includes and what it costs. The free plan allows a small number of properties and tenants; if you reach the limit, the affected items become view-only until you choose a paid plan. Paid plans are activated after the platform team approves your payment."
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Staff management and Accounts are paid add-ons. When they are off, their tabs stay visible with an explanation and a way to ask about them."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "If something looks wrong"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "A bill you did not create? Check which property it belongs to in Billing."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "A tenant cannot sign in? Check their phone number, reset their passcode, and make sure they are not blocked under "
+            },
+            {
+              "t": "bold",
+              "v": "Login access"
+            },
+            {
+              "t": "text",
+              "v": " on their row."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Payment details not showing for a tenant? Re-open Settings and save again; the details are read from your account each time the tenant loads their dashboard."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Need the platform team? Use "
+            },
+            {
+              "t": "bold",
+              "v": "Support"
+            },
+            {
+              "t": "text",
+              "v": " on the Home screen."
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "helpOwnerBn": {
+    "title": "Bari360 — মালিকদের জন্য সাহায্য",
+    "blocks": [
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "কার জন্য:"
+          },
+          {
+            "t": "text",
+            "v": " নিজের সম্পত্তি পরিচালনা করা বাড়ির মালিক। আপনার হোম স্ক্রিনে একটি ছোট সেটআপ গাইড আছে, যা যেকোনো সময় লুকানো যায়। এই পাতায় একই ধাপগুলো আরও বিস্তারিতভাবে ব্যাখ্যা করা হয়েছে।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "শুরু করা"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "সম্পত্তি যোগ করুন।"
+            },
+            {
+              "t": "text",
+              "v": " সম্পত্তি মানে আপনার ভাড়া দেওয়া একটি ইউনিট। "
+            },
+            {
+              "t": "bold",
+              "v": "Properties"
+            },
+            {
+              "t": "text",
+              "v": "-এ গিয়ে "
+            },
+            {
+              "t": "bold",
+              "v": "Add property"
+            },
+            {
+              "t": "text",
+              "v": " চাপুন। কমপক্ষে একটি সম্পত্তি না থাকলে ভাড়াটিয়া বা চালান যোগ করা যাবে না।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "ভাড়াটিয়া যোগ করুন।"
+            },
+            {
+              "t": "text",
+              "v": " "
+            },
+            {
+              "t": "bold",
+              "v": "Tenants"
+            },
+            {
+              "t": "text",
+              "v": "-এ গিয়ে "
+            },
+            {
+              "t": "bold",
+              "v": "Onboard tenant"
+            },
+            {
+              "t": "text",
+              "v": " চাপুন। সম্পত্তি, মাসিক ভাড়া ও তারিখ বেছে নিন। ফোন নম্বরের শেষ চার digit থেকে একটি পাসকোড তৈরি হয় — সেই সারির "
+            },
+            {
+              "t": "bold",
+              "v": "Passcode"
+            },
+            {
+              "t": "text",
+              "v": " দিয়ে সেটি বদলাতে পারেন।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "ভাড়ার চালান তৈরি করুন।"
+            },
+            {
+              "t": "text",
+              "v": " "
+            },
+            {
+              "t": "bold",
+              "v": "Billing"
+            },
+            {
+              "t": "text",
+              "v": "-এ গিয়ে মাসের জন্য "
+            },
+            {
+              "t": "bold",
+              "v": "Create invoice"
+            },
+            {
+              "t": "text",
+              "v": " চাপুন। মোট = ভাড়া + সার্ভिस চার্জ + অতিরিক্ত খরচ − ছাড়।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "বিনিময়ের তথ্য দিন।"
+            },
+            {
+              "t": "text",
+              "v": " "
+            },
+            {
+              "t": "bold",
+              "v": "Settings → Payment details"
+            },
+            {
+              "t": "text",
+              "v": "-এ যান। অ্যাকাউন্ট নম্বর এবং/অথবা QR ছবি যোগ করুন, কোন পদ্ধতিগুলো গ্রহণ করেন তা বাছুন এবং ভাড়াটিয়ারা প্রথমে কোনটি দেখবে তা ঠিক করুন। এটি ঐচ্ছিক, কিন্তু থাকলে ভাড়াটিয়াদের কনফিউশন কমে।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "ভাড়াটিয়াকে আমন্ত্রণ করুন।"
+            },
+            {
+              "t": "text",
+              "v": " সারিতে "
+            },
+            {
+              "t": "bold",
+              "v": "Invite on WhatsApp"
+            },
+            {
+              "t": "text",
+              "v": " চাপুন। এটি নতুন পাসকোড তৈরি করে তাদের লগইন ও অ্যাপ লিংকসহ একটি বার্তা খুলে। যদি নম্বরে WhatsApp না পাওয়া যায়, পাসকোড পর্দায় দেখানো হয় যাতে আপনি নিজে পাঠাতে পারেন।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "মাসিক ভাড়ার চক্র"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "ভাড়াটিয়া চালানটি "
+            },
+            {
+              "t": "bold",
+              "v": "পাঠানো"
+            },
+            {
+              "t": "text",
+              "v": " হিসেবে চিহ্নিত করেন। আপনি একটি নোটিশ ও push পাবেন, এবং চালানে "
+            },
+            {
+              "t": "bold",
+              "v": "মালিকের নিশ্চিতকরণের অপেক্ষায়"
+            },
+            {
+              "t": "text",
+              "v": " দেখাবে।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Billing"
+            },
+            {
+              "t": "text",
+              "v": "-এ "
+            },
+            {
+              "t": "bold",
+              "v": "নিশ্চিতকরণের অপেক্ষায় বিনিময়"
+            },
+            {
+              "t": "text",
+              "v": " দেখুন। কার্ডে তাদের বাছা পদ্ধতি এবং ব্যাংক বা QR ক্ষেত্রে ঐচ্ছিক লেনদেন আইডি ও মন্তব্য থাকে।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "আপনার ব্যাংক বা MFS স্টেটমেন্টের সাথে মিলিয়ে দেখুন, তারপর "
+            },
+            {
+              "t": "bold",
+              "v": "Payment received"
+            },
+            {
+              "t": "text",
+              "v": " চাপুন। শুধু এই কাজটিই চালানকে পরিশোধিত করে এবং Accounts মডিউল থাকলে আয় লিপিবদ্ধ করে।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "তথ্য মেলে না হলে "
+            },
+            {
+              "t": "bold",
+              "v": "Dismiss"
+            },
+            {
+              "t": "text",
+              "v": " চাপুন। চালান আবার বকেয়া হয় এবং ভাড়াটিয়া নতুন করে তথ্য পাঠাতে পারেন।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "একবার পরিশোধিত চালান বদলানো যায় না। নিশ্চিত করার আগে হিসাব যাচাই করে নিন।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "রিসিট ও শেয়ার"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "প্রতিটি চালানে "
+          },
+          {
+            "t": "bold",
+            "v": "Receipt"
+          },
+          {
+            "t": "text",
+            "v": " অপশন আছে। আপনি সাইনেজসহ (যদি Billing-এ যোগ করে থাকেন) একটি রিসিট দেখতে পাবেন। সেটি ছবি হিসেবে ডাউনলোড, প্রিন্ট বা WhatsApp-ে টেক্সট হিসেবে পাঠানো যায়। ভাড়াটিয়ার নিজের Rent ট্যাবেও একই কপি থাকে।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "অনুরোধ, নোটিশ ও রিমাইন্ডার"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Requests"
+            },
+            {
+              "t": "text",
+              "v": "-এ ভাড়াটিয়াদের রক্ষণাবেক্ষণের অনুরোধ দেখা যায়। স্ট্যাটাস বদলাতে একটি খুলুন।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Notices"
+            },
+            {
+              "t": "text",
+              "v": " থেকে ভাড়াটিয়াদের কাছে বার্তা পাঠান। নোটিশ ক্লিকযোগ্য করে সঠিক ট্যাবে নিয়ে যাওয়া যায়।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Reminders"
+            },
+            {
+              "t": "text",
+              "v": " দিয়ে ভাড়ার রিমাইন্ডার নির্ধারণ করুন। একই দিনেরটি অবিলম্বে পাঠানো হয়; ভবিষ্যৎ ও মাসিক রিমাইন্ডারের জন্য প্ল্যাটফর্মের দৈনিক cron চালু থাকা প্রয়োজন।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "প্ল্যান ও সীমা"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "Plan"
+          },
+          {
+            "t": "text",
+            "v": " ট্যাবে আপনার বর্তমান প্ল্যান, এর সুবিধা ও দাম দেখা যায়। ফ্রি প্ল্যানে সীমিত সংখ্যক সম্পত্তি ও ভাড়াটিয়া রাখা যায়। সীমায় পৌঁছালে অতিরিক্ত আইটেম শুধু দেখা যায়, ব্যবহার করা যায় না। Paid প্ল্যান প্ল্যাটফর্ম টিমের পেমেন্ট অনুমোদনের পর চালু হয়।"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Staff management ও Accounts paid add-on। বন্ধ থাকলে তাদের ট্যাব ব্যাখ্যাসহ দেখা যায় এবং সম্পর্কে জিজ্ঞাসা করার সুবিধা থাকে।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "কিছু ঠিক না হলে"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "আপনি তৈরি না করা চালান? Billing-এ দেখুন কোন সম্পত্তির অধীনে আছে।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "ভাড়াটিয়া সাইন ইন করতে পারছেন না? ফোন নম্বর যাচাই করুন, পাসকোড রিসেট করুন এবং সারির "
+            },
+            {
+              "t": "bold",
+              "v": "Login access"
+            },
+            {
+              "t": "text",
+              "v": "-এ তাদের ব্লক করা হয়নি কিনা দেখুন।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "ভাড়াটিয়ার বিনিময়ের তথ্য দেখা যাচ্ছে না? Settings আবার খুলে Save করুন; তথ্য প্রতিবার ভাড়াটিয়ার ড্যাশবোর্ড লোডে আপনার অ্যাকাউন্ট থেকে নেওয়া হয়।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "প্ল্যাটফর্ম টিমের প্রয়োজন? হোম স্ক্রিনের "
+            },
+            {
+              "t": "bold",
+              "v": "Support"
+            },
+            {
+              "t": "text",
+              "v": " ব্যবহার করুন।"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "helpTenantEn": {
+    "title": "Bari360 — Help for tenants",
+    "blocks": [
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "Who this is for:"
+          },
+          {
+            "t": "text",
+            "v": " residents who sign in with a phone number and a passcode given by their landlord. Your Home screen has a short guide you can hide at any time."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Signing in"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Use your registered phone number and the passcode your landlord gave you. The passcode is not your phone number by default — it is generated when the landlord adds you, and they can reset it from their Tenants screen. If it stops working, ask them for a fresh one."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Your rent"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Home"
+            },
+            {
+              "t": "text",
+              "v": " shows the amount due and the quick actions for this month."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Rent"
+            },
+            {
+              "t": "text",
+              "v": " shows every invoice your landlord has issued, what you have paid and what is still due."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Tap an invoice to see its charge breakdown: rent, service charge, extras and any discount. A "
+            },
+            {
+              "t": "bold",
+              "v": "Download"
+            },
+            {
+              "t": "text",
+              "v": " or "
+            },
+            {
+              "t": "bold",
+              "v": "Receipt"
+            },
+            {
+              "t": "text",
+              "v": " action appears once a payment is confirmed."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "If an invoice shows "
+            },
+            {
+              "t": "bold",
+              "v": "Awaiting owner confirmation"
+            },
+            {
+              "t": "text",
+              "v": ", your landlord has been told about the payment and has not recorded it yet."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "How to pay"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "Your landlord may add an account number or a QR image in their Settings. On the Home screen, tap "
+          },
+          {
+            "t": "bold",
+            "v": "Payment details"
+          },
+          {
+            "t": "text",
+            "v": " to see them. If nothing is shown, ask your landlord how they want to receive rent — the app cannot show details they have not entered."
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "You can pay in person, ask someone else to pay on your behalf, transfer from a bank or MFS account, or scan a Bangla QR code with any payment app. All four choices are available when you flag a payment."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Telling your landlord you paid"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "On Home or Rent, tap "
+            },
+            {
+              "t": "bold",
+              "v": "Mark as sent"
+            },
+            {
+              "t": "text",
+              "v": " (or "
+            },
+            {
+              "t": "bold",
+              "v": "I've sent it"
+            },
+            {
+              "t": "text",
+              "v": ")."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Choose how you paid. The method is preselected to your landlord's default, but you can change it."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "For "
+            },
+            {
+              "t": "bold",
+              "v": "bank transfer"
+            },
+            {
+              "t": "text",
+              "v": " or "
+            },
+            {
+              "t": "bold",
+              "v": "Bangla QR"
+            },
+            {
+              "t": "text",
+              "v": ", you may add a transaction ID and remarks. Both are optional — they just help your landlord find the payment when they check their statement."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Submit. The bill now shows "
+            },
+            {
+              "t": "bold",
+              "v": "Awaiting owner confirmation"
+            },
+            {
+              "t": "text",
+              "v": ". Your landlord gets a notice and a push with the details you entered."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "You only need to do this once per invoice. If you made a mistake, ask your landlord to dismiss the claim so you can submit fresh details."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Requests, notices and documents"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Requests"
+            },
+            {
+              "t": "text",
+              "v": " is where you raise a maintenance issue. Add photos if you can — they help the owner understand the problem. You can see the status of each request here."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Notices"
+            },
+            {
+              "t": "text",
+              "v": " is your inbox for messages from the owner and the platform. A notice with a "
+            },
+            {
+              "t": "bold",
+              "v": "Tap to open"
+            },
+            {
+              "t": "text",
+              "v": " sign takes you straight to the section it is about."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Documents"
+            },
+            {
+              "t": "text",
+              "v": " holds files your owner has shared with you."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Settings"
+            },
+            {
+              "t": "text",
+              "v": " is where you change your name and phone, switch language, choose a notification sound, and change your password."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "If something looks wrong"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "A charge you do not recognise? Open the invoice to see its breakdown, then speak to your owner."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Payment marked sent but still showing as unpaid? Your owner has not confirmed it yet."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Cannot sign in? Ask your owner to reset your passcode."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Need to contact the platform team? Use "
+            },
+            {
+              "t": "bold",
+              "v": "Support"
+            },
+            {
+              "t": "text",
+              "v": " on the Home screen if it is shown, or speak to your owner first — they manage your account details."
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "helpTenantBn": {
+    "title": "Bari360 — ভাড়াটিয়াদের জন্য সাহায্য",
+    "blocks": [
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "কার জন্য:"
+          },
+          {
+            "t": "text",
+            "v": " ফোন নম্বর ও বাড়ির মালিকের দেওয়া পাসকোড দিয়ে সাইন ইন করা বাসিন্দা। আপনার হোম স্ক্রিনে একটি ছোট গাইড আছে, যা যেকোনো সময় লুকানো যায়।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "সাইন ইন"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "নিবন্ধিত ফোন নম্বর ও বাড়ির মালিকের দেওয়া পাসকোড ব্যবহার করুন। ডিফল্ট পাসকোড ফোন নম্বর নয় — মালিক আপনাকে যোগ করার সময় এটি তৈরি করেন এবং নিজের Tenants স্ক্রিন থেকে বদলাতে পারেন। পাসকোড কাজ না করলে তাদের কাছ থেকে নতুনটি চান।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "আপনার ভাড়া"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Home"
+            },
+            {
+              "t": "text",
+              "v": "-এ এই মাসের বকেয়া ও দ্রুত কাজগুলো দেখা যায়।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Rent"
+            },
+            {
+              "t": "text",
+              "v": "-এ মালিকের তৈরি সব চালান, কতটা দিয়েছেন ও কতটা বাকি আছে তা দেখা যায়।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "চালানে টাপ করে খরচের বিবরণ দেখুন: ভাড়া, সার্ভিস চার্জ, অতিরিক্ত খরচ ও ছাড়। পেমেন্ট নিশ্চিত হলে "
+            },
+            {
+              "t": "bold",
+              "v": "Download"
+            },
+            {
+              "t": "text",
+              "v": " বা "
+            },
+            {
+              "t": "bold",
+              "v": "Receipt"
+            },
+            {
+              "t": "text",
+              "v": " অপশন দেখা যায়।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "কোনো চালানে "
+            },
+            {
+              "t": "bold",
+              "v": "মালিকের নিশ্চিতকরণের অপেক্ষায়"
+            },
+            {
+              "t": "text",
+              "v": " দেখালে বোঝাতে হবে মালিককে জানানো হয়েছে কিন্তু তিনি এখনো লিপিবদ্ধ করেননি।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "কীভাবে বিনিময় করবেন"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "মালিক Settings-এ অ্যাকাউন্ট নম্বর বা QR ছবি যোগ করতে পারেন। হোম স্ক্রিনে "
+          },
+          {
+            "t": "bold",
+            "v": "Payment details"
+          },
+          {
+            "t": "text",
+            "v": " চাপলে সেগুলো দেখা যায়। কিছু না দেখালে মালিককে জিজ্ঞাসা করুন কোথায় ভাড়া পাঠাতে হবে — তিনি তথ্য না দিলে অ্যাপ দেখাতে পারবে না।"
+          }
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "আপনি সামনাসামনি, অন্য কেউ দিয়ে, ব্যাংক বা MFS থেকে, অথবা যেকোনো অ্যাপ থেকে বাংলা QR স্ক্যান করে বিনিময় করতে পারেন। পেমেন্ট জানানোর সময় চারটি পদ্ধতিই পাওয়া যায়।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "মালিককে বিনিময়ের কথা জানানো"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "Home বা Rent-এ "
+            },
+            {
+              "t": "bold",
+              "v": "Mark as sent"
+            },
+            {
+              "t": "text",
+              "v": " (বা "
+            },
+            {
+              "t": "bold",
+              "v": "I've sent it"
+            },
+            {
+              "t": "text",
+              "v": ") চাপুন।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "কীভাবে বিনিময় করেছেন তা বাছুন। মালিকের ডিফল্ট পদ্ধতি আগে থেকে নির্বাচিত থাকে, কিন্তু বদলাতে পারবেন।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "ব্যাংক ট্রান্সফার"
+            },
+            {
+              "t": "text",
+              "v": " বা "
+            },
+            {
+              "t": "bold",
+              "v": "বাংলা QR"
+            },
+            {
+              "t": "text",
+              "v": "-এ লেনদেন আইডি ও মন্তব্য যোগ করতে পারেন। দুটোই ঐচ্ছিক — শুধু মালিকের স্টেটমেন্টে খুঁজে পেতে সাহায্য করে।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "জমা দিন। চালানে এখন "
+            },
+            {
+              "t": "bold",
+              "v": "মালিকের নিশ্চিতকরণের অপেক্ষায়"
+            },
+            {
+              "t": "text",
+              "v": " দেখাবে। আপনার দেওয়া তথ্যসহ মালিকের কাছে নোটিশ ও push যাবে।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "প্রতি চালানে একবারই করতে হবে। ভুল হলে মালিককে দাবি বাতিল বলুন, তারপর নতুন তথ্য পাঠাতে পারবেন।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "অনুরোধ, নোটিশ ও ডকুমেন্ট"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Requests"
+            },
+            {
+              "t": "text",
+              "v": "-এ রক্ষণাবেক্ষণের অনুরোধ তৈরি করুন। ছবি যোগ করলে মালিক সমস্যা বুঝতে পারবেন। প্রতিটির স্ট্যাটাস এখানে দেখা যায়।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Notices"
+            },
+            {
+              "t": "text",
+              "v": " হলো মালিক ও প্ল্যাটফর্মের বার্তার ইনবক্স। যে নোটিশে "
+            },
+            {
+              "t": "bold",
+              "v": "খুলতে টাপ করুন"
+            },
+            {
+              "t": "text",
+              "v": " লেখা থাকে, সেটি টাপ করলে সঠিক সেকশনে যাবেন।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Documents"
+            },
+            {
+              "t": "text",
+              "v": "-এ মালিকের শেয়ার করা ফাইল থাকে।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Settings"
+            },
+            {
+              "t": "text",
+              "v": "-এ নাম ও ফোন বদলান, ভাষা বদলান, নোটিফিকেশনের শব্দ বেছে নিন ও পাসওয়ার্ড বদলান।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "কিছু ঠিক না হলে"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "অচেনা খরচ? চালান খুলে বিবরণ দেখুন, তারপর মালিকের সাথে কথা বলুন।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "পেমেন্ট পাঠানো দেখাচ্ছে কিন্তু এখনো বকেয়া? মালিক এখনো নিশ্চিত করেননি।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "সাইন ইন করতে পারছেন না? মালিককে পাসকোড রিসেট বলুন।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "প্ল্যাটফর্ম টিমের প্রয়োজন? হোম স্ক্রিনে "
+            },
+            {
+              "t": "bold",
+              "v": "Support"
+            },
+            {
+              "t": "text",
+              "v": " থাকলে ব্যবহার করুন, নইলে প্রথমে মালিকের সাথে কথা বলুন।"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "helpBuildingEn": {
+    "title": "Bari360 — Help for building administrators",
+    "blocks": [
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "Who this is for:"
+          },
+          {
+            "t": "text",
+            "v": " the person who manages a building and bills flat owners for service charge. Your Home screen has a short setup guide you can hide at any time."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Setting up the building"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Set your house number"
+            },
+            {
+              "t": "text",
+              "v": " in "
+            },
+            {
+              "t": "bold",
+              "v": "Settings"
+            },
+            {
+              "t": "text",
+              "v": ". Every NEW flat owner you add afterwards gets a login built from the house number and their phone number, such as "
+            },
+            {
+              "t": "code",
+              "v": "12a-3b-456@bari360.com"
+            },
+            {
+              "t": "text",
+              "v": ". Owners created before you set the number keep the email address they already have."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Add flat owners"
+            },
+            {
+              "t": "text",
+              "v": " under "
+            },
+            {
+              "t": "bold",
+              "v": "Owners"
+            },
+            {
+              "t": "text",
+              "v": ". Each owner can hold more than one flat. You can give each flat its own monthly service charge, and you can detach an owner if they leave."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Add payment details"
+            },
+            {
+              "t": "text",
+              "v": " in "
+            },
+            {
+              "t": "bold",
+              "v": "Settings → Payment details"
+            },
+            {
+              "t": "text",
+              "v": ". Account, QR image, instructions and the methods you accept are all shown to flat owners on their own statement screen. The method you choose as default is preselected for them, but they can change it."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Generate service charge"
+            },
+            {
+              "t": "text",
+              "v": " under "
+            },
+            {
+              "t": "bold",
+              "v": "Service charge"
+            },
+            {
+              "t": "text",
+              "v": ". Pick the month and press Generate. One invoice is created per active flat from its default charge. Pressing Generate again will not duplicate invoices."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Collecting service charge"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "Flat owners can tell you "
+            },
+            {
+              "t": "bold",
+              "v": "how"
+            },
+            {
+              "t": "text",
+              "v": " they paid from their own Service charge tab: in person, through someone else, by bank/MFS transfer, or with Bangla QR. Bank and QR payments may include a transaction ID and remarks to help you cross-check."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Your "
+            },
+            {
+              "t": "bold",
+              "v": "Service charge"
+            },
+            {
+              "t": "text",
+              "v": " tab shows "
+            },
+            {
+              "t": "bold",
+              "v": "Payments awaiting confirmation"
+            },
+            {
+              "t": "text",
+              "v": ". Open one to record the real receipt. The details the owner submitted are carried into the payment note so you can match them against your bank statement."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Recording a payment books income in your Accounts tab, if that module is enabled. A part payment leaves the invoice partly paid; recording the balance settles it."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "If the information does not match, dismiss the claim. The owner can then submit fresh details."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "A settled invoice is frozen: its buttons are switched off and the reason is shown underneath."
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Owners and their flats"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Owners"
+            },
+            {
+              "t": "text",
+              "v": " lists the roster, each owner's login and how many flats they hold. Open an owner to edit their name, phone, default charge or access."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "A flat owner signs in with the generated login ID and a passcode. If they lose it, reset it from their row and share it with them."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Spaces"
+            },
+            {
+              "t": "text",
+              "v": " is the building's own rentable property: its units, tenants and rent invoices. It uses the same tools a normal landlord has, scoped to the building's account."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "Notices, reports and the contract"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Notices"
+            },
+            {
+              "t": "text",
+              "v": " creates a printable record with a reference number and letterhead, and delivers a copy to every flat owner's in-app inbox. Make it clickable to send readers straight to a tab."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Reports"
+            },
+            {
+              "t": "text",
+              "v": " prints an income and expense statement or a single owner's statement, with running balances."
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Plan"
+            },
+            {
+              "t": "text",
+              "v": " shows the building's contract: its term, pay-by date, grace and warning windows, invoices and any renewal request. If a payment is late, a banner appears above every tab. Owners under the building see the same warning and become read-only until the contract is settled — the building is the paying customer."
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "If something looks wrong"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "An owner cannot sign in? Check their generated login ID, reset their passcode, and confirm their roster row is still active."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "An invoice is missing for a flat? Check that the flat is active and has a default service charge, then generate the month again."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "A flat owner says their payment is stuck at \"awaiting confirmation\"? Record or dismiss the claim in the Service charge tab — until then, the app can only show them as unpaid."
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "Need the platform team? Use the Plan tab or contact support through the app settings."
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  "helpBuildingBn": {
+    "title": "Bari360 — বিল্ডিং প্রশাসকদের জন্য সাহায্য",
+    "blocks": [
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "bold",
+            "v": "কার জন্য:"
+          },
+          {
+            "t": "text",
+            "v": " যে ব্যক্তি একটি বিল্ডিং পরিচালনা করেন ও ফ্ল্যাট মালিকদের কাছ থেকে সার্ভিস চার্জ নেন। আপনার হোম স্ক্রিনে একটি ছোট সেটআপ গাইড আছে, যা যেকোনো সময় লুকানো যায়।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "বিল্ডিং সেটআপ"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": true,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Settings-এ হাউস নম্বর দিন।"
+            },
+            {
+              "t": "text",
+              "v": " এরপর আপনি যে নতুন ফ্ল্যাট মালিক যোগ করবেন, তাদের লগইন হাউস নম্বর ও ফোন নম্বর থেকে তৈরি হবে, যেমন "
+            },
+            {
+              "t": "code",
+              "v": "12a-3b-456@bari360.com"
+            },
+            {
+              "t": "text",
+              "v": "। নম্বর দেওয়ার আগে তৈরি মালিকেরা আগের ইমেইলেই সাইন ইন করেন।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Owners-এ ফ্ল্যাট মালিক যোগ করুন।"
+            },
+            {
+              "t": "text",
+              "v": " এক মালিকের একাধিক ফ্ল্যাট থাকতে পারে। প্রতিটি ফ্ল্যাটের আলাদা মাসিক সার্ভিস চার্জ দিতে পারবেন এবং কেউ চলে গেলে roster থেকে সরাতে পারবেন।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Settings → Payment details-এ বিনিময়ের তথ্য দিন।"
+            },
+            {
+              "t": "text",
+              "v": " অ্যাকাউন্ট, QR ছবি, নির্দেশনা ও গ্রহণযোগ্য পদ্ধতি ফ্ল্যাট মালিকদের নিজেদের স্টেটমেন্ট স্ক্রিনে দেখা যায়। আপনি যেটি ডিফল্ট বেছে নেবেন সেটি তাদের আগে থেকে নির্বাচিত থাকে, কিন্তু তারা বদলাতে পারবেন।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Service charge-এ সার্ভিস চার্জ তৈরি করুন।"
+            },
+            {
+              "t": "text",
+              "v": " মাস বেছে Generate চাপুন। প্রতি সক্রিয় ফ্ল্যাটে তার ডিফল্ট চার্জ অনুযায়ী একটি করে চালান তৈরি হবে। দ্বিতীয় বার চাপলে ডুপ্লিকেট চালান তৈরি হবে না।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "সার্ভিস চার্জ সংগ্রহ"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "ফ্ল্যাট মালিকেরা নিজেদের Service charge ট্যাব থেকে জানাতে পারেন কীভাবে বিনিময় করেছেন: সামনাসামনি, অন্য কেউ দিয়ে, ব্যাংক বা MFS ট্রান্সফার, অথবা বাংলা QR। ব্যাংক ও QR-এ লেনদেন আইডি ও মন্তব্য যোগ করতে পারেন, যা আপনার জন্য মিলানো সহজ করে।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "আপনার "
+            },
+            {
+              "t": "bold",
+              "v": "Service charge"
+            },
+            {
+              "t": "text",
+              "v": " ট্যাবে "
+            },
+            {
+              "t": "bold",
+              "v": "নিশ্চিতকরণের অপেক্ষায় বিনিময়"
+            },
+            {
+              "t": "text",
+              "v": " দেখা যায়। একটি খুলে আসল প্রাপ্তি লিপিবদ্ধ করুন। মালিক যে তথ্য পাঠিয়েছেন তা পেমেন্ট নোটে চলে যায়, যাতে ব্যাংক স্টেটমেন্টের সাথে মেলানো যায়।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "পেমেন্ট লিপিবদ্ধ করলে Accounts মডিউল চালু থাকলে আয় লিপিবদ্ধ হয়। আংশিক বিনিময়ে চালান আংশিক পরিশোধিত থাকে; বাকি টাকা লিপিবদ্ধ করলে সম্পূর্ণ পরিশোধিত হয়।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "তথ্য মেলে না হলে দাবি বাতিল করুন। মালিক তখন নতুন তথ্য পাঠাতে পারবেন।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "p",
+        "runs": [
+          {
+            "t": "text",
+            "v": "একবার পরিশোধিত চালান বদলানো যায় না — বাটনগুলো বন্ধ থাকে এবং নিচে কারণ লেখা থাকে।"
+          }
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "মালিক ও তাদের ফ্ল্যাট"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Owners"
+            },
+            {
+              "t": "text",
+              "v": "-এ roster, প্রত্যেকের লগইন ও কতটি ফ্ল্যাট আছে তা দেখা যায়। নাম, ফোন, ডিফল্ট চার্জ বা অ্যাক্সেস বদলাতে একজনকে খুলুন।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "ফ্ল্যাট মালিক জেনারেট করা লগইন আইডি ও পাসকোড দিয়ে সাইন ইন করেন। পাসকোড হারালে সারি থেকে রিসেট করে তাদের দিন।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Spaces"
+            },
+            {
+              "t": "text",
+              "v": " হলো বিল্ডিংয়ের নিজস্ব ভাড়ার জায়গা: ইউনিট, ভাড়াটিয়া ও ভাড়ার চালান। সাধারণ মালিকের মতোই টুল ব্যবহার করা যায়, শুধু বিল্ডিং অ্যাকাউন্টের scoped।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "নোটিশ, রিপোর্ট ও চুক্তি"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "bold",
+              "v": "Notices"
+            },
+            {
+              "t": "text",
+              "v": " থেকে রেফারেন্স নম্বর ও letterhead-সহ প্রিন্টযোগ্য রেকর্ড তৈরি হয় এবং একটি কপি সব ফ্ল্যাট মালিকের ইনবক্সে যায়। ক্লিকযোগ্য করলে পাঠক সরাসরি সঠিক ট্যাবে যান।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Reports"
+            },
+            {
+              "t": "text",
+              "v": " থেকে আয়–ব্যয় বা একজন মালিকের স্টেটমেন্ট প্রিন্ট করা যায়, চলতি ব্যালেন্সসহ।"
+            }
+          ],
+          [
+            {
+              "t": "bold",
+              "v": "Plan"
+            },
+            {
+              "t": "text",
+              "v": "-এ বিল্ডিংয়ের চুক্তি দেখা যায়: মেয়াদ, পরিশোধের তারিখ, grace ও সতর্কতা সময়, চালান ও নবায়ন অনুরোধ। বিলম্ব হলে সব ট্যাবের উপরে একটি ব্যানার দেখা যায়। এর অধীনের মালিকেরাও একই সতর্কতা দেখেন ও শুধু পড়তে পারেন — বিল্ডিংই অর্থ প্রদানকারী।"
+            }
+          ]
+        ]
+      },
+      {
+        "type": "hr"
+      },
+      {
+        "type": "h",
+        "level": 2,
+        "runs": [
+          {
+            "t": "text",
+            "v": "কিছু ঠিক না হলে"
+          }
+        ]
+      },
+      {
+        "type": "list",
+        "ordered": false,
+        "items": [
+          [
+            {
+              "t": "text",
+              "v": "কোনো মালিক সাইন ইন করতে পারছেন না? জেনারেট করা লগইন যাচাই করুন, পাসকোড রিসেট করুন এবং roster সারি সক্রিয় কিনা দেখুন।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "কোনো ফ্ল্যাটের চালান নেই? ফ্ল্যাট সক্রিয় ও তার ডিফল্ট চার্জ আছে কিনা দেখুন, তারপর মাসটি আবার Generate করুন।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "মালিক বলছেন বিনিময় “অপেক্ষায়” আটকে আছে? Service charge ট্যাব থেকে দাবি লিপিবদ্ধ বা বাতিল করুন — তা না হলে অ্যাপ তাদের বকেয়া দেখাবে।"
+            }
+          ],
+          [
+            {
+              "t": "text",
+              "v": "প্ল্যাটফর্ম টিমের প্রয়োজন? Plan ট্যাব ব্যবহার করুন বা অ্যাপ সেটিংস থেকে সাপোর্টে যোগাযোগ করুন।"
+            }
+          ]
+        ]
+      }
+    ]
   }
 } as unknown as {
   privacyEn: LegalDoc; privacyBn: LegalDoc; termsEn: LegalDoc; termsBn: LegalDoc;
   aboutEn: LegalDoc; aboutBn: LegalDoc;
+  helpOwnerEn: LegalDoc; helpOwnerBn: LegalDoc;
+  helpTenantEn: LegalDoc; helpTenantBn: LegalDoc;
+  helpBuildingEn: LegalDoc; helpBuildingBn: LegalDoc;
 };
