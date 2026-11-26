@@ -111,13 +111,15 @@ export function PopupCarousel({
       aria-label={title || "Bari360"}
       // Light theme: a whitish frosted veil, as in the reference. Dark theme: the usual scrim, so the
       // screen does not flash white at night.
-      className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-surface/60 px-4 backdrop-blur-[3px] animate-fade-in dark:bg-scrim/75"
+      className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-surface/60 px-4 md:px-8 backdrop-blur-[3px] animate-fade-in dark:bg-scrim/75"
       style={{
         paddingTop: "calc(1.5rem + env(safe-area-inset-top))",
         paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))",
       }}
     >
-      <div className="relative my-auto w-full max-w-sm animate-scale-in">
+      {/* Mobile keeps max-w-sm untouched. Desktop gets a much wider card so the uploaded banner
+          (which carries the two-column copy) is actually readable. */}
+      <div className="relative my-auto w-full max-w-sm animate-scale-in md:max-w-2xl lg:max-w-3xl">
         <button
           type="button"
           onClick={onClose}
@@ -127,8 +129,10 @@ export function PopupCarousel({
           <X className="h-6 w-6" strokeWidth={2.25} />
         </button>
 
+        {/* The close button lives on the wrapper, so scroll/overflow on THIS element cannot clip
+            it. Mobile stays overflow-hidden; only desktop scrolls inside a 90vh cap. */}
         <div
-          className="overflow-hidden rounded-2xl bg-surface shadow-2xl ring-1 ring-line/[0.06]"
+          className="overflow-hidden rounded-2xl bg-surface shadow-2xl ring-1 ring-line/[0.06] md:max-h-[90vh] md:overflow-y-auto"
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
         >
@@ -142,7 +146,8 @@ export function PopupCarousel({
               // contain, never cover: banners carry text near their edges, and cropping a tall one to
               // the height cap would cut it off. Normal proportions fill the card edge to edge anyway.
               className={
-                "block w-full bg-surface-2 object-contain " + (hasText ? "max-h-[45dvh]" : "max-h-[75dvh]")
+                "block w-full bg-surface-2 object-contain " +
+                (hasText ? "max-h-[45dvh] md:max-h-[60dvh]" : "max-h-[75dvh] md:max-h-[80dvh]")
               }
             />
           )}
@@ -150,9 +155,9 @@ export function PopupCarousel({
           {/* The admin's own words are prose they typed, in the language they typed it in, and are
               not ours to rewrite — same rule as lib/notice-i18n.ts. Only our chrome is translated. */}
           {(hasText || !showImage) && (
-            <div className="max-h-[40dvh] space-y-2 overflow-y-auto p-5">
-              {title && <h2 className="pr-6 text-lg font-bold leading-snug text-heading">{title}</h2>}
-              {body && <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg">{body}</p>}
+            <div className="max-h-[40dvh] space-y-2 overflow-y-auto p-5 md:max-h-[32dvh] md:space-y-3 md:p-7">
+              {title && <h2 className="pr-6 text-lg font-bold leading-snug text-heading md:text-xl">{title}</h2>}
+              {body && <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg md:text-base">{body}</p>}
             </div>
           )}
         </div>

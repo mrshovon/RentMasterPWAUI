@@ -1,3 +1,4 @@
+- Announcement popups now scale up properly on larger screens, so the banners and their text are easy to read, while phones look the same as before.
 - Each home screen now has a small Help card that opens the right guide for that role in a new tab.
 - Fixed the recipient preview on the Emails page when choosing "not signed in lately" or a custom list.
 - Building administrators can now invite flat owners and their own tenants on WhatsApp with fresh login details in one tap.
