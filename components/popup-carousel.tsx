@@ -88,6 +88,9 @@ export function PopupCarousel({
   const body = (lang === "bn" ? item.bodyBn : item.bodyEn) || item.bodyEn || item.bodyBn;
   const showImage = !!item.imageUrl && !failedImages[item.id];
   const hasText = !!(title || body);
+  // Image-only banners have empty title/body by design. If that image is blocked by a network or
+  // fails to load, an empty padded card is worse than no card at all — skip it silently.
+  if (!showImage && !hasText) return null;
 
   const go = (next: number) => setIndex(Math.max(0, Math.min(items.length - 1, next)));
 

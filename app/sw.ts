@@ -40,6 +40,12 @@ const NEVER_CACHE = [
   "/api/logs",
   "/api/app/maintenance",
   "/api/app/latest-release",
+  // Announcements and login banners are admin-controlled CONFIG, not user data. A network-first
+  // 5s timeout on a slow or restricted connection can serve an old empty list from this cache
+  // forever — the same failure that made the in-app update popup undeliverable before
+  // latest-release was added above. These must always go to the network.
+  "/api/app/announcement",
+  "/api/app/login-popup",
 ];
 
 const serwist = new Serwist({
@@ -65,6 +71,14 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+// One-time cleanup for the stale answers the runtime cache may already be holding. New deployments
+// skipWaiting + clientsClaim, so this runs on the next app open and drops any old empty popup
+// response. The two popup endpoints above will never repopulate it.
+const LEGACY_API_CACHE = 'rentmaster-api-get';
+self.addEventListener('activate', (event) => {
+  event.waitUntil(caches.delete(LEGACY_API_CACHE));
+});
 
 // ---------------------------------------------------------------------------
 // Web Push (VAPID) — Phase B. Listeners are inert until the client subscribes.

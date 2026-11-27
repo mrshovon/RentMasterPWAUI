@@ -1,3 +1,5 @@
+- Announcement and login banners now open only once per browser tab session, so they do not keep reappearing while you move between pages.
+- Announcement and login banners now always check for a fresh copy when the app opens, so banners set by the team appear reliably on slower networks.
 - Announcement popups now scale up properly on larger screens, so the banners and their text are easy to read, while phones look the same as before.
 - Each home screen now has a small Help card that opens the right guide for that role in a new tab.
 - Fixed the recipient preview on the Emails page when choosing "not signed in lately" or a custom list.

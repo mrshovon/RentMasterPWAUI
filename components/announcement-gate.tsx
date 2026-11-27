@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PopupCarousel, type PopupSet } from "./popup-carousel";
 import { BACKEND_API_BASE, getStoredSession } from "../lib/api-service";
+import { markPopupShown, popupVersion, wasPopupShown } from "../lib/popup-session";
 
 // =============================================================================
 // Announcement popup — mounted once at the app root (next to MaintenanceGate).
@@ -42,11 +43,34 @@ export function AnnouncementGate() {
         }
         const json = await res.json();
         const next = json?.data as PopupSet | undefined;
+        const count = next?.items?.length || 0;
+        // Diagnostic, not noise: an empty list, a missing session and a blocked request all look
+        // identical on screen, and that ambiguity already hid a CORS failure on this project once.
+        console.info("[announcement] check", {
+          url, status: res.status, count,
+          role: getStoredSession()?.role || null,
+          path: window.location.pathname,
+        });
         // The route already strips inactive items, so anything here is meant to be seen.
         if (cancelled || !next?.items?.length) return;
+
+        // Do not mark the list as shown while the gate is hidden — a visitor who signs in during
+        // this tab session must still get the announcement.
+        const role = getStoredSession()?.role;
+        const path = window.location.pathname;
+        if (!role || role === "admin" || path === "/" || path.startsWith("/reset-password")) {
+          console.info("[announcement] skipped by audience gating", { role, path, count });
+          return;
+        }
+        const version = popupVersion(next);
+        if (wasPopupShown("announcement", version)) {
+          console.info("[announcement] already shown in this tab session", { version, count });
+          return;
+        }
         setSet(next);
-        if (shownVersion.current === next.updatedAt) return; // already shown this exact list
-        shownVersion.current = next.updatedAt;
+        if (shownVersion.current === version) return; // already shown this exact list this mount
+        shownVersion.current = version;
+        markPopupShown("announcement", version);
         setOpen(true);
       } catch (err) {
         console.warn(`[announcement] could not reach ${url} (CORS or network?) — showing nothing.`, err);

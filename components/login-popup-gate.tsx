@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PopupCarousel, type PopupSet } from "./popup-carousel";
 import { BACKEND_API_BASE, getStoredSession } from "../lib/api-service";
 import { useIsMobile } from "../lib/use-is-mobile";
+import { markPopupShown, popupVersion, wasPopupShown } from "../lib/popup-session";
 
 // =============================================================================
 // Login banners — mounted at the app root, shown on the signed-out login screen.
@@ -32,9 +33,18 @@ export function LoginPopupGate() {
     // Only the signed-out login screen. Checked before the request so every other page in the app
     // costs nothing at all.
     const path = typeof window !== "undefined" ? window.location.pathname : "";
-    if (path !== "/") return;
+    if (path !== "/") {
+      console.info("[login-popup] skipped — not the landing page", { path });
+      return;
+    }
     // Someone with a session is mid-redirect to their dashboard; a popup would flash and vanish.
-    if (getStoredSession()) return;
+    if (getStoredSession()) {
+      console.info("[login-popup] skipped — a session already exists");
+      return;
+    }
+    console.info("[login-popup] checking", {
+      narrowViewport: window.matchMedia?.("(max-width: 1023px)").matches ?? null,
+    });
 
     const url = `${BACKEND_API_BASE}/api/app/login-popup`;
     (async () => {
@@ -48,9 +58,17 @@ export function LoginPopupGate() {
         }
         const json = await res.json();
         const next = json?.data as PopupSet | undefined;
+        const count = next?.items?.length || 0;
+        console.info("[login-popup] check", { url, status: res.status, count });
         // The route already strips inactive banners, so anything here is meant to be seen.
         if (cancelled || !next?.items?.length) return;
+        const version = popupVersion(next);
+        if (wasPopupShown("login", version)) {
+          console.info("[login-popup] already shown in this tab session", { version, count });
+          return;
+        }
         setSet(next);
+        markPopupShown("login", version);
         setOpen(true);
       } catch (err) {
         console.warn(`[login-popup] could not reach ${url} (CORS or network?) — showing nothing.`, err);
